@@ -73,6 +73,22 @@ test('review is still required before consequential actions', () => {
   assert.match(ADAM_VOICE_PROMPT, phrase('Still get a real yes before anything that spends money, sends something, books something'));
 });
 
+test('leads with the answer, acts on a clear reversible ask, and does not invent a result', () => {
+  assert.match(ADAM_VOICE_PROMPT, phrase('Lead with the answer or what you just did'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('One or two sentences unless they asked for more'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('When the ask is clear and easy to undo, do it'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('use a preference, place or person you already know instead of asking again'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('Ask only when a wrong guess would spend money, send a message'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('one line naming the first step, then the result'));
+  assert.match(ADAM_VOICE_PROMPT, phrase('Never say something happened until a tool result says it did'));
+  assert.match(ADAM_VOICE_PROMPT, phrase("Before saying you can't, try mail, calendar, a reminder"));
+  assert.match(ADAM_VOICE_PROMPT, phrase("say what's missing and the one next step"));
+});
+
+test('spoken replies stay free of markdown', () => {
+  assert.match(ADAM_VOICE_PROMPT, phrase('like markdown, a list, a URL or a symbol'));
+});
+
 test('talks about outcomes, never exposes the machinery, unless asked', () => {
   assert.match(ADAM_VOICE_PROMPT, phrase('never tools, runtimes, tasks, workflows, or sessions, unless they ask'));
 });
