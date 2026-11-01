@@ -2,65 +2,133 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #0b0c0c;
+    --surface: #151617;
+    --ink: #f2ede4;
+    --muted: #c4beb6;
+    --line: rgba(242, 237, 228, 0.16);
+    --accent: #f2ede4;
+    --on-accent: #0b0c0c;
+    --ok: #8fd4ad;
+    --danger: #f0a598;
+  }
   body {
-    width: 300px;
+    width: 320px;
     margin: 0;
-    padding: 16px;
-    background: #17171a;
-    color: #ececed;
-    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    padding: 18px 18px 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   h1 {
-    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-    color: #8b8b93; margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin: 0 0 4px;
   }
-  .site { font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0 0 16px; color: #c9a227; word-break: break-all; }
-  label { display: block; font-size: 11px; color: #8b8b93; margin: 0 0 4px; }
+  .site {
+    font-size: 15px;
+    line-height: 1.35;
+    margin: 0 0 16px;
+    color: var(--muted);
+    word-break: break-all;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    margin: 0 0 6px;
+  }
   input {
-    width: 100%; box-sizing: border-box; padding: 7px 8px; margin: 0 0 12px;
-    background: #0f0f11; border: 1px solid #313136; border-radius: 6px;
-    color: #ececed; font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    color: var(--ink);
+    font: inherit;
   }
-  input:focus { outline: none; border-color: #c9a227; }
   button {
-    width: 100%; padding: 9px; border: 0; border-radius: 6px;
-    background: #c9a227; color: #17171a; font: inherit; font-weight: 600; cursor: pointer;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
   }
+  button:hover:not(:disabled) { background: #fff; }
   button:disabled { opacity: .5; cursor: default; }
   .linkish {
-    background: none; color: #8b8b93; font-size: 11px; font-weight: 400;
-    padding: 8px 0 0; text-decoration: underline; width: auto;
+    background: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 44px;
+    padding: 8px 0 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    width: auto;
   }
+  .linkish:hover:not(:disabled) { color: var(--ink); background: none; }
   #status { margin: 12px 0 0; white-space: pre-wrap; }
-  .ok { color: #4ea765; }
-  .err { color: #d9534f; }
-  .note { margin: 12px 0 0; font-size: 11px; color: #6f6f77; }
+  .ok { color: var(--ok); }
+  .err { color: var(--danger); }
+  .note { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
   .hidden { display: none; }
-  #sharedList { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid #2a2a2e; }
+  #sharedList { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
   #sharedList h2 {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-    color: #6f6f77; margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    margin: 0 0 8px;
   }
   .session-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    padding: 5px 0; font-size: 12px; color: #c7c7cc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 14px;
+    color: var(--ink);
   }
   .session-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .session-row button {
-    width: auto; padding: 3px 8px; margin: 0; background: none; border: 1px solid #3a3a3f;
-    color: #8b8b93; font-size: 11px; font-weight: 400; flex: none;
+    width: auto;
+    min-height: 32px;
+    padding: 6px 10px;
+    margin: 0;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    flex: none;
   }
-  .session-row button:hover:not(:disabled) { color: #d9534f; border-color: #d9534f; }
+  .session-row button:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: none; }
+  :focus { outline: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 <body>
 
-  <!-- Shown until signed in. -->
-  <section id="signin" class="hidden">
-    <h1>Sign in to Oxy</h1>
-    <p class="site">Connect</p>
+  <section id="signin">
+    <h1>Sign in to Adam</h1>
+    <p class="site">Share a site you are already signed in to.</p>
 
     <label for="userId">User ID</label>
     <input id="userId" type="text" autocomplete="username" autocapitalize="off" spellcheck="false">
@@ -69,16 +137,15 @@
     <input id="password" type="password" autocomplete="current-password">
 
     <button id="signInBtn">Sign in</button>
-    <p class="note">Signed in once. Your password goes straight to your own Oxy server and is not stored.</p>
+    <p class="note">Signed in once. Your password goes straight to your Adam server and is not stored.</p>
   </section>
 
-  <!-- Shown once signed in. -->
   <section id="share" class="hidden">
-    <h1>Share this site with Oxy</h1>
+    <h1>Share this site</h1>
     <p class="site" id="site">…</p>
     <button id="shareBtn" disabled>Share session</button>
     <button id="signOutBtn" class="linkish">Sign out</button>
-    <p class="note">Only this site's cookies are sent. Oxy checks again on its side and drops anything else.</p>
+    <p class="note">Only this site's cookies are sent. Adam checks again on its side and drops anything else.</p>
 
     <div id="sharedList" class="hidden">
       <h2>Shared sites</h2>
@@ -86,7 +153,7 @@
     </div>
   </section>
 
-  <p id="status"></p>
+  <p id="status" role="status"></p>
 
   <script src="popup.js"></script>
 </body>

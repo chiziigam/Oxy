@@ -11,38 +11,15 @@ const SECURITY_EMAIL = process.env.SECURITY_EMAIL || 'security@heyintuitive.com'
 const PRIVACY_UPDATED = '22 October 2026';
 const TERMS_UPDATED = '22 October 2026';
 
-const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const { page: renderPage, escapeHtml } = require('./public-ui');
 const mail = (address = SUPPORT_EMAIL) => `<a href="mailto:${escapeHtml(address)}">${escapeHtml(address)}</a>`;
 
 function page(title, body) {
-  return `<!doctype html>
-<html lang="en-GB">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>${escapeHtml(title)} · ${APP_NAME}</title>
-  <style>
-    :root{--bg:#faf8f5;--ink:#1b1917;--muted:#5d5751;--rule:#e4ded6;--link:#a8452f}
-    @media (prefers-color-scheme:dark){:root{--bg:#0f0e0d;--ink:#f1ece6;--muted:#a59d94;--rule:#2a2724;--link:#e97961}}
-    body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    main{max-width:720px;margin:0 auto;padding:48px 20px 80px}
-    h1{font-size:34px;line-height:1.15;margin:0 0 8px}
-    h2{font-size:20px;margin:36px 0 8px}
-    p,li{color:var(--ink)}
-    li{margin:4px 0}
-    .meta{color:var(--muted);font-size:14px;margin:0 0 28px}
-    a{color:var(--link)}
-    table{border-collapse:collapse;width:100%;font-size:15px}
-    th,td{text-align:left;vertical-align:top;padding:8px 10px 8px 0;border-bottom:1px solid var(--rule)}
-    th{color:var(--muted);font-weight:600}
-    footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--muted);font-size:14px}
-  </style>
-</head>
-<body><main>${body}
-<footer>${COMPANY} · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a> · <a href="/support">Support</a></footer>
-</main></body>
-</html>`;
+  return renderPage({
+    title,
+    body: `${body}
+<footer>${COMPANY} · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></footer>`
+  });
 }
 
 function retentionRows() {
@@ -66,8 +43,8 @@ function privacyPage() {
     </ul>
 
     <h2>What we collect, and why</h2>
-    <table>
-      <tr><th>Data</th><th>Why we need it</th></tr>
+    <div class="table-wrap"><table>
+      <tr><th scope="col">Data</th><th scope="col">Why we need it</th></tr>
       <tr><td>Account details: email address, name, and a hashed password</td><td>To create your account and keep it secure.</td></tr>
       <tr><td>Messages you send and the replies you get, including voice you dictate</td><td>To do what you ask and to keep the conversation in context. Dictated audio is sent for transcription and the recording itself is not kept by us.</td></tr>
       <tr><td>Memories: preferences and facts you ask ${APP_NAME} to keep, or that come up repeatedly</td><td>So you don't have to repeat yourself. You can view and delete them.</td></tr>
@@ -81,7 +58,7 @@ function privacyPage() {
       <tr><td>Payment card details, if you choose to save a card for purchases</td><td>To complete purchases you approve. A payment is never made without your confirmation of the exact amount.</td></tr>
       <tr><td>Device details: push notification token, time zone, app version</td><td>To send you notifications you have allowed and to fix problems.</td></tr>
       <tr><td>Error reports and basic diagnostics</td><td>To find and fix faults. These do not include the content of your messages.</td></tr>
-    </table>
+    </table></div>
 
     <h2>Our lawful bases</h2>
     <ul>
@@ -93,8 +70,8 @@ function privacyPage() {
 
     <h2>Who else handles your data</h2>
     <p>We use service providers to run ${APP_NAME}. They act on our instructions and only receive what they need.</p>
-    <table>
-      <tr><th>Provider</th><th>What they do</th></tr>
+    <div class="table-wrap"><table>
+      <tr><th scope="col">Provider</th><th scope="col">What they do</th></tr>
       <tr><td>OpenAI</td><td>Language processing for understanding and replying to your messages, speech-to-text, and text-to-speech. The text and context needed for a request are sent to them. We use their business API, under which data is not used to train their models.</td></tr>
       <tr><td>Supabase</td><td>Database and file storage.</td></tr>
       <tr><td>Fly.io</td><td>Server hosting (London).</td></tr>
@@ -105,7 +82,7 @@ function privacyPage() {
       <tr><td>Stripe</td><td>Handling a saved payment card, where you use that feature.</td></tr>
       <tr><td>Travel, address and booking providers</td><td>When you ask for flights, stays or an address lookup, the details of that search (such as dates, places or a postcode) are sent to the relevant provider.</td></tr>
       <tr><td>Websites you ask ${APP_NAME} to use</td><td>When ${APP_NAME} browses or buys for you, the details needed (such as your delivery address or name) are entered on that website, as if you had typed them.</td></tr>
-    </table>
+    </table></div>
     <p>Some of these providers are outside the UK, including in the United States. Where that happens we rely on the safeguards UK law requires, such as approved contract terms.</p>
     <p>We may disclose information if the law or a court requires it, or to protect people from harm. If our business is ever sold or merged, your data would move with it under this policy.</p>
 
@@ -219,15 +196,15 @@ function supportPage() {
     <p>Profile, then "Your data", then "Export my data".</p>
 
     <h2>Common questions</h2>
-    <h2 style="font-size:17px;margin-top:20px">How do I connect Gmail or my calendar?</h2>
+    <h3>How do I connect Gmail or my calendar?</h3>
     <p>Open Connections, choose the service, and sign in. ${APP_NAME} only reads your email when you ask or when you've asked it to watch for something. You can disconnect at any time from the same screen.</p>
-    <h2 style="font-size:17px;margin-top:20px">What does ${APP_NAME} remember?</h2>
+    <h3>What does ${APP_NAME} remember?</h3>
     <p>Preferences and facts you ask it to keep, or that come up repeatedly. You can see, edit and delete them in the app.</p>
-    <h2 style="font-size:17px;margin-top:20px">Does it cost anything?</h2>
+    <h3>Does it cost anything?</h3>
     <p>No. ${APP_NAME} is free and has no subscription.</p>
-    <h2 style="font-size:17px;margin-top:20px">Will it spend my money without asking?</h2>
+    <h3>Will it spend my money without asking?</h3>
     <p>No. It asks you to approve the exact amount before any payment, and it re-reads the amount from the page before it pays.</p>
-    <h2 style="font-size:17px;margin-top:20px">I'm not getting notifications.</h2>
+    <h3>I'm not getting notifications.</h3>
     <p>Check Settings, then Notifications, then ${APP_NAME} on your iPhone, and that notifications are switched on inside ${APP_NAME}. If they still don't arrive, email us.</p>
   `);
 }
