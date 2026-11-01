@@ -6,6 +6,7 @@
 // counted in tokens but left out of the dollar figure (and flagged), never guessed.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
+const spendCap = require('./spend-cap');
 
 const als = new AsyncLocalStorage();
 
@@ -75,15 +76,31 @@ const lifetime = emptyTotals();
 const startedAt = new Date().toISOString();
 
 // Called from every model call with the provider's raw usage object.
+function currentTurn() {
+  return als.getStore() || null;
+}
+
+function currentUserId() {
+  return currentTurn()?.userId || null;
+}
+
+function bindUser(userId) {
+  const turn = currentTurn();
+  if (turn && userId) turn.userId = userId;
+}
+
 function record(model, rawUsage, { webSearches = 0 } = {}) {
   const usage = normaliseUsage(rawUsage);
   if (!usage.input && !usage.output && !webSearches) return;
   const table = prices();
   add(lifetime, model || 'unknown', usage, webSearches, table);
-  const turn = als.getStore();
+  const turn = currentTurn();
   if (turn) add(turn, model || 'unknown', usage, webSearches, table);
+  const cost = costOf(model, usage, table);
+  const unpriced = cost === null ? Number(process.env.OXY_UNPRICED_CALL_USD || 0.01) : 0;
+  const usd = (cost === null ? unpriced : cost) + webSearches * WEB_SEARCH_USD;
+  if (turn?.userId && usd > 0) spendCap.charge(turn.userId, usd);
   if (process.env.OXY_USAGE_LOG !== 'off') {
-    const cost = costOf(model, usage, table);
     console.log(`[usage] ${model} in=${usage.input} cached=${usage.cached} out=${usage.output} reasoning=${usage.reasoning}${webSearches ? ` web=${webSearches}` : ''} ~$${cost === null ? 'unpriced' : cost.toFixed(5)}`);
   }
 }
@@ -99,8 +116,9 @@ function recordCost(label, usd) {
 }
 
 // Runs `fn` with a fresh per-turn meter; everything recorded inside lands in it.
-function runWithMeter(fn) {
+function runWithMeter(fn, userId) {
   const turn = emptyTotals();
+  if (userId) turn.userId = userId;
   return als.run(turn, () => fn(turn));
 }
 
@@ -122,4 +140,4 @@ function lifetimeReport() {
   return { since: startedAt, ...summarise(lifetime), byModel: lifetime.byModel };
 }
 
-module.exports = { record, recordCost, runWithMeter, summarise, lifetimeReport, normaliseUsage, costOf, prices, DEFAULT_PRICES };
+module.exports = { record, recordCost, runWithMeter, summarise, lifetimeReport, normaliseUsage, costOf, prices, DEFAULT_PRICES, bindUser, currentUserId, currentTurn };

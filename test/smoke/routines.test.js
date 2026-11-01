@@ -296,12 +296,26 @@ test('markRoutineRun still advances next_run_at on a failed run (no retry storm)
   assert.equal(updated.consecutive_failures, 1);
 });
 
-test('markRoutineRun accumulates consecutive_failures across repeated failures', async () => {
-  const rows = [{ id: 'r1', interval_minutes: 60, next_run_at: new Date().toISOString(), consecutive_failures: 2 }];
+test('markRoutineRun pauses the routine after three consecutive failures', async () => {
+  const rows = [{ id: 'r1', name: 'Morning mail', interval_minutes: 60, next_run_at: new Date().toISOString(), consecutive_failures: 2, enabled: true }];
   const supabase = fakeMarkRunSupabase(rows);
-  await markRoutineRun(supabase, 'r1', new Date(), { success: false, error: 'still broken' });
+  const result = await markRoutineRun(supabase, 'r1', new Date(), { success: false, error: 'still broken' });
   const updated = rows.find((r) => r.id === 'r1');
   assert.equal(updated.consecutive_failures, 3);
+  assert.equal(updated.enabled, false);
+  assert.equal(result.paused, true);
+  assert.equal(result.name, 'Morning mail');
+});
+
+test('markRoutineRun does not count a spend-cap skip as a failure', async () => {
+  const rows = [{ id: 'r1', interval_minutes: 60, next_run_at: new Date().toISOString(), consecutive_failures: 2, enabled: true }];
+  const supabase = fakeMarkRunSupabase(rows);
+  const result = await markRoutineRun(supabase, 'r1', new Date(), { success: false, spendCapped: true, error: 'daily spend cap' });
+  const updated = rows.find((r) => r.id === 'r1');
+  assert.equal(updated.consecutive_failures, 2);
+  assert.equal(updated.enabled, true);
+  assert.equal(result.paused, false);
+  assert.equal(result.spendCapped, undefined);
 });
 
 test('markRoutineRun never throws even when the supabase client blows up', async () => {

@@ -16,9 +16,11 @@ function fakeTimers() {
   };
 }
 
-test('the heartbeat is off unless switched on, and reads its interval', () => {
+test('the heartbeat is off on a laptop, on in production, and reads its interval', () => {
   assert.equal(heartbeatSettings({}).enabled, false);
   assert.equal(heartbeatSettings({ OXY_HEARTBEAT: 'off' }).enabled, false);
+  assert.equal(heartbeatSettings({ NODE_ENV: 'production' }).enabled, true);
+  assert.equal(heartbeatSettings({ NODE_ENV: 'production', OXY_HEARTBEAT: 'off' }).enabled, false);
   assert.deepEqual(heartbeatSettings({ OXY_HEARTBEAT: 'on' }), { enabled: true, intervalMs: 5 * 60 * 1000 });
   assert.equal(heartbeatSettings({ OXY_HEARTBEAT: 'ON', OXY_HEARTBEAT_MINUTES: '2' }).intervalMs, 120000);
   assert.equal(heartbeatSettings({ OXY_HEARTBEAT: 'on', OXY_HEARTBEAT_MINUTES: 'soon' }).intervalMs, 5 * 60 * 1000);

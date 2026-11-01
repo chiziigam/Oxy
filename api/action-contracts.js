@@ -51,7 +51,8 @@ const ACTION_CONTRACTS = {
     paramHints: { due_date: 'ISO date' },
     successSummary: 'Reminder created',
     failureSummary: 'Reminder failed',
-    confirmation: 'none'
+    confirmation: 'none',
+    guidance: 'Use this as soon as they ask to be reminded, nudged, or told at a time. A clear time is enough: pick a due_date and create the reminder in this turn. Do not answer with only a promise to remind them. This does not send a message or spend money.'
   },
   play_music: {
     risk: 'low',
@@ -112,7 +113,8 @@ const ACTION_CONTRACTS = {
     successSummary: 'Calendar checked',
     failureSummary: 'Calendar failed',
     confirmation: 'none',
-    adapter: { kind: 'connector', id: 'google' }
+    adapter: { kind: 'connector', id: 'google' },
+    guidance: 'Use when they ask what is on, whether they are free, or when something is. Read the calendar instead of guessing the day from memory. For a whole-morning "what do I need to know", prefer daily_digest.'
   },
   find_appointment_options: {
     adapter: { kind: 'inline' },
@@ -156,7 +158,7 @@ const ACTION_CONTRACTS = {
       body: 'a polished, complete email draft — never a terse literal fragment of what the user said',
       tone: 'e.g. casual, warm, professional, apologetic, direct'
     },
-    guidance: `If the user gives enough substance, draft the full email body with an appropriate greeting, natural structure, and sign-off. Match any requested tone. Do not ask for a subject. Do not use stiff cliches. For Gmail replies, use the provided full thread context, sender details, memory about the sender, and user communication preferences; include thread_id/in_reply_to/references when available. Match both the user tone and the thread formality: professional for business threads, casual for casual threads. Do not add fake warmth or unnecessary pleasantries, and stop when the point is made. ${EMAIL_TONE_GUIDANCE} ${PERSONAL_IDENTITY_GUIDANCE} If the email you just sent contains a promise the USER has now made — "I'll send the documents tomorrow", "you'll have it by Friday" — call track_commitment straight after it is actually sent, with source:"sent_email" and this thread_id, so it can be surfaced later and chased if it is still outstanding. Only for a real undertaking with a concrete action, never for a pleasantry.`,
+    guidance: `When they ask you to email someone and the recipient and the point are clear, draft it and send it. The review step still waits for their yes. Do not ask whether they want you to send an email. If the user gives enough substance, draft the full email body with an appropriate greeting, natural structure, and sign-off. Match any requested tone. Do not ask for a subject. Do not use stiff cliches. For Gmail replies, use the provided full thread context, sender details, memory about the sender, and user communication preferences; include thread_id/in_reply_to/references when available. Match both the user tone and the thread formality: professional for business threads, casual for casual threads. Do not add fake warmth or unnecessary pleasantries, and stop when the point is made. ${EMAIL_TONE_GUIDANCE} ${PERSONAL_IDENTITY_GUIDANCE} If the email you just sent contains a promise the USER has now made — "I'll send the documents tomorrow", "you'll have it by Friday" — call track_commitment straight after it is actually sent, with source:"sent_email" and this thread_id, so it can be surfaced later and chased if it is still outstanding. Only for a real undertaking with a concrete action, never for a pleasantry.`,
     successSummary: 'Email sent',
     failureSummary: 'Email failed',
     confirmation: 'review_required',
@@ -1342,7 +1344,10 @@ const ACTION_CONTRACTS = {
   stripe_charge: { adapter: { kind: 'inline' },risk: 'high', required: ['amount'], inputExample: { amount: 1000, description: 'payment' }, paramHints: { amount: 'whole number of pence/cents, so 1000 means 10.00' }, successSummary: 'Charged via Stripe', failureSummary: 'Failed', confirmation: 'review', executionMode: 'review' },
   // These move (or purport to move) real money and previously had NO contract at all, so the
   // runner treated them as direct-execute. Register them high-risk + review so they can't.
-  stripe_payout_to_user: { risk: 'high', required: ['amount'], inputExample: { amount: 50, description: 'payout', destination: 'acct_...' }, successSummary: 'Payout initiated', failureSummary: 'Payout failed', confirmation: 'review', executionMode: 'review', adapter: { kind: 'connector', id: 'stripe' } },
+  // Hidden from the model. There is no connected-account payout flow, so offering this tool
+  // only invites a transfer to a destination the model invented. The contract stays review-gated
+  // so a stray call still cannot move money.
+  stripe_payout_to_user: { risk: 'high', required: ['amount'], inputExample: { amount: 50, description: 'payout', destination: 'acct_...' }, successSummary: 'Payout initiated', failureSummary: 'Payout failed', confirmation: 'review', executionMode: 'review', adapter: { kind: 'connector', id: 'stripe' }, modelVisible: false, availability: 'unavailable' },
   spend_from_concierge_via_stripe: { risk: 'high', required: ['amount'], inputExample: { amount: 25, description: 'payment' }, successSummary: 'Charged through Stripe', failureSummary: 'Failed', confirmation: 'review', executionMode: 'review', adapter: { kind: 'connector', id: 'stripe' } },
   get_weather: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, successSummary: 'Weather', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for current conditions. For a future period or weekend forecast, use get_forecast.' },
   get_forecast: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, optional: ['when'], successSummary: 'Forecast', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for a future weather forecast, including tomorrow or a weekend. Keep the requested city and time period in the call.' },
@@ -1408,7 +1413,7 @@ const ACTION_CONTRACTS = {
     failureSummary: 'Could not open the page',
     confirmation: 'none',
     executionMode: 'direct',
-    guidance: 'Open a real web page and read what is on it. Returns the page url, title, visible text and a NUMBERED list of every control on the page — those numbers are the elementIds you pass to browser_act. Use this whenever a task needs a website that has no connector: account settings, cancelling something, a form or application, a portal, a booking page, checking an order. Pass the site\'s own url; use web_search first if you do not know it. Alternatively pass `site` (a name or host) and, to go straight to results, `searchFor` — for a site already known, that opens its real search URL instead of landing on a homepage and hunting for the search box. `objective` is only recorded for context; nothing branches on it.'
+    guidance: 'Use this before saying a website is out of reach. Open a real web page and read what is on it. Returns the page url, title, visible text and a NUMBERED list of every control on the page — those numbers are the elementIds you pass to browser_act. Use this whenever a task needs a website that has no connector: account settings, cancelling something, a form or application, a portal, a booking page, checking an order. Pass the site\'s own url; use web_search first if you do not know it. Alternatively pass `site` (a name or host) and, to go straight to results, `searchFor` — for a site already known, that opens its real search URL instead of landing on a homepage and hunting for the search box. `objective` is only recorded for context; nothing branches on it.'
   },
   browser_observe: {
     adapter: { kind: 'inline' },

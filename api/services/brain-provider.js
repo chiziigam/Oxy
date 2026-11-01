@@ -5,6 +5,7 @@
 
 const { defaultModelForProvider, modelMatchesProvider } = require('./model-routing');
 const usageMeter = require('./usage-meter');
+const spendCap = require('./spend-cap');
 const { splitSystemPrompt } = require('../prompts');
 
 // Minimum output cap so short-answer callers still get visible text.
@@ -525,6 +526,7 @@ async function anthropicGenerate({ model, contents, config, tools = [] }) {
 // Async iterable of { text, candidates } chunks. Awaitable for every provider; the Groq
 // path ignores `model` in favour of OXY_GROQ_MODEL.
 function streamBrain({ provider, model, contents, config }) {
+  spendCap.assertAllowed(usageMeter.currentUserId());
   const p = provider || getBrainProvider();
   const resolvedModel = resolveBrainModel(p, model);
   if (p === 'groq') return groqStream({ model: resolvedModel, contents, config });
@@ -535,6 +537,7 @@ function streamBrain({ provider, model, contents, config }) {
 
 // Non-streaming counterpart, shaped like generateContent's { text } result.
 async function generateBrain({ provider, model, contents, config }) {
+  spendCap.assertAllowed(usageMeter.currentUserId());
   const p = provider || getBrainProvider();
   const resolvedModel = resolveBrainModel(p, model);
   if (OPENAI_COMPATIBLE.has(p)) return compatibleGenerate({ provider: p, model: resolvedModel, contents, config });

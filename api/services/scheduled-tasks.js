@@ -622,6 +622,15 @@ async function deferScheduledTask(task, now = new Date()) {
 // and a watch past its end date has nothing left to watch. They are closed, not run.
 const MISSED_ONCE_GRACE_MINUTES = 60;
 
+function missedReminderNotice(task) {
+  const title = String(task?.title || 'that reminder').replace(/\s+/g, ' ').trim() || 'that reminder';
+  return {
+    kind: 'reminder_missed',
+    title: 'Missed reminder',
+    body: `I missed “${title}”. It was due more than an hour ago, so I left it rather than running it late.`
+  };
+}
+
 function staleScheduledReason(task, now = new Date()) {
   const nowMs = now.getTime();
   if (task.recurrence === 'once') {
@@ -668,6 +677,7 @@ async function advanceScheduledTask(task, now = new Date()) {
 module.exports = {
   normalizeTimeOfDay,
   staleScheduledReason,
+  missedReminderNotice,
   describeSchedule,
   buildScheduledRunInstruction,
   scheduledConditionTriggered,

@@ -89,6 +89,18 @@ function getAuthenticatedUserId(req) {
   return req.auth?.userId || null;
 }
 
+// A database blip must not let a signed token through. 503, not 401: the phone treats 401 as
+// "sign in again", and a brief lookup failure should not log the person out.
+function sessionRevocationDecision({ lookupError, userRow, tokenVersion } = {}) {
+  if (lookupError) {
+    return { ok: false, status: 503, error: 'Session could not be checked. Try again.' };
+  }
+  if (!userRow || userRow.token_version !== tokenVersion) {
+    return { ok: false, status: 401, error: 'Session expired' };
+  }
+  return { ok: true };
+}
+
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const derived = crypto.scryptSync(password, salt, 64).toString('hex');
   return `${salt}:${derived}`;
@@ -110,6 +122,7 @@ module.exports = {
   getSessionSecret,
   hashPassword,
   requireSessionAuth,
+  sessionRevocationDecision,
   signPayload,
   verifyPassword,
   verifySignedPayload
