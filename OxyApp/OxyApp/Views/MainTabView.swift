@@ -13,6 +13,17 @@ struct MainTabView: View {
     private var background: ThreadBackground { ThreadBackground(rawValue: backgroundRaw) ?? .automatic }
 
     var body: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["OXY_DEBUG_NEWHOME"] == "1" {
+            AdamHomeView(onSettings: { opened = .settings })
+                .fullScreenCover(item: $opened) { choice in destination(choice) }
+        } else { legacyBody }
+        #else
+        legacyBody
+        #endif
+    }
+
+    private var legacyBody: some View {
         ChatView(onMenuChoice: { choice, _ in opened = choice })
             .tint(Color.appAccent)
             .preferredColorScheme(background.scheme)

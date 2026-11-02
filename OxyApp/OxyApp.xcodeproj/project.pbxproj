@@ -103,6 +103,10 @@
 		C10000010000000000000004 /* GameMovePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000005 /* GameMovePipeline.swift */; };
 		C10000010000000000000005 /* GameMoveCommandPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000006 /* GameMoveCommandPlanner.swift */; };
 		AD0000010030CEBE7715B745 /* NotificationActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000010044A90FEAB0397A /* NotificationActions.swift */; };
+		AD00000100BAEA074783FFD6 /* AdamHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001007425FD6150CBA4 /* AdamHomeView.swift */; };
+		AD000001007CC7598DB9325F /* AdamItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001003E787669BE0249 /* AdamItemCard.swift */; };
+		AD000001000BC42004625A02 /* AskAdamBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */; };
+		AD000001009C66EC54AD8E1A /* AdamConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -207,6 +211,10 @@
 		C20000010000000000000006 /* GameMoveCommandPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMoveCommandPlanner.swift; sourceTree = "<group>"; };
 		C30000010000000000000001 /* AdamMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdamMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD0000010044A90FEAB0397A /* NotificationActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActions.swift; sourceTree = "<group>"; };
+		AD000001007425FD6150CBA4 /* AdamHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdamHomeView.swift; sourceTree = "<group>"; };
+		AD000001003E787669BE0249 /* AdamItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdamItemCard.swift; sourceTree = "<group>"; };
+		AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskAdamBar.swift; sourceTree = "<group>"; };
+		AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdamConversationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -304,6 +312,7 @@
 		A50000010000000000000005 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AD000001003F7FBB44F24CA5 /* Adam */,
 				A20000010000000000000015 /* MainTabView.swift */,
 				A20000010000000000000038 /* ProfileView.swift */,
 				A20000010000000000000039 /* PendantStatusView.swift */,
@@ -526,6 +535,17 @@
 			path = Sources/AdamMacRuntime;
 			sourceTree = "<group>";
 		};
+		AD000001003F7FBB44F24CA5 /* Adam */ = {
+			isa = PBXGroup;
+			children = (
+				AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */,
+				AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */,
+				AD000001003E787669BE0249 /* AdamItemCard.swift */,
+				AD000001007425FD6150CBA4 /* AdamHomeView.swift */,
+			);
+			path = Adam;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -618,6 +638,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD000001009C66EC54AD8E1A /* AdamConversationView.swift in Sources */,
+				AD000001000BC42004625A02 /* AskAdamBar.swift in Sources */,
+				AD000001007CC7598DB9325F /* AdamItemCard.swift in Sources */,
+				AD00000100BAEA074783FFD6 /* AdamHomeView.swift in Sources */,
 				AD0000010030CEBE7715B745 /* NotificationActions.swift in Sources */,
 				A10000010000000000000F08 /* WorkflowTimelineView.swift in Sources */,
 				A10000010000000000000F14 /* YourHomeView.swift in Sources */,
