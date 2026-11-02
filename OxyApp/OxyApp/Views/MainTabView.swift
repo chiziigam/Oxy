@@ -2,75 +2,20 @@ import SwiftUI
 import UIKit
 
 struct MainTabView: View {
-    @AppStorage("oxy_accentColor") private var accentColor = "stone"
-    @AppStorage(ThreadBackground.storageKey) private var backgroundRaw = ThreadBackground.automatic.rawValue
-    @State private var opened: ThreadMenuChoice?
-    #if DEBUG
-    @State private var didOpenDebugDestination = false
-    @State private var debugSignInSite: String? = ProcessInfo.processInfo.environment["OXY_DEBUG_SIGNIN"]
-    #endif
-
-    private var background: ThreadBackground { ThreadBackground(rawValue: backgroundRaw) ?? .automatic }
+    @State private var showsSettings = false
 
     var body: some View {
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["OXY_DEBUG_NEWHOME"] == "1" {
-            AdamHomeView(onSettings: { opened = .settings })
-                .fullScreenCover(item: $opened) { choice in destination(choice) }
-        } else { legacyBody }
-        #else
-        legacyBody
-        #endif
+        AdamHomeView(onSettings: { showsSettings = true })
+            .tint(Color.adamAccent)
+            .accessibilityHidden(showsSettings)
+            .fullScreenCover(isPresented: $showsSettings) {
+                SettingsRootView(onClose: { showsSettings = false })
+                    .tint(Color.adamAccent)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { _ in showsSettings = false }
+            .onReceive(NotificationCenter.default.publisher(for: AskAdam.notification)) { _ in showsSettings = false }
+            .onAppear { HapticManager.shared.prepare() }
     }
-
-    private var legacyBody: some View {
-        ChatView(onMenuChoice: { choice, _ in opened = choice })
-            .tint(Color.appAccent)
-            .preferredColorScheme(background.scheme)
-            .id(accentColor + backgroundRaw)
-            .accessibilityHidden(opened != nil)
-            .fullScreenCover(item: $opened) { choice in
-                destination(choice)
-                    .preferredColorScheme(background.scheme)
-                    .tint(Color.appAccent)
-                    .swipeToDismiss()
-            }
-            #if DEBUG
-            .sheet(isPresented: Binding(get: { debugSignInSite != nil }, set: { if !$0 { debugSignInSite = nil } })) {
-                SiteSignInSheet(site: debugSignInSite ?? "") {}
-            }
-            #endif
-            .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { _ in
-                opened = nil
-            }
-            .onReceive(NotificationCenter.default.publisher(for: AskAdam.notification)) { _ in
-                opened = nil
-            }
-            .onAppear {
-                HapticManager.shared.prepare()
-                #if DEBUG
-                if !didOpenDebugDestination {
-                    didOpenDebugDestination = true
-                    if let raw = ProcessInfo.processInfo.environment["OXY_DEBUG_OPEN"],
-                       let choice = ThreadMenuChoice(rawValue: raw) {
-                        opened = choice
-                    }
-                }
-                #endif
-            }
-    }
-
-    @ViewBuilder
-    private func destination(_ choice: ThreadMenuChoice) -> some View {
-        switch choice {
-        case .activity: AdamActivityView()
-        case .today: HomeFeedView()
-        case .home: YourHomeView()
-        case .memory: MemoryView()
-        case .settings, .privateChat: SettingsRootView(onClose: { opened = nil })
-        }
-    }
-
 }
 
 struct AdamPresence: View {
@@ -147,142 +92,6 @@ struct AdamPresence: View {
         case .thinking: return "Adam is thinking"
         case .speaking: return "Adam is speaking"
         case .complete: return "Adam finished"
-        }
-    }
-}
-
-private struct AdamYouView: View {
-    @Environment(AppState.self) private var appState
-    @State private var destination: Destination?
-    @State private var contextModel = SettingsContextModel()
-    @State private var appsConnected: Int?
-    @State private var showsSoundClips = false
-    @State private var showBackendURLEditor = false
-    @State private var versionTapCount = 0
-    #if DEBUG
-    @State private var showsIndicatorPreview = false
-    @State private var showsSoundsPreview = false
-    #endif
-    @AppStorage("oxy_custom_backend_url") private var customBackendURL = ""
-
-    private enum Destination: String, Identifiable {
-        case you, apps, account, agents
-        var id: String { rawValue }
-    }
-
-    var body: some View {
-        NavigationStack {
-            SettingsPage(title: "Settings", isRoot: true) {
-                VStack(spacing: 0) {
-                    youRow(title: "You", subtitle: youStatus, icon: "person") { destination = .you }
-                    SettingsRule(inset: 44)
-                    youRow(title: "Apps", subtitle: appsStatus, icon: "cube") { destination = .apps }
-                    SettingsRule(inset: 44)
-                    youRow(title: "Account", subtitle: appState.isDemoSession ? "Sample account" : "Your account and data", icon: "envelope") { destination = .account }
-                }
-                .padding(.vertical, 4)
-
-                if UserDefaults.standard.bool(forKey: HouseholdSoundMonitor.preferenceKey) {
-                    SettingsList {
-                        youRow(title: "Sounds heard", subtitle: "Check what set off an alert", icon: "waveform") { showsSoundClips = true }
-                    }
-                }
-
-                VStack(spacing: 6) {
-                    Button {
-                        versionTapCount += 1
-                        if versionTapCount >= 5 {
-                            versionTapCount = 0
-                            showBackendURLEditor = true
-                        }
-                    } label: {
-                        AdamMark().frame(width: 20, height: 20)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Adam")
-
-                    #if DEBUG
-                    Button { destination = .agents } label: {
-                        Text("Advanced")
-                            .font(.appBody(13))
-                            .foregroundStyle(Color.appMuted)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    #endif
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .toolbar(.hidden, for: .navigationBar)
-            .fullScreenCover(isPresented: $showsSoundClips) { SoundClipsPage().swipeToDismiss() }
-            .sheet(isPresented: $showBackendURLEditor) {
-                BackendURLEditorSheet(currentURL: $customBackendURL) { showBackendURLEditor = false }
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
-            .task { await contextModel.load(isDemo: appState.isDemoSession); await loadAppsCount() }
-        }
-        .fullScreenCover(item: $destination) { item in
-            destinationView(item).swipeToDismiss().environment(\.revealClose, nil)
-        }
-        #if DEBUG
-        .fullScreenCover(isPresented: $showsIndicatorPreview) {
-            if ProcessInfo.processInfo.environment["OXY_DEBUG_YOU"] == "transition" { ActivityTransitionPreview() } else { ActivityMarkPreview() }
-        }
-        .fullScreenCover(isPresented: $showsSoundsPreview) { SoundClipsPage() }
-        .onAppear {
-            if let raw = ProcessInfo.processInfo.environment["OXY_DEBUG_YOU"] {
-                if raw == "indicator" || raw == "transition" { showsIndicatorPreview = true }
-                else if raw == "sounds" { SoundClipStore.shared.seedPreviewClips(); showsSoundsPreview = true }
-                else if let target = Destination(rawValue: raw) { destination = target }
-            }
-        }
-        #endif
-    }
-
-    private func youRow(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
-        SettingsNavRow(title: title, subtitle: subtitle, lead: .icon(icon), action: action)
-    }
-
-    private var youStatus: String {
-        let name = SettingsStore.load().userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "Your name, home and memory" : name
-    }
-
-    private var appsStatus: String {
-        switch appsConnected {
-        case nil: return "Mail, photos, lists and more"
-        case 0?: return "Nothing connected yet"
-        case 1?: return "1 connected"
-        case let n?: return "\(n) connected"
-        }
-    }
-
-    private func loadAppsCount() async {
-        var total = 0
-        if let data = try? await APIClient.shared.request(path: "/connectors/\(appState.userId)"),
-           let response = try? JSONDecoder().decode(ConnectorsResponse.self, from: data) {
-            total += response.connectors.filter { $0.kind == "connection" && $0.implemented && $0.enabled }.count
-        } else { return }
-        if let data = try? await APIClient.shared.request(path: "/connectors/apps"),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let items = json["connections"] as? [[String: Any]] {
-            total += items.filter { ($0["connected"] as? Bool) == true }.count
-        } else { appsConnected = nil; return }
-        appsConnected = total
-    }
-
-    @ViewBuilder
-    private func destinationView(_ item: Destination) -> some View {
-        switch item {
-        case .you: YouPage()
-        case .apps: ConnectorsView()
-        case .account: ProfileView()
-        case .agents: ModelRoutingView()
         }
     }
 }

@@ -30,16 +30,6 @@ struct OxyApp: App {
 struct RootView: View {
     @Environment(AppState.self) private var appState
     @State private var didRestoreSession = false
-    @AppStorage(ThreadBackground.storageKey) private var backgroundRaw = ThreadBackground.automatic.rawValue
-
-    private var followsSystem: Bool {
-        #if DEBUG
-        ProcessInfo.processInfo.environment["OXY_DEBUG_NEWHOME"] == "1"
-        #else
-        false
-        #endif
-    }
-
     var body: some View {
         Group {
             if !didRestoreSession {
@@ -47,11 +37,10 @@ struct RootView: View {
             } else if appState.isAuthenticated {
                 MainTabView()
             } else {
-                LoginView()
+                LoginView().preferredColorScheme(.dark)
             }
         }
         .animation(.easeInOut(duration: 0.35), value: appState.isAuthenticated)
-        .preferredColorScheme(followsSystem ? nil : (ThreadBackground(rawValue: backgroundRaw) ?? .automatic).scheme)
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.environment["OXY_DEBUG_AUTOLOGIN"] == "1" {

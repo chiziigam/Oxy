@@ -34,18 +34,27 @@ struct AdamHomeView: View {
             Color.adamBackground.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) { content }
-                        .padding(.horizontal, AdamLayout.gutter)
-                        .padding(.bottom, 24)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) { content }
+                            .padding(.horizontal, AdamLayout.gutter)
+                            .padding(.bottom, 24)
+                    }
+                    .refreshable { await model.refresh() }
+                    .onReceive(NotificationCenter.default.publisher(for: .adamOpenItem)) { note in
+                        guard let id = note.userInfo?["itemId"] as? String else { return }
+                        Task {
+                            await model.refresh()
+                            let match = model.needsYou.first { $0.checkpointId == id || $0.workflowId == id || $0.id == id }
+                            if let match { withAnimation(.appStandard) { proxy.scrollTo(match.id, anchor: .top) } }
+                        }
+                    }
                 }
-                .refreshable { await model.refresh() }
                 AskAdamBar(text: $draft, isRecording: voice.isRecording, onSend: send, onMic: toggleVoice)
             }
         }
         .task { await model.refresh() }
         .onChange(of: scenePhase) { if scenePhase == .active { Task { await model.refresh() } } }
-        .onReceive(NotificationCenter.default.publisher(for: .adamOpenItem)) { _ in Task { await model.refresh() } }
         .onChange(of: voice.isRecording) {
             if !voice.isRecording, !voice.transcript.isEmpty { draft = voice.transcript }
         }
@@ -55,6 +64,17 @@ struct AdamHomeView: View {
         }
         .sheet(item: $openWorkflow) { open in
             WorkflowTimelineView(workflowId: open.id, onChanged: { Task { await model.refresh() } })
+                .preferredColorScheme(.dark)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { note in
+            guard let text = note.object as? String else { return }
+            openWorkflow = nil
+            conversation = ConversationRequest(text: text)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AskAdam.notification)) { note in
+            guard let text = note.object as? String else { return }
+            openWorkflow = nil
+            draft = text
         }
         .animation(.appStandard, value: model.needsYou.map(\.id))
     }
@@ -88,7 +108,7 @@ struct AdamHomeView: View {
             if !model.needsYou.isEmpty {
                 sectionLabel("Needs you")
                 ForEach(model.needsYou) { item in
-                    AdamDecisionCard(item: item, model: model) { open(item) }
+                    AdamDecisionCard(item: item, model: model) { open(item) }.id(item.id)
                 }
             }
             if !model.working.isEmpty {
