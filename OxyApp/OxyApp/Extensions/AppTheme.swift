@@ -118,6 +118,57 @@ extension Color {
     )
 }
 
+// MARK: - Adam main screen
+extension Color {
+    static let adamBackground = appDynamicColor(
+        dark: Color(red: 0.086, green: 0.137, blue: 0.220),   // #162338
+        light: Color(red: 0.498, green: 0.624, blue: 0.761)   // #7F9FC2
+    )
+    static let adamCard = appDynamicColor(
+        dark: Color.white.opacity(0.10),
+        light: Color.white.opacity(0.62)
+    )
+    static let adamCardEdge = appDynamicColor(
+        dark: Color.white.opacity(0.14),
+        light: Color.white.opacity(0.70)
+    )
+    static let adamInk = appDynamicColor(
+        dark: Color(red: 0.953, green: 0.965, blue: 0.984),   // #F3F6FB
+        light: Color(red: 0.078, green: 0.129, blue: 0.227)   // #14213A
+    )
+    /// Secondary text for use on a card only; on the bare background use `adamInk`.
+    static let adamMuted = appDynamicColor(
+        dark: Color(red: 0.725, green: 0.769, blue: 0.839),   // #B9C4D6
+        light: Color(red: 0.247, green: 0.333, blue: 0.471)   // #3F5578
+    )
+    static let adamAccent = appDynamicColor(
+        dark: Color(red: 0.953, green: 0.965, blue: 0.984),
+        light: Color(red: 0.078, green: 0.129, blue: 0.227)
+    )
+    static let adamOnAccent = appDynamicColor(
+        dark: Color(red: 0.078, green: 0.129, blue: 0.227),
+        light: Color.white
+    )
+    static let adamTrack = appDynamicColor(
+        dark: Color.white.opacity(0.16),
+        light: Color(red: 0.078, green: 0.129, blue: 0.227).opacity(0.15)
+    )
+}
+
+extension Font {
+    static var adamTitle: Font { .appBody(17, weight: .medium) }
+    static var adamBody: Font { .appBody(15) }
+    static var adamButton: Font { .appBody(15, weight: .medium) }
+    static var adamLabel: Font { .appBody(13, weight: .medium) }
+}
+
+enum AdamLayout {
+    static let cardRadius: CGFloat = 24
+    static let buttonRadius: CGFloat = 16
+    static let gutter: CGFloat = 16
+    static let buttonHeight: CGFloat = 44
+}
+
 // MARK: - Object tiles
 extension Color {
     /// The four tile colours, chosen from a word so the same thing is always the same colour.
