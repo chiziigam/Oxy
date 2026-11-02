@@ -4,12 +4,18 @@ struct AuthService {
     private let api = APIClient.shared
     private let provider = "custom_session"
 
-    func register(userId: String, password: String) async throws -> AuthResponse {
+    private func registerBody(userId: String, password: String, email: String?) -> [String: Any] {
+        var body: [String: Any] = ["userId": userId, "password": password]
+        if let email, !email.isEmpty { body["email"] = email }
+        return body
+    }
+
+    func register(userId: String, password: String, email: String? = nil) async throws -> AuthResponse {
         do {
             let data = try await api.request(
                 path: "/auth/register",
                 method: "POST",
-                body: ["userId": userId, "password": password]
+                body: registerBody(userId: userId, password: password, email: email)
             )
             return try JSONDecoder().decode(AuthResponse.self, from: data)
         } catch {

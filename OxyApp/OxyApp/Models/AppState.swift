@@ -37,6 +37,13 @@ final class AppState {
     }
 
     func restoreSession() {
+        // The keychain outlives an uninstall; a fresh install must not inherit the last sign-in.
+        if !UserDefaults.standard.bool(forKey: "adam_install_seen") {
+            UserDefaults.standard.set(true, forKey: "adam_install_seen")
+            keychain.delete(key: "session_token")
+            keychain.delete(key: "user_id")
+            keychain.delete(key: "demo_session")
+        }
         guard let savedToken = keychain.read(key: "session_token"),
               let savedUserId = keychain.read(key: "user_id"),
               !savedToken.isEmpty else {
@@ -47,12 +54,17 @@ final class AppState {
         userId = savedUserId
         isDemoSession = keychain.read(key: "demo_session") == "true"
         isAuthenticated = true
-        if !isDemoSession {
-            Task { @MainActor in
-                NativeIntegrationManager.shared.bootstrap(userId: savedUserId)
-                await HouseholdSoundMonitor.shared.configure(userId: savedUserId)
-                await PhotoLearner.shared.runIfEnabled()
-            }
+        if !isDemoSession, SetupState.isDone(savedUserId) { startServices() }
+    }
+
+    /// Starts the background work that asks for permissions; held back until first-run setup is done.
+    func startServices() {
+        let userId = self.userId
+        guard !userId.isEmpty, !isDemoSession else { return }
+        Task { @MainActor in
+            NativeIntegrationManager.shared.bootstrap(userId: userId)
+            await HouseholdSoundMonitor.shared.configure(userId: userId)
+            await PhotoLearner.shared.runIfEnabled()
         }
     }
 
@@ -77,13 +89,7 @@ final class AppState {
         }
         isAuthenticated = true
         errorMessage = nil
-        if !isDemo {
-            Task { @MainActor in
-                NativeIntegrationManager.shared.bootstrap(userId: userId)
-                await HouseholdSoundMonitor.shared.configure(userId: userId)
-                await PhotoLearner.shared.runIfEnabled()
-            }
-        }
+        if !isDemo, SetupState.isDone(userId) { startServices() }
     }
 
     func logout() {

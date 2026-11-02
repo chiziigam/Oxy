@@ -48,6 +48,10 @@ struct LoginView: View {
 
     private func submit() {
         guard !userId.isEmpty, !password.isEmpty else { return }
+        if isRegistering, !userId.contains("@") {
+            withAnimation { errorMessage = "Enter your email address." }
+            return
+        }
         isLoading = true
         errorMessage = nil
 
@@ -55,7 +59,7 @@ struct LoginView: View {
             do {
                 let response: AuthResponse
                 if isRegistering {
-                    response = try await authService.register(userId: userId, password: password)
+                    response = try await authService.register(userId: userId, password: password, email: userId.contains("@") ? userId : nil)
                 } else {
                     response = try await authService.login(userId: userId, password: password)
                 }
@@ -155,7 +159,7 @@ private struct LoginFormPage: View {
                     .padding(.bottom, 44)
 
                 VStack(alignment: .leading, spacing: 28) {
-                    lineField(placeholder: "Email or username", text: $userId, secure: false, field: .userId)
+                    lineField(placeholder: isRegistering ? "Email" : "Email or username", text: $userId, secure: false, field: .userId, keyboard: isRegistering ? .emailAddress : .default)
                     lineField(placeholder: "Password", text: $password, secure: true, field: .password)
                 }
 
@@ -188,6 +192,14 @@ private struct LoginFormPage: View {
                 .opacity(userId.isEmpty || password.isEmpty ? 0.4 : 1)
                 .animation(.appFast, value: userId.isEmpty || password.isEmpty)
                 .padding(.top, 36)
+
+                if isRegistering {
+                    Text(.init("By creating an account you agree to the [Terms](\(APIClient.shared.baseURL)/terms) and [Privacy Policy](\(APIClient.shared.baseURL)/privacy)."))
+                        .font(.appBody(12))
+                        .foregroundStyle(Color.appMuted)
+                        .tint(Color.appInk)
+                        .padding(.top, 14)
+                }
 
                 if showDemoLogin {
                     Button(action: onDemoLogin) {
@@ -236,7 +248,7 @@ private struct LoginFormPage: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private func lineField(placeholder: String, text: Binding<String>, secure: Bool, field: Field) -> some View {
+    private func lineField(placeholder: String, text: Binding<String>, secure: Bool, field: Field, keyboard: UIKeyboardType = .default) -> some View {
         VStack(spacing: 9) {
             Group {
                 if secure {
@@ -245,6 +257,8 @@ private struct LoginFormPage: View {
                     TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.appMuted))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .keyboardType(keyboard)
+                        .textContentType(keyboard == .emailAddress ? .emailAddress : nil)
                 }
             }
             .font(.appBody(16))

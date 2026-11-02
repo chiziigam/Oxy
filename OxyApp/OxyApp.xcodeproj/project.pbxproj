@@ -95,6 +95,7 @@
 		AD000001002743C220233703 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD00000100146313ECA3D284 /* SettingsRootView.swift */; };
 		AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001003A35D2C361ED3F /* CornerReveal.swift */; };
 		AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001000761B49F110C7C /* TaskInterfaceView.swift */; };
+		AD0000010062C409272AB7AB /* SetupFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001008056B401330E17 /* SetupFlowView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -191,6 +192,7 @@
 		AD00000100146313ECA3D284 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		AD000001003A35D2C361ED3F /* CornerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CornerReveal.swift; sourceTree = "<group>"; };
 		AD000001000761B49F110C7C /* TaskInterfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInterfaceView.swift; sourceTree = "<group>"; };
+		AD000001008056B401330E17 /* SetupFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupFlowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -502,6 +504,7 @@
 		AD000001003F7FBB44F24CA5 /* Adam */ = {
 			isa = PBXGroup;
 			children = (
+				AD000001008056B401330E17 /* SetupFlowView.swift */,
 				AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */,
 				AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */,
 				AD000001003E787669BE0249 /* AdamItemCard.swift */,
@@ -602,6 +605,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD0000010062C409272AB7AB /* SetupFlowView.swift in Sources */,
 				AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */,
 				AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */,
 				AD000001002743C220233703 /* SettingsRootView.swift in Sources */,
