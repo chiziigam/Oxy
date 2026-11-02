@@ -1,6 +1,7 @@
 import UIKit
+import UserNotifications
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -8,7 +9,24 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         if #available(iOS 16.1, *) {
             PendantLiveActivityManager.shared.begin()
         }
+        UNUserNotificationCenter.current().delegate = self
+        NotificationActions.register()
         return true
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let answer = NotificationAnswer(response)
+        await NotificationActions.handle(answer)
     }
 
     func application(

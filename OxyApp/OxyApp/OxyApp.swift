@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct OxyApp: App {
@@ -50,6 +51,7 @@ struct RootView: View {
                 appState.token = "debug-local"
                 appState.isDemoSession = true
                 appState.isAuthenticated = true
+                _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             } else {
                 appState.restoreSession()
             }

@@ -14,14 +14,18 @@ enum AgentTasksService {
     }
 
     static func decide(review: AgentTaskReview, approved: Bool) async throws {
+        try await decide(approvalId: review.id, taskId: review.taskId, approved: approved)
+    }
+
+    static func decide(approvalId: String, taskId: String, approved: Bool) async throws {
         guard let userID = KeychainHelper.shared.read(key: "user_id"), !userID.isEmpty else {
             throw APIError.server(401, "Sign in again.")
         }
         _ = try await APIClient.shared.request(path: "/chat", method: "POST", body: [
             "userId": userID,
             "message": approved ? "Yes, confirm." : "Cancel.",
-            "approvalId": review.id,
-            "approvalTaskId": review.taskId
+            "approvalId": approvalId,
+            "approvalTaskId": taskId
         ])
     }
 

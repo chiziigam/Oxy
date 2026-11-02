@@ -102,6 +102,7 @@
 		C10000010000000000000003 /* MacGameAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* MacGameAdapter.swift */; };
 		C10000010000000000000004 /* GameMovePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000005 /* GameMovePipeline.swift */; };
 		C10000010000000000000005 /* GameMoveCommandPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000006 /* GameMoveCommandPlanner.swift */; };
+		AD0000010030CEBE7715B745 /* NotificationActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000010044A90FEAB0397A /* NotificationActions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -205,6 +206,7 @@
 		C20000010000000000000005 /* GameMovePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMovePipeline.swift; sourceTree = "<group>"; };
 		C20000010000000000000006 /* GameMoveCommandPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMoveCommandPlanner.swift; sourceTree = "<group>"; };
 		C30000010000000000000001 /* AdamMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdamMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AD0000010044A90FEAB0397A /* NotificationActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -269,6 +271,7 @@
 		A50000010000000000000004 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AD0000010044A90FEAB0397A /* NotificationActions.swift */,
 				A20000010000000000000F06 /* HomeBoardService.swift */,
 				A20000010000000000000004 /* KeychainHelper.swift */,
 				A20000010000000000000005 /* APIClient.swift */,
@@ -615,6 +618,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD0000010030CEBE7715B745 /* NotificationActions.swift in Sources */,
 				A10000010000000000000F08 /* WorkflowTimelineView.swift in Sources */,
 				A10000010000000000000F14 /* YourHomeView.swift in Sources */,
 				A10000010000000000000F77 /* HomeFeedView.swift in Sources */,
@@ -842,7 +846,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = OxyApp/OxyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Q7252AW6HC;
 				ENABLE_PREVIEWS = YES;
@@ -876,7 +880,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = OxyApp/OxyApp.Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = Q7252AW6HC;
 				ENABLE_PREVIEWS = YES;
