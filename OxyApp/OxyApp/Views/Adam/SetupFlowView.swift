@@ -46,7 +46,7 @@ struct SetupFlowView: View {
             if scenePhase == .active, waitingForGoogle { Task { await checkGoogle() } }
         }
         .sheet(isPresented: $showsPairing, onDismiss: finish) {
-            PairedDisplaysView().presentationDetents([.large]).preferredColorScheme(.dark)
+            PairedDisplaysView().presentationDetents([.large])
         }
         .task { await checkGoogle() }
     }

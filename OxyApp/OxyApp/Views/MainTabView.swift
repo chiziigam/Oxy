@@ -31,6 +31,9 @@ struct MainTabView: View {
             .onAppear {
                 HapticManager.shared.prepare()
                 showsSetup = needsSetup
+                #if DEBUG
+                if ProcessInfo.processInfo.environment["OXY_DEBUG_SETTINGS"] != nil { showsSettings = true }
+                #endif
             }
     }
 }

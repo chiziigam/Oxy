@@ -60,7 +60,7 @@ struct SettingsRootView: View {
                 .presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $destination) { item in
-            destinationView(item).swipeToDismiss().environment(\.revealClose, nil).preferredColorScheme(.dark)
+            destinationView(item).swipeToDismiss().environment(\.revealClose, nil)
         }
         #if DEBUG
         .onAppear {

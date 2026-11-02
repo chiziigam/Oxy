@@ -8,63 +8,28 @@ private func appDynamicColor(dark: Color, light: Color) -> Color {
 }
 
 extension Color {
-    static let appBackground = Color(UIColor { trait in
-        if let chosen = ThreadBackground.current.uiColor { return chosen }
-        return trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.043, green: 0.047, blue: 0.047, alpha: 1)
-            : UIColor(red: 0.98, green: 0.976, blue: 0.961, alpha: 1)
-    })
+    static let appBackground = Color(UIColor.systemBackground)
 
-    static let appSurface = appDynamicColor(
-        dark: Color(red: 0.082, green: 0.086, blue: 0.09),
-        light: Color.white
-    )
+    static let appSurface = Color(UIColor.secondarySystemBackground)
 
-    static let appSurface2 = appDynamicColor(
-        dark: Color(red: 0.114, green: 0.122, blue: 0.125),
-        light: Color(red: 0.93, green: 0.93, blue: 0.91)
-    )
+    static let appSurface2 = Color(UIColor.systemGray5)
 
-    static let appHairline = appDynamicColor(
-        dark: Color(red: 0.165, green: 0.173, blue: 0.18),
-        light: Color.black.opacity(0.07)
-    )
+    static let appHairline = Color(UIColor.separator)
 
     /// Warm near-black ink (17:1 on the canvas) and a warm grey for secondary text (5.3:1).
-    static let appInk = appDynamicColor(
-        dark: Color(red: 0.949, green: 0.929, blue: 0.894),   // #F2EDE4, the ivory of Adam's site
-        light: Color(red: 0.086, green: 0.086, blue: 0.075)   // #161613
-    )
+    static let appInk = Color(UIColor.label)
 
-    static let appMuted = appDynamicColor(
-        dark: Color(red: 0.604, green: 0.584, blue: 0.565),   // #9A9590
-        light: Color(red: 0.420, green: 0.404, blue: 0.373)   // #6B675F
-    )
+    static let appMuted = Color(UIColor.secondaryLabel)
 
-    static let appAccent = appDynamicColor(
-        dark: Color(red: 0.949, green: 0.929, blue: 0.894),
-        light: Color(red: 0.09, green: 0.09, blue: 0.08)
-    )
+    static let appAccent = Color(UIColor.label)
 
     /// Each appearance pairs the action colour with contrasting ink.
-    static let appOnAccent = appDynamicColor(
-        dark: Color(red: 0.043, green: 0.047, blue: 0.047),
-        light: Color.white
-    )
+    static let appOnAccent = Color(UIColor.systemBackground)
 
     /// A decision keeps its own visible place until its answer is confirmed.
-    static let appDecisionSurface = appDynamicColor(
-        dark: Color(red: 0.20, green: 0.21, blue: 0.18),
-        light: Color(red: 0.94, green: 0.93, blue: 0.89)
-    )
-    static let appMemorySurface = appDynamicColor(
-        dark: Color(red: 0.18, green: 0.20, blue: 0.18),
-        light: Color(red: 0.93, green: 0.93, blue: 0.91)
-    )
-    static let appHomeSurface = appDynamicColor(
-        dark: Color(red: 0.20, green: 0.21, blue: 0.19),
-        light: Color(red: 0.91, green: 0.92, blue: 0.89)
-    )
+    static let appDecisionSurface = Color(UIColor.secondarySystemBackground)
+    static let appMemorySurface = Color(UIColor.secondarySystemBackground)
+    static let appHomeSurface = Color(UIColor.secondarySystemBackground)
 
     // MARK: - Semantic (for trust and safety)
     static let appSuccess = appDynamicColor(
@@ -82,23 +47,17 @@ extension Color {
     )
 
     static let appScrim = Color.black.opacity(0.5)
-    static let appFillSubtle = appDynamicColor(dark: Color.white.opacity(0.08), light: Color.black.opacity(0.06))
+    static let appFillSubtle = Color(UIColor.systemFill)
     static let appFillScrim = appScrim
     static let appObsidian = appBackground
     static let appTitanium = appMuted
 
     /// The user's own messages use a quiet neutral wash.
-    static let appUserBubble = appDynamicColor(
-        dark: Color.white.opacity(0.13),
-        light: Color(red: 0.07, green: 0.22, blue: 0.16).opacity(0.08)
-    )
+    static let appUserBubble = Color(UIColor.systemGray5)
 
     /// Adam's side of the conversation: message bubbles and cards.
     /// The same raised surface as every card (Settings, board, Activity), so a thread has one grey, not two.
-    static let appReceivedBubble = appDynamicColor(
-        dark: Color(red: 0.082, green: 0.086, blue: 0.09),
-        light: Color.white
-    )
+    static let appReceivedBubble = Color(UIColor.secondarySystemBackground)
 
     // MARK: - Roles (thread and cards)
     /// The strongest surface against the current background: the button to press.
@@ -112,10 +71,7 @@ extension Color {
     /// Finished.
     static let appDone = appSuccess
     /// Thin outline for thread cards.
-    static let appCardOutline = appDynamicColor(
-        dark: Color(red: 0.2, green: 0.21, blue: 0.22),
-        light: Color(red: 0.063, green: 0.090, blue: 0.129).opacity(0.13)
-    )
+    static let appCardOutline = Color(UIColor.separator)
 }
 
 // MARK: - Adam main screen

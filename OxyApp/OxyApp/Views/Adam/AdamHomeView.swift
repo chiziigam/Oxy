@@ -65,7 +65,6 @@ struct AdamHomeView: View {
         }
         .sheet(item: $openWorkflow) { open in
             WorkflowTimelineView(workflowId: open.id, onChanged: { Task { await model.refresh() } })
-                .preferredColorScheme(.dark)
         }
         .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { note in
             guard let text = note.object as? String else { return }
