@@ -4,7 +4,7 @@ struct LoginView: View {
     @Environment(AppState.self) private var appState
     @State private var userId = ""
     @State private var password = ""
-    @State private var isRegistering = false
+    @State private var isRegistering = !UserDefaults.standard.bool(forKey: "adam_signed_in_before")
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var didAttemptAutoDemoLogin = false
@@ -13,7 +13,7 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color.appBackground.ignoresSafeArea()
+            Color.adamBackground.ignoresSafeArea()
 
             // Straight to the sign-in form — no intro carousel, no mic slide.
             LoginFormPage(
@@ -36,7 +36,8 @@ struct LoginView: View {
 
     private var shouldShowDemoLogin: Bool {
         #if DEBUG
-        return true
+        return ProcessInfo.processInfo.environment["OXY_DEBUG_DEMO_LOGIN"] == "1"
+            || UserDefaults.standard.bool(forKey: "oxy_enable_local_dev_auth")
         #else
         return UserDefaults.standard.bool(forKey: "oxy_enable_local_dev_auth")
         #endif
@@ -145,18 +146,20 @@ private struct LoginFormPage: View {
     @FocusState private var focusedField: Field?
     private enum Field { case userId, password }
 
+    private var canSubmit: Bool { !userId.isEmpty && !password.isEmpty }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 96)
+                AdamMark().frame(width: 30, height: 30)
+                    .padding(.top, 72)
+                    .padding(.bottom, 40)
+                    .accessibilityHidden(true)
 
-                BrandWordmark(height: 24)
-                    .padding(.bottom, 44)
-
-                Text(isRegistering ? "Create your account." : "Welcome back.")
-                    .font(.heroTitle)
-                    .foregroundStyle(Color.appInk)
-                    .padding(.bottom, 44)
+                Text(isRegistering ? "Create your account" : "Sign in")
+                    .font(.appBody(32, weight: .semibold))
+                    .foregroundStyle(Color.adamInk)
+                    .padding(.bottom, 36)
 
                 VStack(alignment: .leading, spacing: 28) {
                     lineField(placeholder: isRegistering ? "Email" : "Email or username", text: $userId, secure: false, field: .userId, keyboard: isRegistering ? .emailAddress : .default)
@@ -165,81 +168,38 @@ private struct LoginFormPage: View {
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(Font.appBody(12, weight: .medium))
-                        .foregroundStyle(Color.appDanger)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .font(.adamBody)
+                        .foregroundStyle(Color.adamInk)
                         .padding(.top, 20)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Button(action: onSubmit) {
-                    HStack(spacing: 8) {
-                        if isLoading {
-                            ProgressView()
-                                .tint(Color.appBackground)
-                                .scaleEffect(0.8)
-                        }
-                        Text(isRegistering ? "Create Account" : "Sign In")
-                            .font(.appBody(15, weight: .semibold))
-                    }
-                    .foregroundStyle(Color.appBackground)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.appInk, in: RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
-                }
-                .buttonStyle(.appScale)
-                .disabled(isLoading || userId.isEmpty || password.isEmpty)
-                .opacity(userId.isEmpty || password.isEmpty ? 0.4 : 1)
-                .animation(.appFast, value: userId.isEmpty || password.isEmpty)
-                .padding(.top, 36)
+                AdamButton(title: isLoading ? "One moment" : (isRegistering ? "Create account" : "Sign in"), prominent: true, isEnabled: canSubmit && !isLoading, action: onSubmit)
+                    .padding(.top, 32)
 
                 if isRegistering {
                     Text(.init("By creating an account you agree to the [Terms](\(APIClient.shared.baseURL)/terms) and [Privacy Policy](\(APIClient.shared.baseURL)/privacy)."))
-                        .font(.appBody(12))
-                        .foregroundStyle(Color.appMuted)
-                        .tint(Color.appInk)
+                        .font(.adamLabel)
+                        .foregroundStyle(Color.adamInk.opacity(0.8))
+                        .tint(Color.adamInk)
                         .padding(.top, 14)
                 }
 
                 if showDemoLogin {
-                    Button(action: onDemoLogin) {
-                        HStack(spacing: 8) {
-                            AppIcon("person-check", size: 16)
-                            Text("Continue as Test User")
-                                .font(.appBody(14, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.appInk)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.appFillSubtle)
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                                .stroke(Color.appHairline, lineWidth: 0.5)
-                        )
-                    }
-                    .buttonStyle(.appScale)
-                    .disabled(isLoading)
-                    .opacity(isLoading ? 0.55 : 1)
-                    .padding(.top, 14)
-
-                    Text("Debug demo session")
-                        .font(.appBody(12, weight: .light))
-                        .foregroundStyle(Color.appMuted)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 8)
+                    AdamButton(title: "Continue as test user", isEnabled: !isLoading, action: onDemoLogin)
+                        .padding(.top, 14)
                 }
 
                 Button {
                     withAnimation(.appFast) { isRegistering.toggle() }
+                    errorMessage = nil
                 } label: {
-                    Text(isRegistering ? "Already have an account? Sign in" : "New here? Create account")
-                        .font(.appBody(14))
-                        .foregroundStyle(Color.appMuted)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    Text(isRegistering ? "I already have an account" : "New here? Create account")
+                        .font(.adamButton)
+                        .foregroundStyle(Color.adamInk)
+                        .frame(maxWidth: .infinity, minHeight: AdamLayout.buttonHeight)
                 }
-                .buttonStyle(.appScale)
-                .padding(.top, 20)
+                .buttonStyle(.plain)
+                .padding(.top, 12)
 
                 Spacer().frame(height: 60)
             }
@@ -252,24 +212,24 @@ private struct LoginFormPage: View {
         VStack(spacing: 9) {
             Group {
                 if secure {
-                    SecureField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.appMuted))
+                    SecureField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.adamMuted))
+                        .textContentType(isRegistering ? .newPassword : .password)
                 } else {
-                    TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.appMuted))
+                    TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.adamMuted))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(keyboard)
-                        .textContentType(keyboard == .emailAddress ? .emailAddress : nil)
+                        .textContentType(keyboard == .emailAddress ? .emailAddress : .username)
                 }
             }
-            .font(.appBody(16))
-            .foregroundStyle(Color.appInk)
-            .tint(Color.appTitanium)
+            .font(.appBody(18))
+            .foregroundStyle(Color.adamInk)
+            .tint(Color.adamInk)
             .focused($focusedField, equals: field)
 
             Rectangle()
-                .fill(focusedField == field ? Color.appInk.opacity(0.55) : Color.appFillSubtle)
-                .frame(height: focusedField == field ? 1 : 0.5)
-                .animation(.appFast, value: focusedField)
+                .fill(Color.adamInk.opacity(focusedField == field ? 0.7 : 0.3))
+                .frame(height: focusedField == field ? 1.5 : 1)
         }
     }
 }

@@ -37,7 +37,7 @@ struct RootView: View {
             } else if appState.isAuthenticated {
                 MainTabView()
             } else {
-                LoginView().preferredColorScheme(.dark)
+                LoginView()
             }
         }
         .animation(.easeInOut(duration: 0.35), value: appState.isAuthenticated)

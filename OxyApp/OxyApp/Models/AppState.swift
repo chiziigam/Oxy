@@ -89,6 +89,7 @@ final class AppState {
         }
         isAuthenticated = true
         errorMessage = nil
+        if !isDemo { UserDefaults.standard.set(true, forKey: "adam_signed_in_before") }
         if !isDemo, SetupState.isDone(userId) { startServices() }
     }
 
