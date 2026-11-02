@@ -40,6 +40,8 @@ async function updateResponsibility({ userId, action, params, enrichedParams, co
       options: params.checkpoint_options || null,
       expiresAt: params.checkpoint_expires_at || null
     });
+    const workflow = await wf.getWorkflow(supabase, userId, workflowId).catch(() => null);
+    await deps.announceDecision?.(userId, checkpoint, workflow);
     return {
       success: true,
       checkpointId: checkpoint.id,
@@ -55,6 +57,7 @@ async function updateResponsibility({ userId, action, params, enrichedParams, co
   const updated = await wf.updateWorkflow(supabase, userId, workflowId, patch, {
     summary: params?.note || null
   });
+  await deps.announceResult?.(userId, updated);
   return { success: true, text: updated.next_action || updated.current_step || 'Updated.', actionSummary: 'Updated' };
 }
 

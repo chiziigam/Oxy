@@ -61,7 +61,15 @@ function buildInboundReplyNotification({
       requestTaskId: requestTaskId || null,
       eventId: eventId || null,
       channelType: channelType || null,
-      decision: replyDecision
+      decision: replyDecision,
+      ...(replyDecision === 'ask' ? {
+        push: {
+          apsCategory: 'adam.reply',
+          threadId: conversationKey,
+          collapseId: conversationKey,
+          data: { conversationId: conversationKey }
+        }
+      } : {})
     }
   };
 }

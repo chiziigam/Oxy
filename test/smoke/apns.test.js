@@ -31,6 +31,16 @@ test('a push is sent over http2 to the device path with the app topic', async ()
   assert.equal(fakeConnect.last.lastHeaders['apns-topic'], 'ai.oxy.app');
 });
 
+test('a collapse id replaces an earlier push for the same decision', async () => {
+  await sendApns({ host: 'https://x', authToken: 'jwt', topic: 't', deviceToken: 'abc', payload: {}, collapseId: 'cp1', connect: fakeConnect(200) });
+  assert.equal(fakeConnect.last.lastHeaders['apns-collapse-id'], 'cp1');
+});
+
+test('no collapse id header is sent when none is given', async () => {
+  await sendApns({ host: 'https://x', authToken: 'jwt', topic: 't', deviceToken: 'abc', payload: {}, connect: fakeConnect(200) });
+  assert.equal('apns-collapse-id' in fakeConnect.last.lastHeaders, false);
+});
+
 test('Apple refusing a token is reported with its reason, and only unregistered tokens count as dead', async () => {
   const result = await sendApns({ host: 'https://x', authToken: 'jwt', topic: 't', deviceToken: 'abc', payload: {}, connect: fakeConnect(400, 'BadDeviceToken') });
   assert.equal(result.ok, false);

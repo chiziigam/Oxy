@@ -172,6 +172,7 @@ const notifications = require('./services/notifications');
 const offers = require('./services/offers');
 const photoNotesService = require('./services/photo-notes');
 const apns = require('./services/apns');
+const decisionPush = require('./services/decision-push');
 const { raiseRecentActionFollowUp, recoverySnapshot } = require('./services/action-follow-up');
 const commitments = require('./services/commitments');
 const { normalizeHouseholdState, formatHouseholdState } = require('./services/household-state');
@@ -1156,14 +1157,18 @@ async function sendPushToUser(userId, briefing) {
         authToken: token,
         topic: bundleId,
         deviceToken: device.push_token,
+        collapseId: briefing.push?.collapseId || null,
         payload: {
           aps: {
             alert: { title: briefing.title || 'Assistant', body: briefing.body || briefing.text || '' },
             sound: 'default',
-            'mutable-content': 1
+            'mutable-content': 1,
+            ...(briefing.push?.apsCategory ? { category: briefing.push.apsCategory } : {}),
+            ...(briefing.push?.threadId ? { 'thread-id': briefing.push.threadId } : {})
           },
           briefingId: briefing.id,
-          kind: briefing.kind
+          kind: briefing.kind,
+          ...(briefing.push?.data || {})
         }
       });
       if (result.ok) { sent += 1; return; }
@@ -2937,7 +2942,7 @@ async function executeAction(userId, action, params, context = {}) {
 const notificationDelivery = createDeliveryRuntime({
   supabase,
   sendPush: async (userId, payload) => {
-    const result = await sendPushToUser(userId, { title: payload.title, body: payload.body, kind: payload.category });
+    const result = await sendPushToUser(userId, { title: payload.title, body: payload.body, kind: payload.category, push: payload.push || null });
     // sendPushToUser reports { sent: 0, skipped: true } when APNs is not configured. That is
     // not a delivery, and must not be recorded as one.
     return { ok: Number(result?.sent) > 0, error: result?.skipped ? 'Apple push is not configured' : result?.error };
@@ -2989,9 +2994,29 @@ async function notifyApprovalWaiting(userId, parked) {
     title: notice.title,
     body: notice.body,
     dedupeKey: notifications.dedupeKeyFor({ category: notice.category, state: `approval:${notice.approvalId}` }),
-    sourceRef: { approvalId: notice.approvalId, taskId: notice.taskId }
+    sourceRef: {
+      approvalId: notice.approvalId,
+      taskId: notice.taskId,
+      push: (({ category, threadId, collapseId, data }) => ({ apsCategory: category, threadId, collapseId, data }))(
+        decisionPush.buildApprovalPush({ approval: parked, risk: getActionContract(parked?.action?.type)?.risk })
+      )
+    }
   });
   if (queued?.ok) await notificationDelivery.deliverPending(userId);
+}
+
+async function announceResult(userId, workflow) {
+  const push = decisionPush.buildResultPush({ workflow });
+  if (!push) return { ok: true, skipped: true };
+  return decisionPush.announce({ delivery: notificationDelivery, userId, push, category: 'other' });
+}
+
+async function announceDecision(userId, checkpoint, workflow) {
+  return decisionPush.announce({
+    delivery: notificationDelivery,
+    userId,
+    push: decisionPush.buildDecisionPush({ checkpoint, workflow })
+  });
 }
 
 async function evaluateAndSurfaceContextWatches(userId, nativeContext, now = new Date(), logger = console) {
@@ -10181,6 +10206,8 @@ app.get('/concierge/balance', requireSessionAuth, async (req, res) => {
 // because several entries are `const`s declared further down and would throw at startup.
 const actionDeps = {
   supabase,
+  announceDecision,
+  announceResult,
   agentWorkspace,
   travelSearch,
   travelInventory,

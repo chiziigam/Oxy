@@ -4,7 +4,7 @@
 
 const http2 = require('node:http2');
 
-function sendApns({ host, authToken, topic, deviceToken, payload, connect = http2.connect, timeoutMs = 10000 }) {
+function sendApns({ host, authToken, topic, deviceToken, payload, collapseId = null, connect = http2.connect, timeoutMs = 10000 }) {
   return new Promise((resolve) => {
     let settled = false;
     const done = (result) => { if (!settled) { settled = true; resolve(result); } };
@@ -12,14 +12,16 @@ function sendApns({ host, authToken, topic, deviceToken, payload, connect = http
     try { client = connect(host); } catch (error) { return done({ ok: false, status: 0, reason: error.message }); }
     const finish = (result) => { try { client.close(); } catch { /* already closed */ } done(result); };
     client.on('error', (error) => finish({ ok: false, status: 0, reason: error.message }));
-    const request = client.request({
+    const headers = {
       ':method': 'POST',
       ':path': `/3/device/${deviceToken}`,
       authorization: `bearer ${authToken}`,
       'apns-topic': topic,
       'apns-push-type': 'alert',
       'content-type': 'application/json'
-    });
+    };
+    if (collapseId) headers['apns-collapse-id'] = String(collapseId).slice(0, 64);
+    const request = client.request(headers);
     request.setTimeout(timeoutMs, () => { request.close(); finish({ ok: false, status: 0, reason: 'timeout' }); });
     let status = 0;
     let body = '';

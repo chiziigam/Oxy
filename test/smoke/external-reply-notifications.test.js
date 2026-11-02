@@ -30,7 +30,13 @@ test('buildInboundReplyNotification creates a deduped, actionable email notifica
     requestTaskId: 'task-1',
     eventId: 'event-1',
     channelType: 'email',
-    decision: 'ask'
+    decision: 'ask',
+    push: {
+      apsCategory: 'adam.reply',
+      threadId: 'conversation-1',
+      collapseId: 'conversation-1',
+      data: { conversationId: 'conversation-1' }
+    }
   });
 });
 
@@ -48,6 +54,7 @@ test('informational SMS replies are surfaced at low urgency without auto-acting'
   assert.match(notification.title, /\+447700900123/);
   assert.doesNotMatch(notification.body, /needs your attention/);
   assert.equal(notification.sourceRef.decision, 'surface');
+  assert.equal(notification.sourceRef.push, undefined);
 });
 
 test('likely verification codes are redacted from the notification preview', () => {

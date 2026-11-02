@@ -607,7 +607,7 @@ function runtimeWith(overrides = {}) {
   };
   const runtime = createDeliveryRuntime({
     supabase,
-    sendPush: async () => { calls.push('push'); return { ok: false, error: 'Apple push is not configured' }; },
+    sendPush: overrides.sendPush || (async () => { calls.push('push'); return { ok: false, error: 'Apple push is not configured' }; }),
     sendEmail: async (args) => { calls.push(`email:${args.provider || 'resend'}:${args.to}`); return overrides.emailResult ?? { ok: true, providerRef: 'resend-1' }; },
     sendTelegram: async (_userId, args) => { calls.push(`telegram:${args.text}`); return overrides.telegramResult ?? { ok: true }; },
     createBriefing: async () => { calls.push('in_app'); return { id: 'b1' }; },
@@ -855,4 +855,17 @@ test('preferences read back as a sentence, not a settings dump', () => {
   assert.match(text, /urgent only/);
   assert.match(text, /quiet 22:00-07:00/);
   assert.match(text, /delivery: in_app/);
+});
+
+test('a push carries the answer actions stored on its event', async () => {
+  let sent = null;
+  const { runtime, rows } = runtimeWith({ sendPush: async (_userId, payload) => { sent = payload; return { ok: true }; }, devices: 1 });
+  await runtime.raise('u1', {
+    category: 'reply_needed', title: 'Book the plumber', body: 'Thursday at 2pm?', dedupeKey: 'cp1',
+    sourceRef: { push: { apsCategory: 'adam.approve', threadId: 'wf1', collapseId: 'cp1', data: { workflowId: 'wf1', checkpointId: 'cp1' } } }
+  });
+  const event = [...rows.values()][0];
+  const result = await runtime.deliverOne('u1', event, { prefs: {}, available: ['push'], emailTo: null });
+  assert.equal(result.status, 'delivered');
+  assert.deepEqual(sent.push, { apsCategory: 'adam.approve', threadId: 'wf1', collapseId: 'cp1', data: { workflowId: 'wf1', checkpointId: 'cp1' } });
 });

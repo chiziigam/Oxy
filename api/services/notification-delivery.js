@@ -195,7 +195,7 @@ function createDeliveryRuntime({
     let result;
     try {
       if (decision.channel === 'push') {
-        result = await sendPush(userId, { title: event.title, body: event.body, category: event.category });
+        result = await sendPush(userId, { title: event.title, body: event.body, category: event.category, push: event.source_ref?.push || null });
       } else if (decision.channel === 'email') {
         const shaped = notifications.formatNotificationEmail(event);
         result = await sendEmail({
@@ -384,7 +384,7 @@ function createDeliveryRuntime({
         if (channel === 'in_app' || channel === event.channel) continue;
         let result;
         try {
-          if (channel === 'push') result = await sendPush(event.user_id, { title, body: event.body, category: event.category });
+          if (channel === 'push') result = await sendPush(event.user_id, { title, body: event.body, category: event.category, push: event.source_ref?.push || null });
           else if (channel === 'email') {
             const shaped = notifications.formatNotificationEmail({ ...event, title });
             result = await sendEmail({ userId: event.user_id, to: emailTo, subject: shaped.subject, text: shaped.text, provider: emailProvider });
