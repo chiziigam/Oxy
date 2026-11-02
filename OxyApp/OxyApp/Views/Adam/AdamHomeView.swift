@@ -8,6 +8,7 @@ struct AdamHomeView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = ThreadBoardModel()
     @State private var draft = ""
     @State private var conversation: ConversationRequest?
@@ -46,7 +47,7 @@ struct AdamHomeView: View {
                         Task {
                             await model.refresh()
                             let match = model.needsYou.first { $0.checkpointId == id || $0.workflowId == id || $0.id == id }
-                            if let match { withAnimation(.appStandard) { proxy.scrollTo(match.id, anchor: .top) } }
+                            if let match { withAnimation(reduceMotion ? nil : .appStandard) { proxy.scrollTo(match.id, anchor: .top) } }
                         }
                     }
                 }
@@ -76,7 +77,7 @@ struct AdamHomeView: View {
             openWorkflow = nil
             draft = text
         }
-        .animation(.appStandard, value: model.needsYou.map(\.id))
+        .animation(reduceMotion ? nil : .appStandard, value: model.needsYou.map(\.id))
     }
 
     private var header: some View {
@@ -123,7 +124,7 @@ struct AdamHomeView: View {
                     AdamDoneRow(item: item) { open(item) }
                 }
                 if doneItems.count > Self.visibleDone {
-                    Button(showEarlier ? "Show less" : "Earlier") { withAnimation(.appStandard) { showEarlier.toggle() } }
+                    Button(showEarlier ? "Show less" : "Earlier") { withAnimation(reduceMotion ? nil : .appStandard) { showEarlier.toggle() } }
                         .font(.adamLabel).foregroundStyle(Color.adamInk)
                         .frame(minHeight: AdamLayout.buttonHeight)
                 }

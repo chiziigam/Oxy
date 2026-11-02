@@ -8,6 +8,7 @@ struct AdamConversationView: View {
     @State private var viewModel = ChatViewModel()
     @State private var draft = ""
     @State private var voice = VoiceInputManager()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -38,7 +39,7 @@ struct AdamConversationView: View {
                         .padding(.bottom, 12)
                     }
                     .onChange(of: viewModel.messages.count) {
-                        if let last = viewModel.messages.last { withAnimation(.appStandard) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                        if let last = viewModel.messages.last { withAnimation(reduceMotion ? nil : .appStandard) { proxy.scrollTo(last.id, anchor: .bottom) } }
                     }
                 }
                 AskAdamBar(text: $draft, isRecording: voice.isRecording, onSend: send, onMic: toggleVoice)
