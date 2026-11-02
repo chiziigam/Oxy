@@ -14,7 +14,6 @@ struct AdamHomeView: View {
     @State private var conversation: ConversationRequest?
     @State private var openWorkflow: OpenWorkflow?
     @State private var showEarlier = false
-    @State private var showsHome = false
     @State private var voice = VoiceInputManager()
 
     private static let visibleDone = 5
@@ -64,9 +63,6 @@ struct AdamHomeView: View {
             AdamConversationView(initialMessage: request.text)
                 .environment(appState)
         }
-        .fullScreenCover(isPresented: $showsHome) {
-            YourHomeView().swipeToDismiss().environment(\.revealClose, nil).preferredColorScheme(.dark)
-        }
         .sheet(item: $openWorkflow) { open in
             WorkflowTimelineView(workflowId: open.id, onChanged: { Task { await model.refresh() } })
                 .preferredColorScheme(.dark)
@@ -110,9 +106,6 @@ struct AdamHomeView: View {
         } else if nothingToShow {
             emptyState
         } else {
-            if let home = model.home, !HomeMap.rooms(from: home).isEmpty {
-                homeCard(home)
-            }
             if !model.needsYou.isEmpty {
                 sectionLabel("Needs you")
                 ForEach(model.needsYou) { item in
@@ -137,17 +130,6 @@ struct AdamHomeView: View {
                 }
             }
         }
-    }
-
-    private func homeCard(_ home: HomeModel) -> some View {
-        Button { showsHome = true } label: {
-            AdamCard {
-                HomeMap(rooms: HomeMap.rooms(from: home), compact: true)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens your home")
     }
 
     private var shownDone: [BoardItem] {
