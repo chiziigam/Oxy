@@ -8,19 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		E1000001000000000000B001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E1000001000000000000B002 /* PrivacyInfo.xcprivacy */; };
-		AB1000000000000000000002 /* AgentEnvironmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000000000000000000002 /* AgentEnvironmentView.swift */; };
-		AB1000000000000000000F01 /* CornerReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000000000000000000F01 /* CornerReveal.swift */; };
-		AB1000000000000000000001 /* TaskInterfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000000000000000000001 /* TaskInterfaceView.swift */; };
 		A10000010000000000000F08 /* WorkflowTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F08 /* WorkflowTimelineView.swift */; };
 		A10000010000000000000F14 /* YourHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F14 /* YourHomeView.swift */; };
-		A10000010000000000000F77 /* HomeFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F77 /* HomeFeedView.swift */; };
 		A10000010000000000000F16 /* SceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F16 /* SceneView.swift */; };
 		A10000010000000000000F90 /* PlaceResultsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F90 /* PlaceResultsCard.swift */; };
 		A10000010000000000000FA1 /* ResultOptionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000FA1 /* ResultOptionsCard.swift */; };
 		A10000010000000000000F91 /* TravelOptionsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F91 /* TravelOptionsCard.swift */; };
 		A10000010000000000000F92 /* CompareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F92 /* CompareSheet.swift */; };
-		A10000010000000000000F15 /* AdamActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F15 /* AdamActivityView.swift */; };
-		A10000010000000000000F07 /* HomeBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F07 /* HomeBoardView.swift */; };
 		A10000010000000000000F06 /* HomeBoardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F06 /* HomeBoardService.swift */; };
 		A10000010000000000000F05 /* HomeBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F05 /* HomeBoard.swift */; };
 		A1000001000000000000F010 /* MessageUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000001000000000000F010 /* MessageUI.framework */; };
@@ -33,7 +27,6 @@
 		A1000001000000000000020D /* AgentContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000020D /* AgentContextService.swift */; };
 		A10000010000000000000212 /* ModelRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000212 /* ModelRouting.swift */; };
 		A10000010000000000000213 /* ModelRoutingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000213 /* ModelRoutingService.swift */; };
-		A10000010000000000000214 /* ModelRoutingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000214 /* ModelRoutingView.swift */; };
 		A10000010000000000000215 /* AgentContinuity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000215 /* AgentContinuity.swift */; };
 		A10000010000000000000216 /* AgentContinuityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000216 /* AgentContinuityService.swift */; };
 		A10000010000000000000217 /* AgentContinuityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000217 /* AgentContinuityView.swift */; };
@@ -45,15 +38,11 @@
 		A10000010000000000000006 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000006 /* AuthService.swift */; };
 		A10000010000000000000007 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* ChatService.swift */; };
 		A10000010000000000000008 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* LoginView.swift */; };
-		A10000010000000000000009 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* ChatView.swift */; };
 		A10000010000000000000010 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* ChatViewModel.swift */; };
 		A10000010000000000000011 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* MessageBubble.swift */; };
 		F10C0A110000000000000001 /* CheckoutInformationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10C0A120000000000000001 /* CheckoutInformationSheet.swift */; };
 		A10000010000000000000047 /* TurnReceiptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000047 /* TurnReceiptRow.swift */; };
 		A10000010000000000000F10 /* ThreadBoardCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F10 /* ThreadBoardCards.swift */; };
-		A10000010000000000000F11 /* ThreadHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F11 /* ThreadHeader.swift */; };
-		A10000010000000000000F99 /* HomeNowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F99 /* HomeNowView.swift */; };
-		A10000010000000000000F12 /* ThreadWheelMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F12 /* ThreadWheelMenu.swift */; };
 		A10000010000000000000F13 /* ThreadMessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000F13 /* ThreadMessageRow.swift */; };
 		A10000010000000000000012 /* Color+Oxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* Color+Oxy.swift */; };
 		A10000010000000000000013 /* LoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* LoadingIndicator.swift */; };
@@ -88,12 +77,8 @@
 		A10000010000000000000032 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000032 /* AppTheme.swift */; };
 		A10000010000000000000033 /* PendantTelemetryMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000033 /* PendantTelemetryMonitor.swift */; };
 		A10000010000000000000034 /* DeviceStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000034 /* DeviceStatusCard.swift */; };
-		A10000010000000000000035 /* LegalConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000035 /* LegalConsentView.swift */; };
-		A10000010000000000000036 /* SetupPendantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000036 /* SetupPendantView.swift */; };
-		A10000010000000000000037 /* ConnectionTroubleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000037 /* ConnectionTroubleView.swift */; };
 		A10000010000000000000038 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000038 /* ProfileView.swift */; };
 		A10000010000000000000039 /* PendantStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000039 /* PendantStatusView.swift */; };
-		A10000010000000000000040 /* AppHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000040 /* AppHeaderView.swift */; };
 		A10000010000000000000041 /* OxyShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000041 /* OxyShortcuts.swift */; };
 		A10000010000000000000043 /* PendantLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000043 /* PendantLiveActivity.swift */; };
 		A10000010000000000000044 /* ScreenHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000044 /* ScreenHeaderView.swift */; };
@@ -108,23 +93,19 @@
 		AD000001000BC42004625A02 /* AskAdamBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */; };
 		AD000001009C66EC54AD8E1A /* AdamConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */; };
 		AD000001002743C220233703 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD00000100146313ECA3D284 /* SettingsRootView.swift */; };
+		AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001003A35D2C361ED3F /* CornerReveal.swift */; };
+		AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001000761B49F110C7C /* TaskInterfaceView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		E1000001000000000000B002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		AB2000000000000000000002 /* AgentEnvironmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEnvironmentView.swift; sourceTree = "<group>"; };
-		AB2000000000000000000F01 /* CornerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CornerReveal.swift; sourceTree = "<group>"; };
-		AB2000000000000000000001 /* TaskInterfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInterfaceView.swift; sourceTree = "<group>"; };
 		A20000010000000000000F08 /* WorkflowTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkflowTimelineView.swift; sourceTree = "<group>"; };
 		A20000010000000000000F14 /* YourHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YourHomeView.swift; sourceTree = "<group>"; };
-		A20000010000000000000F77 /* HomeFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFeedView.swift; sourceTree = "<group>"; };
 		A20000010000000000000F16 /* SceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneView.swift; sourceTree = "<group>"; };
 		A20000010000000000000F90 /* PlaceResultsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceResultsCard.swift; sourceTree = "<group>"; };
 		A20000010000000000000FA1 /* ResultOptionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultOptionsCard.swift; sourceTree = "<group>"; };
 		A20000010000000000000F91 /* TravelOptionsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravelOptionsCard.swift; sourceTree = "<group>"; };
 		A20000010000000000000F92 /* CompareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareSheet.swift; sourceTree = "<group>"; };
-		A20000010000000000000F15 /* AdamActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdamActivityView.swift; sourceTree = "<group>"; };
-		A20000010000000000000F07 /* HomeBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBoardView.swift; sourceTree = "<group>"; };
 		A20000010000000000000F06 /* HomeBoardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBoardService.swift; sourceTree = "<group>"; };
 		A20000010000000000000F05 /* HomeBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBoard.swift; sourceTree = "<group>"; };
 		A2000001000000000000F010 /* MessageUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MessageUI.framework; path = System/Library/Frameworks/MessageUI.framework; sourceTree = SDKROOT; };
@@ -137,7 +118,6 @@
 		A2000001000000000000020D /* AgentContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentContextService.swift; sourceTree = "<group>"; };
 		A20000010000000000000212 /* ModelRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRouting.swift; sourceTree = "<group>"; };
 		A20000010000000000000213 /* ModelRoutingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRoutingService.swift; sourceTree = "<group>"; };
-		A20000010000000000000214 /* ModelRoutingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRoutingView.swift; sourceTree = "<group>"; };
 		A20000010000000000000215 /* AgentContinuity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentContinuity.swift; sourceTree = "<group>"; };
 		A20000010000000000000216 /* AgentContinuityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentContinuityService.swift; sourceTree = "<group>"; };
 		A20000010000000000000217 /* AgentContinuityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentContinuityView.swift; sourceTree = "<group>"; };
@@ -149,15 +129,11 @@
 		A20000010000000000000006 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A20000010000000000000007 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		A20000010000000000000008 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		A20000010000000000000009 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		A20000010000000000000010 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		A20000010000000000000011 /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubble.swift; sourceTree = "<group>"; };
 		F10C0A120000000000000001 /* CheckoutInformationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutInformationSheet.swift; sourceTree = "<group>"; };
 		A20000010000000000000047 /* TurnReceiptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnReceiptRow.swift; sourceTree = "<group>"; };
 		A20000010000000000000F10 /* ThreadBoardCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadBoardCards.swift; sourceTree = "<group>"; };
-		A20000010000000000000F11 /* ThreadHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadHeader.swift; sourceTree = "<group>"; };
-		A20000010000000000000F99 /* HomeNowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeNowView.swift; sourceTree = "<group>"; };
-		A20000010000000000000F12 /* ThreadWheelMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadWheelMenu.swift; sourceTree = "<group>"; };
 		A20000010000000000000F13 /* ThreadMessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadMessageRow.swift; sourceTree = "<group>"; };
 		A20000010000000000000012 /* Color+Oxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Oxy.swift"; sourceTree = "<group>"; };
 		A20000010000000000000013 /* LoadingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicator.swift; sourceTree = "<group>"; };
@@ -194,12 +170,8 @@
 		A20000010000000000000032 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		A20000010000000000000033 /* PendantTelemetryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendantTelemetryMonitor.swift; sourceTree = "<group>"; };
 		A20000010000000000000034 /* DeviceStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStatusCard.swift; sourceTree = "<group>"; };
-		A20000010000000000000035 /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
-		A20000010000000000000036 /* SetupPendantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupPendantView.swift; sourceTree = "<group>"; };
-		A20000010000000000000037 /* ConnectionTroubleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionTroubleView.swift; sourceTree = "<group>"; };
 		A20000010000000000000038 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		A20000010000000000000039 /* PendantStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendantStatusView.swift; sourceTree = "<group>"; };
-		A20000010000000000000040 /* AppHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppHeaderView.swift; sourceTree = "<group>"; };
 		A20000010000000000000041 /* OxyShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OxyShortcuts.swift; sourceTree = "<group>"; };
 		A20000010000000000000043 /* PendantLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendantLiveActivity.swift; sourceTree = "<group>"; };
 		A20000010000000000000044 /* ScreenHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenHeaderView.swift; sourceTree = "<group>"; };
@@ -217,6 +189,8 @@
 		AD0000010021B5DD1E7EAD9E /* AskAdamBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskAdamBar.swift; sourceTree = "<group>"; };
 		AD00000100B2CA6071FF8E82 /* AdamConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdamConversationView.swift; sourceTree = "<group>"; };
 		AD00000100146313ECA3D284 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		AD000001003A35D2C361ED3F /* CornerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CornerReveal.swift; sourceTree = "<group>"; };
+		AD000001000761B49F110C7C /* TaskInterfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInterfaceView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -347,22 +321,18 @@
 		A50000010000000000000007 /* Chat */ = {
 			isa = PBXGroup;
 			children = (
-				A20000010000000000000009 /* ChatView.swift */,
+				AD000001000761B49F110C7C /* TaskInterfaceView.swift */,
+				AD000001003A35D2C361ED3F /* CornerReveal.swift */,
 				A20000010000000000000010 /* ChatViewModel.swift */,
 				A20000010000000000000011 /* MessageBubble.swift */,
 				F10C0A120000000000000001 /* CheckoutInformationSheet.swift */,
 				A20000010000000000000047 /* TurnReceiptRow.swift */,
 				A20000010000000000000F10 /* ThreadBoardCards.swift */,
 				A20000010000000000000F16 /* SceneView.swift */,
-				AB2000000000000000000001 /* TaskInterfaceView.swift */,
-				AB2000000000000000000002 /* AgentEnvironmentView.swift */,
-				AB2000000000000000000F01 /* CornerReveal.swift */,
 				A20000010000000000000F90 /* PlaceResultsCard.swift */,
 				A20000010000000000000FA1 /* ResultOptionsCard.swift */,
 				A20000010000000000000F91 /* TravelOptionsCard.swift */,
 				A20000010000000000000F92 /* CompareSheet.swift */,
-				A20000010000000000000F11 /* ThreadHeader.swift */,
-				A20000010000000000000F12 /* ThreadWheelMenu.swift */,
 				A20000010000000000000F13 /* ThreadMessageRow.swift */,
 				A20000010000000000000034 /* DeviceStatusCard.swift */,
 			);
@@ -374,7 +344,6 @@
 			children = (
 				A20000010000000000000013 /* LoadingIndicator.swift */,
 				A20000010000000000000014 /* ErrorBanner.swift */,
-				A20000010000000000000040 /* AppHeaderView.swift */,
 				A20000010000000000000044 /* ScreenHeaderView.swift */,
 			);
 			path = Components;
@@ -462,7 +431,6 @@
 		A5000001000000000000020C /* Agent */ = {
 			isa = PBXGroup;
 			children = (
-				A20000010000000000000214 /* ModelRoutingView.swift */,
 				A20000010000000000000217 /* AgentContinuityView.swift */,
 			);
 			path = Agent;
@@ -480,10 +448,6 @@
 			children = (
 				A20000010000000000000F08 /* WorkflowTimelineView.swift */,
 				A20000010000000000000F14 /* YourHomeView.swift */,
-				A20000010000000000000F99 /* HomeNowView.swift */,
-				A20000010000000000000F77 /* HomeFeedView.swift */,
-				A20000010000000000000F15 /* AdamActivityView.swift */,
-				A20000010000000000000F07 /* HomeBoardView.swift */,
 				A20000010000000000000100 /* AgenticHomeView.swift */,
 				A20000010000000000000104 /* GlebAgenticFlow.swift */,
 			);
@@ -493,9 +457,6 @@
 		A50000010000000000000016 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
-				A20000010000000000000035 /* LegalConsentView.swift */,
-				A20000010000000000000036 /* SetupPendantView.swift */,
-				A20000010000000000000037 /* ConnectionTroubleView.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -641,6 +602,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */,
+				AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */,
 				AD000001002743C220233703 /* SettingsRootView.swift in Sources */,
 				AD000001009C66EC54AD8E1A /* AdamConversationView.swift in Sources */,
 				AD000001000BC42004625A02 /* AskAdamBar.swift in Sources */,
@@ -649,9 +612,6 @@
 				AD0000010030CEBE7715B745 /* NotificationActions.swift in Sources */,
 				A10000010000000000000F08 /* WorkflowTimelineView.swift in Sources */,
 				A10000010000000000000F14 /* YourHomeView.swift in Sources */,
-				A10000010000000000000F77 /* HomeFeedView.swift in Sources */,
-				A10000010000000000000F15 /* AdamActivityView.swift in Sources */,
-				A10000010000000000000F07 /* HomeBoardView.swift in Sources */,
 				A10000010000000000000F06 /* HomeBoardService.swift in Sources */,
 				A10000010000000000000F05 /* HomeBoard.swift in Sources */,
 				A10000010000000000000001 /* OxyApp.swift in Sources */,
@@ -663,7 +623,6 @@
 				A1000001000000000000020D /* AgentContextService.swift in Sources */,
 				A10000010000000000000212 /* ModelRouting.swift in Sources */,
 				A10000010000000000000213 /* ModelRoutingService.swift in Sources */,
-				A10000010000000000000214 /* ModelRoutingView.swift in Sources */,
 				A10000010000000000000215 /* AgentContinuity.swift in Sources */,
 				A10000010000000000000216 /* AgentContinuityService.swift in Sources */,
 				A10000010000000000000217 /* AgentContinuityView.swift in Sources */,
@@ -678,23 +637,16 @@
 				A10000010000000000000043 /* PendantLiveActivity.swift in Sources */,
 				A10000010000000000000044 /* ScreenHeaderView.swift in Sources */,
 				A10000010000000000000008 /* LoginView.swift in Sources */,
-				A10000010000000000000009 /* ChatView.swift in Sources */,
 				A10000010000000000000010 /* ChatViewModel.swift in Sources */,
 				A10000010000000000000011 /* MessageBubble.swift in Sources */,
 				F10C0A110000000000000001 /* CheckoutInformationSheet.swift in Sources */,
 				A10000010000000000000047 /* TurnReceiptRow.swift in Sources */,
 				A10000010000000000000F10 /* ThreadBoardCards.swift in Sources */,
 				A10000010000000000000F16 /* SceneView.swift in Sources */,
-				AB1000000000000000000001 /* TaskInterfaceView.swift in Sources */,
-				AB1000000000000000000002 /* AgentEnvironmentView.swift in Sources */,
-				AB1000000000000000000F01 /* CornerReveal.swift in Sources */,
 				A10000010000000000000F90 /* PlaceResultsCard.swift in Sources */,
 				A10000010000000000000FA1 /* ResultOptionsCard.swift in Sources */,
 				A10000010000000000000F91 /* TravelOptionsCard.swift in Sources */,
 				A10000010000000000000F92 /* CompareSheet.swift in Sources */,
-				A10000010000000000000F11 /* ThreadHeader.swift in Sources */,
-				A10000010000000000000F99 /* HomeNowView.swift in Sources */,
-				A10000010000000000000F12 /* ThreadWheelMenu.swift in Sources */,
 				A10000010000000000000F13 /* ThreadMessageRow.swift in Sources */,
 				A10000010000000000000012 /* Color+Oxy.swift in Sources */,
 				A10000010000000000000032 /* AppTheme.swift in Sources */,
@@ -725,12 +677,8 @@
 				A10000010000000000000033 /* PendantTelemetryMonitor.swift in Sources */,
 				A10000010000000000000028 /* HapticManager.swift in Sources */,
 				A10000010000000000000034 /* DeviceStatusCard.swift in Sources */,
-				A10000010000000000000035 /* LegalConsentView.swift in Sources */,
-				A10000010000000000000036 /* SetupPendantView.swift in Sources */,
-				A10000010000000000000037 /* ConnectionTroubleView.swift in Sources */,
 				A10000010000000000000038 /* ProfileView.swift in Sources */,
 				A10000010000000000000039 /* PendantStatusView.swift in Sources */,
-				A10000010000000000000040 /* AppHeaderView.swift in Sources */,
 				A10000010000000000000048 /* PaymentsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
