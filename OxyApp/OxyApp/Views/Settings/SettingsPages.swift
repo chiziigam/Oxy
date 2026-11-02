@@ -65,10 +65,6 @@ struct YouPage: View {
                 }
             }
 
-            SettingsList {
-                SettingsNavRow(title: "Memory", subtitle: "Saved notes and photo context") { destination = .saved }
-            }
-
             if model.isLoading {
                 ProgressView("Loading your details")
                     .font(.appBody(15))

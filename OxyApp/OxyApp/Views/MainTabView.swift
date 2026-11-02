@@ -67,7 +67,7 @@ struct MainTabView: View {
         case .today: HomeFeedView()
         case .home: YourHomeView()
         case .memory: MemoryView()
-        case .settings, .privateChat: AdamYouView()
+        case .settings, .privateChat: SettingsRootView(onClose: { opened = nil })
         }
     }
 
