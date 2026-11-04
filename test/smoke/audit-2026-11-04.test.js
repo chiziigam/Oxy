@@ -209,3 +209,12 @@ test('a new chat can close its browser session, and only its own', async () => {
     server.close();
   }
 });
+
+test('a hosting platform tenant is its own site, not the whole platform', () => {
+  const { registrableSite } = require('../../api/lib/site');
+  assert.equal(registrableSite('alice.github.io'), 'alice.github.io');
+  assert.equal(registrableSite('www.alice.github.io'), 'alice.github.io');
+  assert.equal(registrableSite('my-shop.vercel.app'), 'my-shop.vercel.app');
+  assert.equal(registrableSite('shop.co.uk'), 'shop.co.uk');
+  assert.equal(registrableSite('www.johnlewis.com'), 'johnlewis.com');
+});

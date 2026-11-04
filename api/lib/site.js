@@ -13,7 +13,12 @@ const MULTI_PART_SUFFIXES = new Set([
   'com.br', 'net.br', 'org.br',
   'com.sg', 'com.my', 'com.hk', 'com.tw', 'com.mx', 'com.tr', 'com.ar',
   'co.in', 'net.in', 'org.in',
-  'co.kr', 'or.kr'
+  'co.kr', 'or.kr',
+  // Hosting platforms where every tenant is its own site. Collapsing these to the platform
+  // name would file one customer's cookies under another's session.
+  'github.io', 'gitlab.io', 'vercel.app', 'netlify.app', 'pages.dev', 'workers.dev',
+  'herokuapp.com', 'web.app', 'firebaseapp.com', 'blogspot.com', 'wordpress.com',
+  'tumblr.com', 'myshopify.com', 'substack.com'
 ]);
 
 function registrableSite(input) {

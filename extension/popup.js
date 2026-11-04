@@ -41,7 +41,10 @@ const MULTI_PART_SUFFIXES = new Set([
   'co.jp', 'or.jp', 'ne.jp', 'ac.jp', 'go.jp',
   'com.br', 'net.br', 'org.br',
   'com.sg', 'com.my', 'com.hk', 'com.tw', 'com.mx', 'com.tr', 'com.ar',
-  'co.in', 'net.in', 'org.in', 'co.kr', 'or.kr'
+  'co.in', 'net.in', 'org.in', 'co.kr', 'or.kr',
+  'github.io', 'gitlab.io', 'vercel.app', 'netlify.app', 'pages.dev', 'workers.dev',
+  'herokuapp.com', 'web.app', 'firebaseapp.com', 'blogspot.com', 'wordpress.com',
+  'tumblr.com', 'myshopify.com', 'substack.com'
 ]);
 
 /**
@@ -57,6 +60,14 @@ function siteFromUrl(url) {
   if (labels.length <= 2) return labels.join('.') || null;
   const keep = MULTI_PART_SUFFIXES.has(labels.slice(-2).join('.')) ? 3 : 2;
   return labels.slice(-keep).join('.');
+}
+
+/** An email signs in by email; anything else is a user id. */
+function credentialsFor(identifier, password) {
+  const value = identifier.trim();
+  return value.includes('@')
+    ? { email: value.toLowerCase(), password }
+    : { userId: value, password };
 }
 
 function showSignIn() {
@@ -175,7 +186,7 @@ async function signIn() {
     const response = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, password })
+      body: JSON.stringify(credentialsFor(userId, password))
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.token) {
