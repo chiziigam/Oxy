@@ -8203,6 +8203,8 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             const text = chunk.text || '';
             if (text) {
               spoken += text;
+              // Speak each finished sentence while the rest is still being written.
+              if (ttsStreamer) ttsStreamer.ingest(spoken);
             }
           }
           spoken = guardVisibleDataResponse(parseActions(spoken).spoken || spoken, dataResults);
