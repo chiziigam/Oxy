@@ -117,6 +117,7 @@ struct YourHomeView: View {
                     } else if hasDevices {
                         stateHeader
                         devicesSection
+                        homeDeviceRow
                     } else if loaded && !failed {
                         notConnected
                     }
@@ -183,15 +184,23 @@ struct YourHomeView: View {
 
     private var notConnected: some View {
         VStack(alignment: .leading, spacing: AppSpacing.lg) {
-            Text("Nothing is paired yet.")
+            Text("Your speaker isn't paired.")
                 .font(.role(.title)).foregroundStyle(Color.appInk)
-            Text("Pair a display and its status shows here.")
+            Text("Pair it and its rooms show here.")
                 .font(.role(.body)).foregroundStyle(Color.appMuted)
                 .fixedSize(horizontal: false, vertical: true)
-            AdamButton(title: "Add a display", prominent: true) {
+            AdamButton(title: "Pair your speaker", prominent: true) {
                 HapticManager.shared.impact(.medium)
+                showsDeviceSetup = true
+            }
+            Button("Pair a screen instead") {
+                HapticManager.shared.impact(.light)
                 showsDisplaySetup = true
             }
+            .font(.appBody(15))
+            .foregroundStyle(Color.appMuted)
+            .frame(minHeight: 44)
+            .buttonStyle(.plain)
         }
     }
 
@@ -398,6 +407,14 @@ struct YourHomeView: View {
     }
 
     // MARK: Building blocks
+
+    private var homeDeviceRow: some View {
+        SettingsList {
+            SettingsNavRow(title: "Home device", subtitle: "Pairing, status and wake word") {
+                showsDeviceSetup = true
+            }
+        }
+    }
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)

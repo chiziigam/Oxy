@@ -15,6 +15,7 @@ struct AdamHomeView: View {
     @State private var openWorkflow: OpenWorkflow?
     @State private var showEarlier = false
     @State private var voice = VoiceInputManager()
+    @State private var showsSpeaker = false
 
     private static let visibleDone = 5
 
@@ -33,8 +34,14 @@ struct AdamHomeView: View {
         doneItems.allSatisfy { $0.date.map(Calendar.current.isDateInToday) ?? false } ? "Done today" : "Done"
     }
 
+    /// What the devices heard or sensed, newest first.
+    private var heardItems: [HomeModel.Observation] {
+        Array((model.home?.observations ?? []).sorted { $0.at > $1.at }.prefix(3))
+    }
+
     private var nothingToShow: Bool {
-        model.needsYou.isEmpty && model.working.isEmpty && noticedItems.isEmpty && doneItems.isEmpty
+        model.needsYou.isEmpty && model.working.isEmpty && noticedItems.isEmpty
+            && heardItems.isEmpty && doneItems.isEmpty
     }
 
     var body: some View {
@@ -77,6 +84,10 @@ struct AdamHomeView: View {
             AdamConversationView(initialMessage: request.text)
                 .environment(appState)
         }
+        .sheet(isPresented: $showsSpeaker) {
+            YourHomeView()
+                .environment(appState)
+        }
         .sheet(item: $openWorkflow) { open in
             WorkflowTimelineView(workflowId: open.id, onChanged: { Task { await model.refresh() } })
         }
@@ -105,8 +116,61 @@ struct AdamHomeView: View {
         .padding(.horizontal, AdamLayout.gutter)
     }
 
-    @ViewBuilder
     private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            speakerBar
+            boardContent
+        }
+    }
+
+    /// The speaker is the product; it sits at the top of the screen, not inside Settings.
+    private var speakerBar: some View {
+        Button { showsSpeaker = true } label: {
+            HStack(alignment: .center, spacing: 12) {
+                StatusDot(color: speakerOnline ? Color.appSuccess : Color.appMuted, hollow: !speakerOnline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(speakerName).font(.adamTitle).foregroundStyle(Color.adamInk)
+                    Text(speakerState).font(.adamBody).foregroundStyle(Color.adamMuted)
+                }
+                Spacer(minLength: 8)
+                AppIcon("chevron-right", size: 12).foregroundStyle(Color.adamMuted)
+            }
+            .padding(AdamLayout.gutter)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.adamCard, in: RoundedRectangle(cornerRadius: AdamLayout.cardRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AdamLayout.cardRadius, style: .continuous)
+                    .strokeBorder(Color.adamCardEdge, lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.appScale(0.99))
+        .accessibilityLabel("\(speakerName). \(speakerState)")
+        .accessibilityHint("Opens the speaker and its rooms")
+    }
+
+    private var speaker: HomeModel.Device? {
+        guard let home = model.home else { return nil }
+        return home.devices.first { $0.kind != "browser" } ?? home.devices.first
+    }
+
+    private var speakerOnline: Bool { speaker?.online ?? false }
+
+    private var speakerName: String {
+        guard let speaker else { return "No speaker yet" }
+        return speaker.room.map { "\($0) speaker" } ?? speaker.name
+    }
+
+    private var speakerState: String {
+        guard let speaker else { return "Pair one to hear the house" }
+        if speaker.online { return "Listening" }
+        guard let raw = speaker.lastSeenAt, let seen = DisplayTimestampParser.date(from: raw) else {
+            return "Offline"
+        }
+        return "Offline · last seen \(seen.formatted(.relative(presentation: .named)))"
+    }
+
+    @ViewBuilder
+    private var boardContent: some View {
         if !model.hasLoaded {
             ProgressView().tint(Color.adamInk).frame(maxWidth: .infinity).padding(.top, 60)
         } else if model.refreshFailed && nothingToShow {
@@ -133,8 +197,13 @@ struct AdamHomeView: View {
                     AdamWorkingCard(item: item, model: model) { open(item) }
                 }
             }
-            if !noticedItems.isEmpty {
+            if !heardItems.isEmpty || !noticedItems.isEmpty {
                 sectionLabel("Noticed")
+                ForEach(heardItems) { item in
+                    AdamNoticeRow(title: item.summary, detail: item.room) {
+                        draft = "Tell me more about: \(item.summary)"
+                    }
+                }
                 ForEach(noticedItems) { item in
                     AdamDoneRow(item: item)
                 }
@@ -165,7 +234,7 @@ struct AdamHomeView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 120)
+        .padding(.top, 48)
     }
 
     private func sectionLabel(_ text: String) -> some View {

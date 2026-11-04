@@ -153,8 +153,7 @@ struct AdamWorkingCard: View {
     }
 }
 
-struct AdamDoneRow: View {
-    let item: BoardItem
+struct AdamDoneRow: View {    let item: BoardItem
     var onOpen: (() -> Void)? = nil
 
     var body: some View {
@@ -171,6 +170,34 @@ struct AdamDoneRow: View {
             Text(item.failed == true ? "Couldn't finish: \(item.title)" : item.title)
                 .font(.adamBody).foregroundStyle(Color.adamInk)
             if let detail = item.detail, !detail.isEmpty {
+                Text(detail).font(.adamLabel).foregroundStyle(Color.adamInk.opacity(0.7))
+            }
+        }
+        .multilineTextAlignment(.leading)
+        .frame(maxWidth: .infinity, minHeight: AdamLayout.buttonHeight, alignment: .leading)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+    }
+}
+
+/// Something a device heard or sensed. Tapping it puts the question in the composer.
+struct AdamNoticeRow: View {
+    let title: String
+    let detail: String?
+    var onAsk: (() -> Void)? = nil
+
+    var body: some View {
+        if let onAsk {
+            Button(action: onAsk) { content }.buttonStyle(.plain)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.adamBody).foregroundStyle(Color.adamInk)
+            if let detail, !detail.isEmpty {
                 Text(detail).font(.adamLabel).foregroundStyle(Color.adamInk.opacity(0.7))
             }
         }
