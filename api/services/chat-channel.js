@@ -1,6 +1,44 @@
 'use strict';
 
 const TELEGRAM_BOT_CHANNEL = 'telegram_bot';
+const ROOM_DEVICE_CHANNEL = 'display';
+
+// A speaker is not the place to fill in a tenancy form. These are the capabilities that make
+// sense said out loud in a room; anything bigger is handed to the background (create_agent_task)
+// and finished on the phone. The profile is about where the device is, not what the task is:
+// every one of these is an ordinary capability the phone also has.
+const ROOM_DEVICE_TOOLS = Object.freeze([
+  'web_search',
+  'get_weather',
+  'get_forecast',
+  'get_calendar_events',
+  'create_calendar_event',
+  'create_reminder',
+  'send_message',
+  'send_adam_email',
+  'send_adam_sms',
+  'play_music',
+  'set_notification_preference',
+  'change_setting',
+  'list_scheduled_tasks',
+  'create_scheduled_task',
+  'cancel_scheduled_task',
+  'find_commitments',
+  'resolve_commitment',
+  'find_place',
+  'get_directions',
+  'search_trains',
+  'remember_person',
+  'find_people',
+  'forget_memory',
+  'calculate',
+  'create_agent_task'
+]);
+
+function toolsForChannel(channel) {
+  return normalizeChatChannel(channel) === ROOM_DEVICE_CHANNEL ? ROOM_DEVICE_TOOLS : null;
+}
+
 
 // "Text" is ordinary conversational language, so on a Telegram conversation it means
 // use the channel the person is already in. Keep explicit native-channel requests on the
@@ -30,7 +68,7 @@ function buildTelegramChatRequest(userId, message) {
 }
 
 function buildDisplayChatRequest(userId, message) {
-  return { userId, message, channel: 'display' };
+  return { userId, message, channel: ROOM_DEVICE_CHANNEL };
 }
 
 function buildChatChannelContext(channel) {
@@ -41,6 +79,9 @@ For an unqualified request to message a personal contact, use Telegram through t
 
 module.exports = {
   TELEGRAM_BOT_CHANNEL,
+  ROOM_DEVICE_CHANNEL,
+  ROOM_DEVICE_TOOLS,
+  toolsForChannel,
   normalizeChatChannel,
   adaptActionForChannel,
   buildTelegramChatRequest,

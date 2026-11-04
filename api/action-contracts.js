@@ -1777,9 +1777,13 @@ function buildFunctionDeclarations() {
   );
 }
 
-function buildToolsForGemini(includeSearch = false) {
+function buildToolsForGemini(includeSearch = false, options = {}) {
   const { buildFunctionDeclarationsFromCatalog } = require('./services/action-catalog');
-  const decls = buildFunctionDeclarationsFromCatalog();
+  let decls = buildFunctionDeclarationsFromCatalog();
+  // A surface may carry a smaller budget of capabilities; the declarations are the bulk of
+  // every request, so sending a room speaker all 127 of them is what makes it slow to answer.
+  const only = options.only ? new Set(options.only) : null;
+  if (only) decls = decls.filter(declaration => only.has(declaration.name));
   const tools = [{ functionDeclarations: decls }];
   if (includeSearch) {
     tools.push({ googleSearch: {} });

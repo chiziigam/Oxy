@@ -1260,7 +1260,7 @@ async function refreshBriefingSourceData(userId, todayKey, snapshot) {
 }
 
 const { buildSystemPrompt, CORE_SYSTEM_PROMPT } = require('./prompts');
-const { buildChatChannelContext, buildTelegramChatRequest, buildDisplayChatRequest, normalizeChatChannel } = require('./services/chat-channel');
+const { buildChatChannelContext, buildTelegramChatRequest, buildDisplayChatRequest, normalizeChatChannel, toolsForChannel } = require('./services/chat-channel');
 const urgentScreens = require('./services/urgent-screens');
 
 function normalizeGeminiHistory(history) {
@@ -2355,7 +2355,7 @@ async function inferContextualDeterministicTurn(userId, message, settings, trace
   return null;
 }
 
-function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedContentName, baseHistory, userContent, useAgentTools = true }) {
+function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedContentName, baseHistory, userContent, useAgentTools = true, toolNames = null }) {
   // Keep control instructions authoritative. Cached prompts force dynamic rules into
   // conversation content, which is too weak for tool use and factuality.
   const canUseCachedPrompt = false;
@@ -2371,7 +2371,7 @@ function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedCont
   // Agentic: prefer native function calling for reliability + loops
   if (useAgentTools) {
     try {
-      config.tools = buildToolsForGemini(!!useSearch);
+      config.tools = buildToolsForGemini(!!useSearch, toolNames ? { only: toolNames } : {});
       // googleSearch alongside functionDeclarations 400s unless server-side tool
       // invocations are enabled.
       config.toolConfig = { functionCallingConfig: { mode: 'AUTO' }, ...(useSearch ? { includeServerSideToolInvocations: true } : {}) };
@@ -7745,7 +7745,9 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       userContent: { role: 'user', parts: [{ text: message }] },
       // Native function declarations travel with every plain-chat turn. Without them the
       // model claims actions it never performed, since it emits no <action> text to fall back on.
-      useAgentTools: true
+      useAgentTools: true,
+      // A room speaker carries a smaller budget of capabilities than the phone.
+      toolNames: toolsForChannel(channel)
     });
 
     // === AGENTIC UPGRADE: Use ReAct loop for non-deterministic turns (fixes loop, orchestration, planning foundation) ===
