@@ -21,6 +21,7 @@ test('short imperative yes and no replies still work', () => {
   assert.strictEqual(isPendingConfirmMessage('approve it'), true);
   assert.strictEqual(isPendingConfirmMessage('confirm that'), true);
   assert.strictEqual(isPendingConfirmMessage('yes, send it'), true);
+  assert.strictEqual(isPendingConfirmMessage('Yes, confirm.'), true);
   assert.strictEqual(isPendingCancelMessage('cancel it'), true);
   assert.strictEqual(isPendingCancelMessage('stop that'), true);
 });

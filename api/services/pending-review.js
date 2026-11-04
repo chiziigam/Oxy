@@ -26,6 +26,7 @@ function isPendingConfirmMessage(message) {
   }
   return /^(yes|yeah|yep|yup|confirm|confirmed|approve|approved|proceed)$/i.test(text) ||
     /\b(yes please|looks good|go ahead|do it|send it|send now|send the message|send that message|message them|book it|order it|call them|open it|that's fine|that is fine|all good)\b/i.test(text) ||
+    /^(?:yes|yeah|yep|yup)[,\s]+(?:please\s+)?(?:approve|confirm|proceed|go ahead)\b.+/i.test(text) ||
     /^(?:please\s+)?(?:approve|confirm|proceed with|go ahead with)\b.+/i.test(text);
 }
 
