@@ -13,8 +13,6 @@ const { buildToolsForGemini, getActionContract } = require('../action-contracts'
 const { modelView, compactStaleObservations } = require('./agent-context-trim');
 
 // Simple in-memory for traces during a run; production should persist
-const runTraces = new Map();
-
 // One source, not both: resp.functionCalls is a derived view over the same content.parts array,
 // so reading both double-counts every call and executes each one twice. Pure and exported so
 // that is unit-testable without a real client.
@@ -74,7 +72,6 @@ function createAgentTrace(userId, goal) {
     finalSpoken: '',
     actionsTaken: []
   };
-  runTraces.set(id, trace);
   return trace;
 }
 
