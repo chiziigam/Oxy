@@ -166,7 +166,7 @@ struct WorkflowTimelineView: View {
                 if checkpoint.isChoice, let options = checkpoint.options {
                     VStack(spacing: 8) {
                         ForEach(options) { option in
-                            Button { resolve(checkpoint, approved: true, choice: option.label) } label: {
+                            Button { resolve(checkpoint, approved: true, choice: option.id) } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(option.label).font(.body.weight(.medium)).foregroundStyle(Color.appInk)
                                     if let text = option.detail, !text.isEmpty {
