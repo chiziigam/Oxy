@@ -2508,7 +2508,7 @@ async function* generateSpeechStream(text, voiceName) {
   if (audio) yield audio;
 }
 
-function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingStart = null }) {
+function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingStart = null, speakStream = generateSpeechStream }) {
   let lastSentenceCount = 0;
   let nextEmitIndex = 0;
   const readyAudio = new Map();
@@ -2568,7 +2568,7 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
       if (trace) trace.log(`tts.chunk_start.${job.seq}`);
       const task = (async () => {
         try {
-          for await (const audio of generateSpeechStream(job.text, voiceName)) {
+          for await (const audio of speakStream(job.text, voiceName)) {
             job.state.chunks.push(audio);
             flushReadyAudio();
           }
@@ -2582,6 +2582,10 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
           pump();
         }
       })();
+      // waitForAll still rejects so the caller can report the failure, but the rejection is
+      // observed here too: a clip that fails before waitForAll is reached must not become an
+      // unhandled rejection that takes the whole process down.
+      task.catch(() => {});
       tasks.push(task);
     }
   }
@@ -10404,6 +10408,7 @@ module.exports.buildChatContext = buildChatContext;
 module.exports.buildMorningBriefing = buildMorningBriefing;
 module.exports.checkAdamSendCap = checkAdamSendCap;
 module.exports.buildApnsAuthToken = buildApnsAuthToken;
+module.exports.createSentenceTtsStreamer = createSentenceTtsStreamer;
 module.exports.runAgenticLoop = runAgenticLoop;
 module.exports.forgetMemory = forgetMemory;
 module.exports.delegatedRunLifecycle = delegatedRunLifecycle;

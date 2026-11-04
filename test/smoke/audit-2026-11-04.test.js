@@ -142,3 +142,23 @@ test('local device data is excluded from the production image', () => {
   const ignore = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../.dockerignore'), 'utf8');
   assert.match(ignore, /^data$/m);
 });
+
+test('a failed TTS clip cannot become an unhandled rejection', async () => {
+  const { createSentenceTtsStreamer } = require('../../api/index');
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const streamer = createSentenceTtsStreamer({
+      voiceName: 'test',
+      sse: () => {},
+      speakStream: async function* () { throw new Error('tts down'); },
+    });
+    streamer.ingest('Hello there. This is a second sentence.');
+    await assert.rejects(streamer.waitForAll(), /tts down/);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
