@@ -279,6 +279,7 @@ public final class CodexCLIProvider: AgentCLIProviding {
             "--skip-git-repo-check",
             "--json",
             "-C", workingDirectory.path,
+            "--",
             prompt
         ]
 
@@ -414,6 +415,7 @@ public final class ClaudeCLIProvider: AgentCLIProviding {
         if let model, !model.isEmpty {
             arguments += ["--model", model]
         }
+        arguments.append("--")
         arguments.append(prompt)
 
         let result = try runner.run(
