@@ -65,11 +65,12 @@ struct AdamHomeView: View {
                         }
                     }
                 }
-                AskAdamBar(text: $draft, isRecording: voice.isRecording, onSend: send, onMic: toggleVoice)
+                AskAdamBar(text: $draft, isRecording: voice.isRecording, error: voice.errorMessage, onSend: send, onMic: toggleVoice)
             }
         }
         .task {
             await model.refresh()
+            if !model.refreshFailed { _ = try? await HomeBoardService.markSeen() }
             #if DEBUG
             if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION"] != nil {
                 conversation = ConversationRequest(text: "")
@@ -185,6 +186,19 @@ struct AdamHomeView: View {
         } else if nothingToShow {
             emptyState
         } else {
+            if model.refreshFailed {
+                HStack(spacing: 10) {
+                    Text("Not up to date")
+                        .font(.adamBody)
+                        .foregroundStyle(Color.adamMuted)
+                    Spacer()
+                    Button("Try again") { Task { await model.refresh() } }
+                        .font(.adamLabel)
+                        .foregroundStyle(Color.adamInk)
+                        .frame(minHeight: AdamLayout.buttonHeight)
+                }
+                .padding(.horizontal, 4)
+            }
             if !model.needsYou.isEmpty {
                 sectionLabel("Needs you")
                 ForEach(model.needsYou) { item in
@@ -211,7 +225,13 @@ struct AdamHomeView: View {
             if !doneItems.isEmpty {
                 sectionLabel(doneLabel)
                 ForEach(shownDone) { item in
-                    AdamDoneRow(item: item) { open(item) }
+                    // Only work with its own detail has somewhere to go. A finished task used
+                    // to open an empty conversation sheet and then vanish.
+                    if item.workflowId != nil {
+                        AdamDoneRow(item: item) { open(item) }
+                    } else {
+                        AdamDoneRow(item: item)
+                    }
                 }
                 if doneItems.count > Self.visibleDone {
                     Button(showEarlier ? "Show less" : "Earlier") { withAnimation(reduceMotion ? nil : .appStandard) { showEarlier.toggle() } }
@@ -242,9 +262,9 @@ struct AdamHomeView: View {
     }
 
     private func open(_ item: BoardItem) {
+        guard let workflowId = item.workflowId else { return }
         model.markFinishedSeen(item)
-        if let workflowId = item.workflowId { openWorkflow = OpenWorkflow(id: workflowId) }
-        else { conversation = ConversationRequest(text: "") }
+        openWorkflow = OpenWorkflow(id: workflowId)
     }
 
     private func send() {
