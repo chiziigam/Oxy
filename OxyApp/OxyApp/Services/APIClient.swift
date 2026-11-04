@@ -24,9 +24,13 @@ final class APIClient: @unchecked Sendable {
     /// Priority: UserDefaults override > OXY_BASE_URL build setting > hardcoded default.
     /// Users can set a custom URL via Settings → Diagnostics or the `oxy_custom_backend_url` UserDefaults key.
     var baseURL: String {
+        #if DEBUG
+        // A developer override only. In a shipped build it could send the session token to
+        // any host typed into a hidden field.
         if let custom = UserDefaults.standard.string(forKey: "oxy_custom_backend_url"), !custom.isEmpty {
             return custom.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         }
+        #endif
         if let envURL = Bundle.main.infoDictionary?["OXY_BASE_URL"] as? String, !envURL.isEmpty {
             return envURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         }
@@ -103,7 +107,8 @@ final class APIClient: @unchecked Sendable {
             let errorBody = try? JSONDecoder().decode(ErrorBody.self, from: data)
             let message = errorBody?.error ?? "Request failed"
             if http.statusCode == 401 {
-                handleUnauthorized()
+                // A wrong password is a 401 too; it is not an expired session.
+                if !path.hasPrefix("/auth/") { handleUnauthorized() }
                 throw APIError.server(401, message)
             }
             throw APIError.server(http.statusCode, message)
@@ -179,7 +184,8 @@ final class APIClient: @unchecked Sendable {
             let errorBody = try? JSONDecoder().decode(ErrorBody.self, from: data)
             let message = errorBody?.error ?? "Upload failed"
             if http.statusCode == 401 {
-                handleUnauthorized()
+                // A wrong password is a 401 too; it is not an expired session.
+                if !path.hasPrefix("/auth/") { handleUnauthorized() }
                 throw APIError.server(401, message)
             }
             throw APIError.server(http.statusCode, message)
@@ -371,7 +377,13 @@ enum APIError: LocalizedError {
             // "Bad Gateway") that surface verbatim on Home. Anything else carries a
             // real message worth showing.
             switch status {
-            case 401, 403: return "Your session expired. Sign in again."
+            case 401, 403:
+                let carried = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !carried.isEmpty,
+                   !["unauthorized", "session expired", "forbidden"].contains(carried.lowercased()) {
+                    return carried
+                }
+                return "Your session expired. Sign in again."
             case 404: return "That's no longer available."
             case 408: return "The server took too long to answer."
             case 429: return "Too many requests. Try again shortly."
