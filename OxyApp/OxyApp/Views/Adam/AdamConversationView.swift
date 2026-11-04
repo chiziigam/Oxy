@@ -33,6 +33,9 @@ struct AdamConversationView: View {
         .onChange(of: voice.isRecording) {
             if !voice.isRecording, !voice.transcript.isEmpty { draft = voice.transcript }
         }
+        .onDisappear {
+            if voice.isRecording { voice.cancel() }
+        }
     }
 
     private var header: some View {
@@ -154,6 +157,7 @@ struct AdamConversationView: View {
     private func toggleVoice() {
         if voice.isRecording { voice.stopRecording() } else { voice.startRecording(userId: appState.userId) }
     }
+
 }
 
 /// Three dots that lift in turn while Adam is working.

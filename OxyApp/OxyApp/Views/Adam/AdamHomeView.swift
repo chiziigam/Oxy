@@ -71,6 +71,10 @@ struct AdamHomeView: View {
         .task {
             await model.refresh()
             if !model.refreshFailed { _ = try? await HomeBoardService.markSeen() }
+            // A Siri/Shortcuts request that cold-launched the app is waiting here.
+            if let pending = SiriRequestBus.shared.take(), !pending.isEmpty {
+                conversation = ConversationRequest(text: pending)
+            }
             #if DEBUG
             if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION"] != nil {
                 conversation = ConversationRequest(text: "")
@@ -80,6 +84,11 @@ struct AdamHomeView: View {
         .onChange(of: scenePhase) { if scenePhase == .active { Task { await model.refresh() } } }
         .onChange(of: voice.isRecording) {
             if !voice.isRecording, !voice.transcript.isEmpty { draft = voice.transcript }
+        }
+        .onDisappear {
+            // Leaving while the microphone is open must not keep the recorder and the
+            // .record audio session alive, with household listening paused for good.
+            if voice.isRecording { voice.cancel() }
         }
         .sheet(item: $conversation) { request in
             AdamConversationView(initialMessage: request.text)
@@ -101,6 +110,11 @@ struct AdamHomeView: View {
             guard let text = note.object as? String else { return }
             openWorkflow = nil
             draft = text
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .oxyVoiceMessage)) { note in
+            guard let text = note.userInfo?["text"] as? String, !text.isEmpty else { return }
+            openWorkflow = nil
+            conversation = ConversationRequest(text: text)
         }
         .animation(reduceMotion ? nil : .appStandard, value: model.needsYou.map(\.id))
     }
