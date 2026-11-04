@@ -18,6 +18,19 @@
 -- bypasses RLS regardless). browser_sessions — the one table that actually works — has
 -- no RLS at all. Matching that, not inventing a new convention.
 
+-- One-shot rebuild. It was safe when these tables were empty; re-applying it today would
+-- destroy stored steps, routines, site passwords and chat settings. Refuse if any holds data.
+do $$
+begin
+  if (to_regclass('public.task_steps') is not null and exists (select 1 from task_steps limit 1))
+     or (to_regclass('public.routines') is not null and exists (select 1 from routines limit 1))
+     or (to_regclass('public.vault_credentials') is not null and exists (select 1 from vault_credentials limit 1))
+     or (to_regclass('public.task_entities') is not null and exists (select 1 from task_entities limit 1))
+     or (to_regclass('public.chat_settings') is not null and exists (select 1 from chat_settings limit 1)) then
+    raise exception 'Refusing to re-apply the user-id rebuild: these tables now hold user data.';
+  end if;
+end $$;
+
 drop table if exists task_steps;
 drop table if exists routines;
 drop table if exists vault_credentials;
