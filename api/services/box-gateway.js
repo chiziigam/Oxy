@@ -11,7 +11,8 @@ const RATE = 16000;
 const MIN_AUDIO_BYTES = RATE * 2 * 0.4;
 const MAX_AUDIO_BYTES = RATE * 2 * 15;
 const MAX_SPOKEN = 500;
-const MAX_REPLY_PCM = RATE * 2 * 35;
+const MAX_REPLY_PCM = RATE * 2 * 15;
+const MORE_ON_PHONE = 'There is more on your phone.';
 const SENSOR_FRESH_MS = 2 * 60 * 1000;
 const SOUND_BUCKET_MS = 10 * 60 * 1000;
 const PHONE_ONLY = 'Open Adam on your phone to approve that.';
@@ -179,6 +180,7 @@ function registerBoxRoutes(app, deps) {
     let firstAudioMs = null;
     let answerAudioMs = null;
     let ackPlayed = false;
+    let truncated = false;
     const writeAudio = (pcm, isAck = false) => {
       if (!headersSent) {
         res.writeHead(200, {
@@ -213,8 +215,9 @@ function registerBoxRoutes(app, deps) {
           try { clip = wavToPcm16k(Buffer.from(event.data, 'base64')); }
           catch (e) { log('warn', 'box.voice.bad_clip', { error: e.message }); continue; }
           if (!clip.length) continue;
-          // The device holds 40 seconds; stop rather than overrun it.
-          if (audioBytes + clip.length > MAX_REPLY_PCM) break;
+          // A spoken reply is a sentence or two. Anything longer is a monologue in the room;
+          // the phone has the rest.
+          if (audioBytes + clip.length > MAX_REPLY_PCM) { truncated = true; break; }
           writeAudio(clip);
         } else if (event.type === 'actions') {
           actions = Array.isArray(event.results) ? event.results : [];
@@ -234,6 +237,13 @@ function registerBoxRoutes(app, deps) {
         answerAudioMs = Date.now() - startedAt;
         log('info', 'box.voice.spoken_after_stream', { at_ms: answerAudioMs });
       } catch (e) { log('warn', 'box.voice.late_speech_failed', { error: e.message }); }
+    }
+    if (truncated) {
+      try {
+        const tail = wavToPcm16k(Buffer.from(await voice.synthesizeSpeech(MORE_ON_PHONE), 'base64'));
+        res.write(tail);
+        log('info', 'box.voice.truncated', { at_ms: Date.now() - startedAt });
+      } catch (e) { log('warn', 'box.voice.truncate_notice_failed', { error: e.message }); }
     }
     // An approval is never spoken as if it had happened; it is named after the answer.
     if (findPendingAction(actions)) {

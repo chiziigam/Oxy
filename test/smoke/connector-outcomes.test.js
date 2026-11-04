@@ -6,13 +6,15 @@ const stocks = require('../../connectors/stocks');
 const amazon = require('../../connectors/amazon');
 const brainProvider = require('../../api/services/brain-provider');
 
-test('weather works through grounded search without an OpenWeather key', async () => {
+test('weather falls back to grounded search when the forecast API cannot answer', async () => {
   const saved = brainProvider.webSearchBrain;
+  const savedFetch = global.fetch;
   let prompt = '';
   brainProvider.webSearchBrain = async input => {
     prompt = input.prompt;
     return 'London: 18°C, light rain, feels like 17°C. Updated 10 minutes ago.';
   };
+  global.fetch = async () => { throw new Error('offline'); };
   try {
     const result = await weather.execute('user-1', 'get_weather', { city: 'London' });
     assert.equal(result.success, true);
@@ -22,6 +24,7 @@ test('weather works through grounded search without an OpenWeather key', async (
     assert.match(result.text, /18°C/);
   } finally {
     brainProvider.webSearchBrain = saved;
+    global.fetch = savedFetch;
   }
 });
 
@@ -46,7 +49,9 @@ test('stocks work through grounded search without an Alpha Vantage key', async (
 
 test('public-data searches stay unavailable when grounded search returns no answer', async () => {
   const saved = brainProvider.webSearchBrain;
+  const savedFetch = global.fetch;
   brainProvider.webSearchBrain = async () => '';
+  global.fetch = async () => { throw new Error('offline'); };
   try {
     const [weatherResult, stockResult] = await Promise.all([
       weather.execute('user-1', 'get_weather', { city: 'London' }),
@@ -60,6 +65,7 @@ test('public-data searches stay unavailable when grounded search returns no answ
     }
   } finally {
     brainProvider.webSearchBrain = saved;
+    global.fetch = savedFetch;
   }
 });
 

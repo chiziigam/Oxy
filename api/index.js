@@ -2510,6 +2510,12 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
   const readyAudio = new Map();
   const tasks = [];
   let speakingNotified = false;
+  // Unlimited by default: measured, a short queue left the first clip no faster and made the
+  // whole reply slower, because the cost is per-sentence synthesis, not contention.
+  const configuredConcurrency = Number(process.env.OXY_TTS_CONCURRENCY || 0);
+  const concurrency = configuredConcurrency > 0 ? configuredConcurrency : Number.POSITIVE_INFINITY;
+  const waiting = [];
+  let inFlight = 0;
 
   const flushReadyAudio = () => {
     while (readyAudio.has(nextEmitIndex)) {
@@ -2536,31 +2542,45 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
     const seq = tasks.length;
     if (trace) trace.log(`tts.chunk_schedule.${seq}`, JSON.stringify(trimmed.slice(0, 80)));
     if (seq === 0) {
-      const earlyClause = trimmed.match(/^([^,;:]{1,24}[,;:])\s+(.+)$/);
+      // The first clip is the only one anyone is waiting for, so split it as early as the
+      // sentence allows rather than speaking a whole 25-word opening.
+      const earlyClause = trimmed.match(/^([^,;:]{1,60}[,;:])\s+(.+)$/);
       if (earlyClause) {
         schedule(earlyClause[1].trim());
         schedule(earlyClause[2].trim());
         return;
       }
     }
-    if (trace) trace.log(`tts.chunk_start.${seq}`);
     const state = { chunks: [], done: false, sentCount: 0 };
     readyAudio.set(seq, state);
-    const task = (async () => {
-      try {
-        for await (const audio of generateSpeechStream(trimmed, voiceName)) {
-          state.chunks.push(audio);
-          flushReadyAudio();
-        }
-        state.done = true;
-        flushReadyAudio();
-      } catch (error) {
-        if (trace) trace.log(`tts.chunk_fail.${seq}`, error.message);
-        throw error;
-      }
-    })();
-    tasks.push(task);
+    waiting.push({ seq, state, text: trimmed });
+    pump();
   };
+
+  function pump() {
+    while (inFlight < concurrency && waiting.length) {
+      const job = waiting.shift();
+      inFlight += 1;
+      if (trace) trace.log(`tts.chunk_start.${job.seq}`);
+      const task = (async () => {
+        try {
+          for await (const audio of generateSpeechStream(job.text, voiceName)) {
+            job.state.chunks.push(audio);
+            flushReadyAudio();
+          }
+          job.state.done = true;
+          flushReadyAudio();
+        } catch (error) {
+          if (trace) trace.log(`tts.chunk_fail.${job.seq}`, error.message);
+          throw error;
+        } finally {
+          inFlight -= 1;
+          pump();
+        }
+      })();
+      tasks.push(task);
+    }
+  }
 
   return {
     ingest(text) {
@@ -2582,7 +2602,13 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
       if (remainder) schedule(remainder);
     },
     async waitForAll() {
-      await Promise.all(tasks);
+      // Jobs are started in waves, so a single Promise.all would resolve while the queue
+      // still held sentences and their audio would never be sent.
+      while (waiting.length || inFlight > 0) {
+        if (!tasks.length) break;
+        const wave = tasks.splice(0, tasks.length);
+        await Promise.all(wave);
+      }
       flushReadyAudio();
     }
   };
