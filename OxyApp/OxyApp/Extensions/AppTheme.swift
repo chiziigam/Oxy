@@ -356,10 +356,6 @@ extension View {
         font(.appBody(12, weight: .medium))
             .foregroundStyle(Color.appMuted)
     }
-
-    func appHairline(radius: CGFloat) -> some View {
-        self
-    }
 }
 
 // MARK: - List primitives
@@ -488,17 +484,6 @@ private struct AdamDotShape: Shape {
         let c = CGPoint(x: rect.midX, y: rect.minY + rect.height * 0.69)
         return Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2))
     }
-}
-
-// MARK: - Activity mark
-
-enum AdamActivityState {
-    /// Adam is doing something: the dot traces the roof of the A.
-    case working
-    /// Adam is hearing you: the dot becomes the speaker cone of a ripple of dots.
-    case listening
-    /// Adam needs you: the dot draws a question mark, then drops in as its full stop.
-    case waiting
 }
 
 /// Adds an interactive left-edge swipe-to-dismiss to a screen, which `fullScreenCover`
