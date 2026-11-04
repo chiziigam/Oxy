@@ -26,7 +26,7 @@ final class AppState {
             if self.isDemoSession { return }
             #endif
             self.logout()
-            self.errorMessage = "Session expired. Please sign in again."
+            self.errorMessage = "You've been signed out. Sign in again."
         }
     }
 

@@ -6,9 +6,9 @@ struct ConnectionTroubleView: View {
     var onSkip: () -> Void = {}
 
     private let checks = [
-        "Is the home device on the charger?",
-        "Bluetooth enabled on iPhone?",
-        "Home device within 1 meter?"
+        "Is it on its charger?",
+        "Is Bluetooth on?",
+        "Is it within a metre of your iPhone?"
     ]
 
     var body: some View {
@@ -18,7 +18,7 @@ struct ConnectionTroubleView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
 
-                Text("Device not found")
+                Text("Can't find your home device")
                     .font(.appBody(13, weight: .medium))
                     .foregroundStyle(Color.appMuted)
 

@@ -253,7 +253,7 @@ final class APIClient: @unchecked Sendable {
                     guard (200...299).contains(http.statusCode) else {
                         if http.statusCode == 401 {
                             self.handleUnauthorized()
-                            continuation.yield(.error("Session expired. Please sign in again."))
+                            continuation.yield(.error("You've been signed out. Sign in again."))
                         } else {
                             continuation.yield(.error("Server error"))
                         }

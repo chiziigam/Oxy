@@ -146,7 +146,7 @@ final class ChatViewModel {
             hasOlderHistory = false
             if ProcessInfo.processInfo.environment["OXY_DEBUG_FAILED"] == "1" {
                 var failed = Message(dbId: nil, role: .assistant, content: "", timestamp: now, actions: [], sources: [])
-                failed.turnError = "Network connection was lost."
+                failed.turnError = "Lost connection."
                 messages.append(failed)
             }
             if let path = ProcessInfo.processInfo.environment["OXY_DEBUG_SCENE_FILE"],
@@ -1289,13 +1289,13 @@ final class ChatViewModel {
             return error
         }
         if lower.contains("network") || lower.contains("internet") || lower.contains("lost") || lower.contains("offline") {
-            return "Network connection was lost. Try again."
+            return "Lost connection. Try again."
         }
         if lower.contains("timed out") || lower.contains("timeout") {
             return "That took too long. Try again."
         }
         if lower.contains("session expired") {
-            return "Session expired. Please sign in again."
+            return "You've been signed out. Sign in again."
         }
         return "Something went wrong. Try again."
     }
@@ -1303,12 +1303,12 @@ final class ChatViewModel {
     nonisolated private static func nativeMusicTimeoutResult() -> NativeLocalActionResult {
         NativeLocalActionResult(
             action: "play_music",
-            text: "Native music took too long to respond, so I stopped waiting.",
-            cardText: "Native music timed out",
-            actionSummary: "Music timed out",
+            text: "Music took too long to respond, so I stopped waiting.",
+            cardText: "Music didn't respond",
+            actionSummary: "Music didn't respond",
             deepLink: nil,
             success: false,
-            error: "Native music request timed out."
+            error: "Music didn't respond."
         )
     }
 
@@ -1316,11 +1316,11 @@ final class ChatViewModel {
         NativeLocalActionResult(
             action: "check_health",
             text: "Apple Health took too long to respond, so I stopped waiting.",
-            cardText: "Health timed out",
-            actionSummary: "Health timed out",
+            cardText: "Apple Health didn't respond",
+            actionSummary: "Apple Health didn't respond",
             deepLink: "x-apple-health://",
             success: false,
-            error: "Native health request timed out."
+            error: "Apple Health didn't respond."
         )
     }
 

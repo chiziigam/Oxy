@@ -150,7 +150,7 @@ struct AgentContinuityView: View {
                                 Text(workflow.name)
                                     .font(.appBody(13, weight: .medium))
                                     .foregroundStyle(Color.appInk)
-                                Text(workflow.isScheduled ? cadence(workflow.intervalMinutes) : "Event trigger")
+                                Text(workflow.isScheduled ? cadence(workflow.intervalMinutes) : "When something happens")
                                     .font(.appBody(12))
                                     .foregroundStyle(Color.appMuted)
                             }
@@ -289,7 +289,7 @@ struct AgentContinuityView: View {
             pendingData = data
             selectedFileName = url.lastPathComponent
         } catch {
-            errorMessage = "Couldn't read that export."
+            errorMessage = "Couldn't read that file. Choose a ChatGPT or Claude export."
         }
         isWorking = false
     }

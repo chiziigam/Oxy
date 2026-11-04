@@ -475,7 +475,7 @@ struct DisplayRenderSheet: View {
                     .font(.appBody(21, weight: .semibold))
                     .foregroundStyle(Color.appInk)
 
-                Text("This sends the reply as a short readable update.")
+                Text("Shows a short version of the reply on the display.")
                     .font(.appBody(13))
                     .foregroundStyle(Color.appMuted)
 
@@ -494,7 +494,7 @@ struct DisplayRenderSheet: View {
                         .foregroundStyle(Color.appAccent)
                     }
                 } else if displays.isEmpty {
-                    Text("No displays paired. Pair one in Settings.")
+                    Text("No displays yet. Add one in Your home.")
                         .font(.appBody(14))
                         .foregroundStyle(Color.appMuted)
                 } else {

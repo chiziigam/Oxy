@@ -69,7 +69,7 @@ struct LoginView: View {
                 } else {
                     await MainActor.run {
                         HapticManager.shared.warning()
-                        withAnimation { errorMessage = response.error ?? "Authentication failed" }
+                        withAnimation { errorMessage = response.error ?? "Couldn't sign you in. Check your details and try again." }
                         isLoading = false
                     }
                 }
@@ -101,7 +101,7 @@ struct LoginView: View {
                     }
                     return
                 }
-                await MainActor.run { failDemoLogin(response.error ?? "Demo login is not available on this backend.") }
+                await MainActor.run { failDemoLogin(response.error ?? "Test sign-in isn't available on this server.") }
             } catch {
                 await MainActor.run { failDemoLogin(error.localizedDescription) }
             }

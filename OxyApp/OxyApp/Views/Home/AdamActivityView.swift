@@ -111,7 +111,7 @@ struct AdamActivityView: View {
                         if isEmpty && loaded && errorMessage == nil {
                             emptyState
                         } else {
-                            if !asks.isEmpty { section("Waiting on you", asks) }
+                            if !asks.isEmpty { section("Needs you", asks) }
                             if !upcoming.isEmpty { section("Coming up", upcoming) }
                             if !past.isEmpty { section(filter == .done ? "Done" : "Recently", past) }
                         }
@@ -246,7 +246,7 @@ struct AdamActivityView: View {
                         .foregroundStyle(Color.appMuted)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .minimumScaleFactor(0.75)
-                        .accessibilityLabel(item.date == nil ? "Time unavailable" : timeLabel(for: item))
+                        .accessibilityLabel(item.date == nil ? "Time unknown" : timeLabel(for: item))
                         if dynamicTypeSize.isAccessibilitySize {
                             Spacer()
                             marker(for: item)
@@ -291,7 +291,7 @@ struct AdamActivityView: View {
                     : AnyLayout(HStackLayout(spacing: 8))
                 actionLayout {
                     if let workflowId = item.workflowId {
-                        actionPill("View work") { openWorkflowID = workflowId }
+                        actionPill("View task") { openWorkflowID = workflowId }
                     }
                     actionPill("Ask about this") { AskAdam.draft("Tell me more about: \(item.title)") }
                         .accessibilityLabel("Ask about \(item.title)")
@@ -338,7 +338,7 @@ struct AdamActivityView: View {
             case .asked:
                 Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8)
                     .frame(width: 16, height: 16)
-                    .accessibilityLabel("Waiting on you")
+                    .accessibilityLabel("Needs you")
             case .noticed, .scheduled, .checked:
                 Color.clear.frame(width: 16, height: 16)
             }
@@ -347,7 +347,7 @@ struct AdamActivityView: View {
 
     private func detailLine(for item: ActivityEvent) -> String? {
         if item.type == .scheduled {
-            if item.stale == true { return "Next run unavailable" }
+            if item.stale == true { return "Next check unknown" }
             return item.detail
         }
         guard let detail = item.detail, !detail.isEmpty,
@@ -366,7 +366,7 @@ struct AdamActivityView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(filter == .comingUp ? "Nothing scheduled" : (filter == .done ? "No completed work" : "No activity yet"))
+            Text(filter == .comingUp ? "Nothing scheduled" : (filter == .done ? "Nothing finished yet" : "No activity yet"))
                 .font(.sectionTitle)
                 .foregroundStyle(Color.appInk)
         }
@@ -402,7 +402,7 @@ struct AdamActivityView: View {
             #endif
             errorMessage = nil
         } catch {
-            errorMessage = feed == .empty ? "Couldn't load Activity." : "Couldn't update Activity. Showing saved activity."
+            errorMessage = feed == .empty ? "Couldn't load your activity." : "Couldn't refresh. Showing what was saved."
         }
         loaded = true
     }

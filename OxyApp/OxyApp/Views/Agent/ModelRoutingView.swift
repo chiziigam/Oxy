@@ -104,7 +104,7 @@ struct ModelRoutingView: View {
             selectedProvider = loaded.selected.provider
             selectedModel = loaded.selected.model
         } catch {
-            errorMessage = "Couldn't load your choices."
+            errorMessage = "Couldn't load the models."
         }
         isLoading = false
     }

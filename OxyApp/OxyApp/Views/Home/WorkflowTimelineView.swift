@@ -46,7 +46,7 @@ struct WorkflowTimelineView: View {
                                 OxySkeletonCard(height: 180)
                             }
                             .frame(width: max(0, geometry.size.width - AppSpacing.margin * 2))
-                            .accessibilityLabel("Loading work")
+                            .accessibilityLabel("Loading task")
                         }
                     }
                     .frame(width: max(0, geometry.size.width - AppSpacing.margin * 2), alignment: .leading)
@@ -157,12 +157,12 @@ struct WorkflowTimelineView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if expired(checkpoint) {
-                Text("This decision has expired.").font(.body).foregroundStyle(Color.appInk)
+                Text("This expired before you answered.").font(.body).foregroundStyle(Color.appInk)
                 Button("Ask Adam to check again") { AskAdam.draft("Check this again: \(checkpoint.prompt)") }
                     .font(.body.weight(.medium)).foregroundStyle(Color.appAccent)
                     .frame(minHeight: 44)
             } else if submittedIDs.contains(checkpoint.id) {
-                Text("Answer sent. Updating status…").font(.body).foregroundStyle(Color.appInk)
+                Text("Answer sent. Checking it went through…").font(.body).foregroundStyle(Color.appInk)
             } else if resolvingCheckpointID == checkpoint.id {
                 ProgressView("Sending answer").font(.body).tint(Color.appAccent)
             } else if detail?.workflow.isFinished != true {
@@ -282,7 +282,7 @@ struct WorkflowTimelineView: View {
         } catch is CancellationError {
             return
         } catch {
-            errorMessage = detail == nil ? "Couldn't load this work." : "Couldn't update this work. Showing saved details."
+            errorMessage = detail == nil ? "Couldn't load this task." : "Couldn't refresh. Showing what was saved."
         }
     }
 
@@ -297,7 +297,7 @@ struct WorkflowTimelineView: View {
             do {
                 #if DEBUG
                 if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_WORKFLOW"] == "server-expired" {
-                    throw APIError.server(500, "That decision expired — ask me again and I'll re-check.")
+                    throw APIError.server(500, "This expired. Ask Adam to check again.")
                 }
                 #endif
                 try await HomeBoardService.resolveCheckpoint(workflowId: workflowId, checkpointId: checkpoint.id,
@@ -366,7 +366,7 @@ private struct TimelineRow: View {
                 Text(event.summary ?? "Update").font(.body.weight(isFirst ? .medium : .regular))
                     .foregroundStyle(Color.appInk)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(event.date.map { $0.formatted(date: Calendar.current.isDateInToday($0) ? .omitted : .abbreviated, time: .shortened) } ?? "Time unavailable")
+                Text(event.date.map { $0.formatted(date: Calendar.current.isDateInToday($0) ? .omitted : .abbreviated, time: .shortened) } ?? "Time unknown")
                     .font(.caption).foregroundStyle(Color.appMuted)
                 if event.isUser { Text("You").font(.caption).foregroundStyle(Color.appMuted) }
             }

@@ -53,7 +53,7 @@ struct TodaySuggestionsContent: View {
                 OxySkeletonCard(height: 210, cornerRadius: 18)
                 OxySkeletonCard(height: 92, cornerRadius: 18)
             } else if failed {
-                quietState("Couldn't load today", detail: "", icon: "refresh")
+                quietState("Couldn't load today's suggestions", detail: "", icon: "refresh")
                 Button("Try again") { Task { await load() } }
                     .buttonStyle(.app(.secondary, fullWidth: false))
             } else if let first = visible.first {

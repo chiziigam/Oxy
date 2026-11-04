@@ -62,7 +62,7 @@ struct MemoryView: View {
                             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                             : AnyLayout(HStackLayout())
                         summaryLayout {
-                            Text(isLoading ? "Loading memories" : (errorMessage != nil ? (items.isEmpty ? "Memories unavailable" : "Last loaded memories") : "\(items.count) saved memories"))
+                            Text(isLoading ? "Loading memories" : (errorMessage != nil ? (items.isEmpty ? "Couldn't load memories" : "Showing what was saved") : "\(items.count) saved memories"))
                                 .font(.appBody(14)).foregroundStyle(Color.appMuted)
                             if !typeSize.isAccessibilitySize { Spacer() }
                             Button {
@@ -334,14 +334,14 @@ struct MemoryView: View {
                 path: "/memory/\(appState.userId)/items/\(item.id)", method: "PUT", body: ["content": trimmed]
             )
             let result = try JSONDecoder().decode(MemoryChangeResponse.self, from: data)
-            guard result.success else { return "Couldn't save the change. Try again." }
+            guard result.success else { return "Couldn't save that change. Try again." }
             if let index = items.firstIndex(where: { $0.id == item.id }) {
                 items[index] = MemoryItem(id: item.id, content: trimmed, source: item.source, createdAt: item.createdAt)
             }
             HapticManager.shared.success()
             return nil
         } catch {
-            return "Couldn't save the change. Try again."
+            return "Couldn't save that change. Try again."
         }
     }
 

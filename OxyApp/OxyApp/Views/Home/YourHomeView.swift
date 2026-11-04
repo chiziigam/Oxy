@@ -649,7 +649,7 @@ struct YourHomeView: View {
             SettingsList {
                 SettingsRow(title: "Room", subtitle: device.room ?? "Not assigned")
                 SettingsRule()
-                SettingsRow(title: "Urgent alerts", subtitle: "Show alerts on this screen") {
+                SettingsRow(title: "Urgent alerts", subtitle: "Show alerts on this display") {
                     SettingsToggle(isOn: Binding(
                         get: { urgentChoice[device.id] ?? device.showsUrgent },
                         set: { setUrgent(device, $0) }

@@ -54,8 +54,8 @@ struct ConnectorsView: View {
 
     private static let directory: [Section] = [
         Section(title: "Mail and calendar", entries: [
-            own("google", "Gmail and Calendar", "Mail and diary"),
-            own("microsoft", "Outlook and Calendar", "Mail and diary")
+            own("google", "Gmail and Calendar", "Mail and calendar"),
+            own("microsoft", "Outlook and Calendar", "Mail and calendar")
         ]),
         Section(title: "Messages", entries: [
             own("telegram", "Telegram", "Message people"),

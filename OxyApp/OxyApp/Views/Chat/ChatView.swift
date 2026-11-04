@@ -305,7 +305,7 @@ struct ChatView: View {
             if viewModel.isLoadingHistory {
                 ProgressView().tint(Color.appMuted)
             } else if viewModel.networkError == nil {
-                Text("No conversation yet.")
+                Text("No messages yet.")
                     .font(.role(.body)).foregroundStyle(Color.appMuted)
             }
         }
@@ -458,7 +458,7 @@ struct ChatView: View {
                                 }
                             }
                             Spacer()
-                            Button("Current Chat") {
+                            Button("Back to latest") {
                                 Task {
                                     await viewModel.returnToCurrentChat(userId: appState.userId)
                                 }
@@ -747,7 +747,7 @@ struct ChatView: View {
                     voiceInput.isTranscribing = true
                 }
                 if ProcessInfo.processInfo.environment["OXY_DEBUG_VOICE_ERROR"] == "1" {
-                    voiceErrorMessage = "Microphone access is off. Enable it in Settings to use voice."
+                    voiceErrorMessage = "The microphone is off for Adam. Turn it on in Settings to talk."
                 }
             }
             #endif
@@ -847,7 +847,7 @@ struct ChatView: View {
                     handleMessageComposeResult(result)
                 }
             }
-            .alert("Messages unavailable", isPresented: Binding(
+            .alert("Couldn't load messages", isPresented: Binding(
                 get: { messageComposerAlert != nil },
                 set: { if !$0 { messageComposerAlert = nil } }
             )) {
@@ -1373,7 +1373,7 @@ struct ChatView: View {
 
     private func presentMessageDraft(_ draft: MessageDraft) {
         guard MFMessageComposeViewController.canSendText() else {
-            messageComposerAlert = "This device cannot send text messages from an in-app composer."
+            messageComposerAlert = "This iPhone can't send texts from here."
             return
         }
         messageDraft = draft
@@ -1578,7 +1578,7 @@ private struct ActionReviewSheet: View {
             case "send_message", "send_telegram": return "Message ready to send"
             case "make_call": return "Call ready to make"
             case "create_calendar_event": return "Calendar event ready"
-            default: return "Review action"
+            default: return "Review"
             }
         }()
     }
@@ -1958,7 +1958,7 @@ private struct ChatInputBar: View {
             .padding(.horizontal, 4)
             .padding(.vertical, 12)
             .accessibilityLabel(incognito ? "Private message" : "Ask Adam")
-            .accessibilityHint(incognito ? "Private chat. This turn is not saved." : "")
+            .accessibilityHint(incognito ? "Private. This message isn't saved." : "")
     }
 
     private var voiceField: some View {
