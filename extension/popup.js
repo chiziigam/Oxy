@@ -154,14 +154,18 @@ async function showShare() {
 }
 
 async function init() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  site = siteFromUrl(tab?.url);
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    site = siteFromUrl(tab?.url);
 
-  const stored = await chrome.storage.local.get(['token', 'userId']);
-  token = stored.token || null;
-  if (stored.userId) userIdEl.value = stored.userId;
+    const stored = await chrome.storage.local.get(['token', 'userId']);
+    token = stored.token || null;
+    if (stored.userId) userIdEl.value = stored.userId;
 
-  if (token) await showShare(); else showSignIn();
+    if (token) await showShare(); else showSignIn();
+  } catch {
+    showSignIn();
+  }
 }
 
 async function signIn() {
@@ -190,7 +194,7 @@ async function signIn() {
     say('');
     await showShare();
   } catch (error) {
-    say(`Could not reach Oxy: ${error.message}`, 'err');
+    say(`Could not reach Adam: ${error.message}`, 'err');
     signInBtn.disabled = false;
   } finally {
     signInBtn.disabled = false;
@@ -282,7 +286,7 @@ async function share() {
     await showShare();
     say(message, 'ok');
   } catch (error) {
-    say(`Could not reach Oxy: ${error.message}`, 'err');
+    say(`Could not reach Adam: ${error.message}`, 'err');
     shareBtn.disabled = false;
   }
 }

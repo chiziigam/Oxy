@@ -4404,37 +4404,45 @@ app.post('/auth/forgot-password', forgotPasswordRateLimiter, async (req, res) =>
   }
 });
 
+function authPage(title, body) {
+  return require('./public-ui').page({ title, card: true, body });
+}
+
+function resetFormResponse(req, res, status, jsonBody, html) {
+  const formPost = String(req.headers['content-type'] || '').includes('application/x-www-form-urlencoded');
+  if (!formPost) return res.status(status).json(jsonBody);
+  return res.status(status).type('html').send(authPage(html.title, `<h1>${escapeHtml(html.title)}</h1><p>${escapeHtml(html.message)}</p>`));
+}
+
 app.get('/auth/reset-password', (req, res) => {
-  const { token } = req.query;
+  const token = String(req.query.token || '');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!DOCTYPE html><html><head><title>Reset Password · Adam</title>
-  <style>body{font-family:sans-serif;max-width:420px;margin:60px auto;padding:0 24px;color:#1a1a1a}
-  h2{margin-bottom:8px}input{width:100%;padding:10px;margin:8px 0 16px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:15px}
-  button{width:100%;padding:12px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:15px;cursor:pointer}</style>
-  </head><body>
-  <h2>Reset your password</h2>
-  <p>Enter a new password (minimum 8 characters).</p>
+  if (!token) {
+    return res.send(authPage('Reset password', `<h1>Reset link missing</h1><p>Open the reset link from your email. If it has expired, request a new one in the app.</p>`));
+  }
+  res.send(authPage('Reset password', `<h1>Reset your password</h1>
+  <p>At least 8 characters.</p>
   <form method="POST" action="/auth/reset-password">
-    <input type="hidden" name="token" value="${escapeHtml(String(token || ''))}">
-    <label>New Password<input type="password" name="newPassword" minlength="8" required></label>
-    <button type="submit">Reset Password</button>
-  </form>
-  </body></html>`);
+    <input type="hidden" name="token" value="${escapeHtml(token)}">
+    <label for="newPassword">New password</label>
+    <input id="newPassword" type="password" name="newPassword" minlength="8" autocomplete="new-password" required>
+    <button type="submit">Reset password</button>
+  </form>`));
 });
 
 app.post('/auth/reset-password', express.urlencoded({ extended: false }), async (req, res) => {
   try {
     const { token, newPassword } = req.body || {};
-    if (!token || !newPassword) return res.status(400).json({ error: 'Token and newPassword are required.' });
+    if (!token || !newPassword) return resetFormResponse(req, res, 400, { error: 'Token and newPassword are required.' }, { title: 'Missing details', message: 'Enter a new password from the link in your email.' });
     if (typeof newPassword !== 'string' || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+      return resetFormResponse(req, res, 400, { error: 'Password must be at least 8 characters.' }, { title: 'Password too short', message: 'Use at least 8 characters.' });
     }
     if (typeof token !== 'string' || token.startsWith(EMAIL_VERIFY_TOKEN_PREFIX) || newPassword.length > MAX_PASSWORD_LENGTH) {
-      return res.status(400).json({ error: 'Invalid or expired reset token.' });
+      return resetFormResponse(req, res, 400, { error: 'Invalid or expired reset token.' }, { title: 'Link not valid', message: 'That link is invalid or has expired. Request a new one in the app.' });
     }
     const { data: tokenRow } = await supabase.from('password_reset_tokens').select('id, user_id, expires_at, used').eq('token', token).maybeSingle();
     if (!tokenRow || tokenRow.used || new Date(tokenRow.expires_at) < new Date()) {
-      return res.status(400).json({ error: 'Invalid or expired reset token.' });
+      return resetFormResponse(req, res, 400, { error: 'Invalid or expired reset token.' }, { title: 'Link not valid', message: 'That link is invalid or has expired. Request a new one in the app.' });
     }
     const newHash = hashPassword(newPassword);
     const account = await getUserAccount(tokenRow.user_id);
@@ -4444,17 +4452,20 @@ app.post('/auth/reset-password', express.urlencoded({ extended: false }), async 
     if (passwordError) throw passwordError;
     await supabase.from('password_reset_tokens').update({ used: true }).eq('id', tokenRow.id);
     log('info', 'auth.password_reset.completed', { userId: tokenRow.user_id });
-    res.json({ success: true });
+    return resetFormResponse(req, res, 200, { success: true }, { title: 'Password updated', message: 'You can sign in with the new password in the Adam app.' });
   } catch (err) {
     log('error', 'auth.reset_password.error', { error: err.message });
-    res.status(500).json({ error: err.message });
+    return resetFormResponse(req, res, 500, { error: err.message }, { title: 'Something went wrong', message: 'Try the link again.' });
   }
 });
 
 const EMAIL_VERIFY_TOKEN_PREFIX = 'verify_';
 
 app.get('/auth/verify-email/confirm', async (req, res) => {
-  const page = (message) => res.type('html').send(`<!DOCTYPE html><html><head><title>Adam</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:sans-serif;max-width:420px;margin:60px auto;padding:0 24px"><p>${escapeHtml(message)}</p></body></html>`);
+  const page = (message) => {
+    const title = /verified/i.test(message) ? 'Email verified' : /expired/i.test(message) ? 'Link expired' : 'Check your email';
+    return res.type('html').send(authPage(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`));
+  };
   try {
     const token = String(req.query.token || '');
     if (!token.startsWith(EMAIL_VERIFY_TOKEN_PREFIX)) return page('That link is not valid.');
@@ -8505,10 +8516,10 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 
   if (!userId) {
-    return res.status(400).send('Invalid OAuth state');
+    return res.status(400).type('html').send(authPage('Google', '<h1>Could not connect Google</h1><p>That sign-in link is not valid. Start again from the app.</p>'));
   }
   if (!code || typeof code !== 'string') {
-    return res.status(400).send('Missing OAuth code');
+    return res.status(400).type('html').send(authPage('Google', '<h1>Could not connect Google</h1><p>The sign-in response was incomplete. Start again from the app.</p>'));
   }
 
   try {
@@ -8536,24 +8547,12 @@ app.get('/auth/google/callback', async (req, res) => {
     if (upsertError) throw upsertError;
 
     const appOrigin = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#0d0d0d;color:#fff">
-        <p style="font-size:18px">✓ Google connected</p>
-        <p style="color:#888;font-size:13px">You can close this window</p>
-        <script>window.opener?.postMessage('google_auth_success',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),1500);</script>
-      </body></html>
-    `);
+    res.type('html').send(authPage('Google', `<h1>Google connected</h1><p>You can close this window.</p><script>window.opener?.postMessage('google_auth_success',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),1500);</script>`));
   } catch (err) {
     console.error('/auth/google/callback error:', err.response?.data || err.message);
     const appOrigin = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
     const errMsg = escapeHtml(err.response?.data?.error_description || err.message);
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#0d0d0d;color:#fff">
-        <p style="font-size:18px">✗ Connection failed</p>
-        <p style="color:#888;font-size:13px">${errMsg}</p>
-        <script>window.opener?.postMessage('google_auth_error',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),3000);</script>
-      </body></html>
-    `);
+    res.type('html').send(authPage('Google', `<h1>Connection failed</h1><p>${errMsg}</p><script>window.opener?.postMessage('google_auth_error',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),3000);</script>`));
   }
 });
 
@@ -8593,8 +8592,8 @@ app.get('/auth/microsoft/callback', async (req, res) => {
   if (error) {
     return res.send(`<script>window.opener?.postMessage('microsoft_auth_error',${JSON.stringify(appOrigin)});window.close();</script>`);
   }
-  if (!userId) return res.status(400).send('Invalid OAuth state');
-  if (!code || typeof code !== 'string') return res.status(400).send('Missing OAuth code');
+  if (!userId) return res.status(400).type('html').send(authPage('Microsoft', '<h1>Could not connect Outlook</h1><p>That sign-in link is not valid. Start again from the app.</p>'));
+  if (!code || typeof code !== 'string') return res.status(400).type('html').send(authPage('Microsoft', '<h1>Could not connect Outlook</h1><p>The sign-in response was incomplete. Start again from the app.</p>'));
 
   try {
     const tenant = process.env.MS_TENANT || 'common';
@@ -8618,23 +8617,11 @@ app.get('/auth/microsoft/callback', async (req, res) => {
     );
     if (upsertError) throw upsertError;
 
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#0d0d0d;color:#fff">
-        <p style="font-size:18px">✓ Outlook connected</p>
-        <p style="color:#888;font-size:13px">You can close this window</p>
-        <script>window.opener?.postMessage('microsoft_auth_success',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),1500);</script>
-      </body></html>
-    `);
+    res.type('html').send(authPage('Outlook', `<h1>Outlook connected</h1><p>You can close this window.</p><script>window.opener?.postMessage('microsoft_auth_success',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),1500);</script>`));
   } catch (err) {
     console.error('/auth/microsoft/callback error:', err.response?.data || err.message);
     const errMsg = escapeHtml(err.response?.data?.error_description || err.message);
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#0d0d0d;color:#fff">
-        <p style="font-size:18px">✗ Connection failed</p>
-        <p style="color:#888;font-size:13px">${errMsg}</p>
-        <script>window.opener?.postMessage('microsoft_auth_error',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),3000);</script>
-      </body></html>
-    `);
+    res.type('html').send(authPage('Outlook', `<h1>Connection failed</h1><p>${errMsg}</p><script>window.opener?.postMessage('microsoft_auth_error',${JSON.stringify(appOrigin)});setTimeout(()=>window.close(),3000);</script>`));
   }
 });
 
@@ -8815,7 +8802,16 @@ app.get('/install-shortcut', (_req, res) => {
 
 app.get('/', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.sendFile(path.resolve(__dirname, '..', 'index.html'));
+  res.send(require('./public-ui').page({
+    title: 'Adam',
+    body: `<h1>A personal assistant for what you need done.</h1>
+    <p>The iPhone app is where you ask Adam to do something, see what it is working on, and approve anything that is hard to undo.</p>
+    <ul class="facts">
+      <li><h2>Ask</h2><p>Messages, calendar, search and bookings, using the accounts you connect.</p></li>
+      <li><h2>Approval</h2><p>Payments and other hard-to-undo changes wait until you approve the exact thing.</p></li>
+      <li><h2>Your data</h2><p>You can export or delete your account from Profile in the app. <a href="/support">Support</a> can do it if you cannot get in.</p></li>
+    </ul>`
+  }));
 });
 
 // Sentry error handler must be last
@@ -8984,26 +8980,27 @@ function displayBearerToken(req) {
 
 function displayPageHtml() {
   return [
-    '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">',
     '<title>Adam display</title><style>',
-    'body{margin:0;background:#111;color:#f5f1ec;font:16px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}',
-    'main{min-height:100vh;display:grid;place-items:center;padding:8vw;box-sizing:border-box}',
-    'section{width:min(720px,100%)}h1{font-size:clamp(28px,6vw,64px);margin:0 0 18px}',
-    'p{color:#b8b0a8;line-height:1.5}input,button{font:inherit;padding:13px 15px;border-radius:10px;border:1px solid #514b46}',
-    'input{background:#1d1b1a;color:#fff;width:100%;box-sizing:border-box;margin:8px 0}',
-    'button{background:#e97961;color:#111;border:0;font-weight:700;cursor:pointer}',
-    '#content{white-space:pre-wrap;font-size:clamp(20px,4vw,42px);line-height:1.35;color:#f5f1ec}',
-    '.urgent{text-align:center}.urgent .ring{width:160px;height:160px;border-radius:50%;border:6px solid #F0A23A;margin:0 auto 36px;animation:urgentpulse 2s ease-in-out infinite}',
-    '.urgent .big{font-size:clamp(22px,4.4vw,44px);color:#f5f1ec;margin:0 0 14px}.urgent .muted{font-size:20px;margin:0 0 40px}',
-    '.urgent .row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}.urgent button{border-radius:99px;padding:16px 30px;font-size:22px;background:transparent;color:#f5f1ec;border:1.5px solid #8f8781;font-weight:600}.urgent button.main{background:#f5f1ec;color:#111;border-color:#f5f1ec}',
+    ':root{color-scheme:dark}body{margin:0;background:#0b0c0c;color:#f2ede4;font:17px/1.5 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}',
+    'main{min-height:100vh;display:grid;place-items:center;padding:max(32px,8vw);box-sizing:border-box}',
+    'section{width:min(720px,100%)}h1{font-size:clamp(32px,6vw,64px);line-height:1.05;letter-spacing:-.02em;font-weight:700;margin:0 0 16px}',
+    'p{color:#c4beb6;line-height:1.5;margin:0}input,button{font:inherit}input{background:#151617;color:#f2ede4;width:100%;box-sizing:border-box;border:1px solid rgba(242,237,228,.2);border-radius:14px;min-height:48px;padding:12px 14px}',
+    'input::placeholder{color:#c4beb6;opacity:1}button{cursor:pointer}',
+    '#content{white-space:pre-wrap;font-size:clamp(20px,4vw,42px);line-height:1.35;color:#f2ede4}',
+    '.urgent{text-align:center}.urgent .ring{width:min(160px,40vw);height:min(160px,40vw);border-radius:50%;border:6px solid #F0A23A;margin:0 auto 36px;animation:urgentpulse 2s ease-in-out infinite}',
+    '.urgent .big{font-size:clamp(22px,4.4vw,44px);color:#f2ede4;margin:0 0 14px}.urgent .muted{font-size:20px;margin:0 0 40px;color:#c4beb6}',
+    '.urgent .row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}.urgent button{border-radius:999px;min-height:52px;padding:14px 28px;font-size:20px;background:transparent;color:#f2ede4;border:1.5px solid #c4beb6;font-weight:600}.urgent button.main{background:#f2ede4;color:#0b0c0c;border-color:#f2ede4}',
+    '.urgent button:hover{background:rgba(242,237,228,.08)}.urgent button.main:hover{background:#fff}',
     '@keyframes urgentpulse{50%{transform:scale(1.08);border-color:#FFC15E}}@media (prefers-reduced-motion:reduce){.urgent .ring{animation:none}}',
     'body.scene main{padding:0;display:block}body.scene section{width:100%;height:100vh}iframe{border:0;width:100%;height:100vh;display:block}',
-    '.pair{max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:14px}.pair h1{margin:0}.pair .eyebrow{margin:0;font-size:13px;letter-spacing:.04em;color:#8f8781}.pair .lede{margin:0 0 6px}',
-    '.pair input{border-radius:14px;margin:0;font-size:17px}.pair input.code{font:600 clamp(28px,7vw,40px) ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-align:center;text-transform:uppercase;padding:18px 12px}',
-    '.pair input:focus{outline:2px solid #e97961;outline-offset:2px;border-color:transparent}.pair button.main{border-radius:99px;padding:16px 24px;font-size:17px}.pair button:disabled{opacity:.55;cursor:default}',
-    '.pair .error{margin:0;min-height:1.5em;color:#F0A23A;font-size:15px}.idle{text-align:center}.idle .eyebrow{margin:0 0 10px;font-size:13px;letter-spacing:.04em;color:#8f8781}.idle h1{margin:0 0 12px}',
-    '.enroll{text-align:center}.enroll .eyebrow{margin:0 auto 10px;font-size:13px;letter-spacing:.04em;color:#8f8781}.enroll h1{margin:0 0 6px}.enroll .digits{font:600 clamp(72px,20vw,168px) ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;margin:.15em 0 .1em .16em;color:#f5f1ec;line-height:1}.enroll p{margin:0 auto;max-width:30em}',
-    '.muted{font-size:13px;color:#8f8781}</style></head><body><main><section id="app"></section></main>',
+    '.pair{max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:12px}.pair h1{margin:0}.pair .eyebrow{margin:0;font-size:15px;color:#c4beb6}.pair .lede{margin:0 0 8px;color:#c4beb6}',
+    '.pair input{margin:0;font-size:17px}.pair input.code{font:600 clamp(28px,7vw,40px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-align:center;text-transform:uppercase;padding:18px 12px;min-height:72px}',
+    '.pair button.main{margin-top:6px;border:0;border-radius:999px;min-height:52px;padding:14px 24px;font-size:17px;font-weight:650;background:#f2ede4;color:#0b0c0c}.pair button.main:hover{background:#fff}.pair button:disabled{opacity:.55;cursor:default}',
+    'input:focus,button:focus{outline:none}input:focus-visible,button:focus-visible{outline:2px solid #f2ede4;outline-offset:3px}',
+    '.pair .error{margin:0;min-height:1.5em;color:#f0c27a;font-size:15px}.idle{text-align:center}.idle .eyebrow{margin:0 0 10px;font-size:15px;color:#c4beb6}.idle h1{margin:0 0 12px}',
+    '.enroll{text-align:center}.enroll .eyebrow{margin:0 auto 10px;font-size:15px;color:#c4beb6}.enroll h1{margin:0 0 6px}.enroll .digits{font:600 clamp(64px,18vw,148px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;margin:.15em 0 .1em .12em;color:#f2ede4}.enroll p{margin:0 auto;max-width:28em;color:#c4beb6}',
+    '.muted{font-size:15px;color:#c4beb6}</style></head><body><main><section id="app"></section></main>',
     '<script>',
     'const app=document.getElementById("app");',
     'const params=new URLSearchParams(location.search);',

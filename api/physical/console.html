@@ -1,26 +1,208 @@
 <!doctype html>
-<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Adam physical runtime</title>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adam physical runtime</title>
 <style>
-body{font:15px/1.5 system-ui;margin:0;background:#121518;color:#e9ecef}header{padding:20px 28px;border-bottom:1px solid #343a40;display:flex;gap:20px;align-items:center}h1{font-size:20px;margin:0}small{color:#aab4bf}.pill{border:1px solid #6f8a9d;padding:2px 8px;border-radius:20px}main{padding:24px 28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}section{background:#1c2227;border:1px solid #343a40;border-radius:10px;padding:16px;min-height:120px}h2{font-size:16px;margin:0 0 10px}pre{font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto}button{background:#dcaa55;color:#1b160e;border:0;border-radius:6px;padding:9px 14px;cursor:pointer}input{padding:9px;background:#101315;color:white;border:1px solid #66717b;border-radius:6px}form{display:flex;gap:8px;flex-wrap:wrap}.sim{color:#f6b969}.real{color:#8dd7a4}
+  :root {
+    color-scheme: light dark;
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --ink: #161613;
+    --muted: #6b675f;
+    --line: rgba(22, 22, 19, 0.12);
+    --accent: #123829;
+    --on-accent: #ffffff;
+    --sim: #8c5709;
+    --real: #146b40;
+    --code: #f3f1eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0c0c;
+      --surface: #151617;
+      --ink: #f2ede4;
+      --muted: #c4beb6;
+      --line: rgba(242, 237, 228, 0.16);
+      --accent: #f2ede4;
+      --on-accent: #0b0c0c;
+      --sim: #f0c27a;
+      --real: #8fd4ad;
+      --code: #101112;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+  }
+  h1 { font-size: 20px; line-height: 1.2; margin: 0; letter-spacing: -0.02em; }
+  #status { color: var(--muted); }
+  .pill { border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; font-size: 13px; }
+  .auth { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-left: auto; }
+  .auth label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  .auth input { width: 220px; flex: none; }
+  main { padding: 20px 24px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-height: 120px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  pre { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; max-height: 440px; overflow: auto; margin: 0; background: var(--code); border-radius: 10px; padding: 10px 12px; }
+  pre.empty { color: var(--muted); font-family: inherit; font-size: 14px; background: transparent; padding: 0; }
+  button {
+    background: var(--accent); color: var(--on-accent); border: 0; border-radius: 12px;
+    min-height: 44px; padding: 10px 14px; font: inherit; font-weight: 650; cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: default; }
+  input {
+    min-height: 44px; padding: 10px 12px; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 12px; font: inherit; min-width: 0; flex: 1 1 140px;
+  }
+  form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sim { color: var(--sim); }
+  .real { color: var(--real); }
+  #result, #setupResult { margin: 10px 0 0; }
+  :focus { outline: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 640px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .auth { margin-left: 0; width: 100%; }
+  }
 </style>
-<header><h1>Adam physical runtime</h1><span id="environment" class="pill">Loading</span><small id="status">Connecting…</small></header>
+</head>
+<body>
+<header>
+  <h1>Adam physical runtime</h1>
+  <span id="environment" class="pill">Loading</span>
+  <small id="status">Connecting…</small>
+  <form id="auth" class="auth">
+    <label>Admin token
+      <input id="adminToken" type="password" autocomplete="current-password" placeholder="Leave blank here">
+    </label>
+    <button type="submit">Apply</button>
+  </form>
+</header>
 <main>
-<section><h2>Rooms and state</h2><pre id="rooms"></pre></section>
-<section><h2>Devices</h2><pre id="devices"></pre></section>
-<section><h2>Watches</h2><pre id="watches"></pre></section>
-<section><h2>Recent actions</h2><pre id="actions"></pre></section>
-<section><h2>Observations and provenance</h2><pre id="observations"></pre></section>
-<section><h2>Events</h2><pre id="events"></pre></section>
-<section><h2>Create simulated room and device</h2><form id="setup"><input id="roomName" placeholder="Room name" required><input id="deviceName" placeholder="Device ID" required><button>Create</button></form><pre id="setupResult"></pre></section>
-<section><h2>Simulate observation</h2><form id="simulate"><input id="device" placeholder="Simulator device ID" required><input id="secret" type="password" placeholder="Device secret" required><input id="type" placeholder="Observation type" value="motion_detected" required><input id="value" placeholder="JSON value" value="true" required><button>Send</button></form><p id="result"></p></section>
+<section><h2>Rooms and state</h2><pre id="rooms" class="empty">Nothing yet</pre></section>
+<section><h2>Devices</h2><pre id="devices" class="empty">Nothing yet</pre></section>
+<section><h2>Watches</h2><pre id="watches" class="empty">Nothing yet</pre></section>
+<section><h2>Recent actions</h2><pre id="actions" class="empty">Nothing yet</pre></section>
+<section><h2>Observations and provenance</h2><pre id="observations" class="empty">Nothing yet</pre></section>
+<section><h2>Events</h2><pre id="events" class="empty">Nothing yet</pre></section>
+<section>
+  <h2>Create simulated room and device</h2>
+  <form id="setup">
+    <input id="roomName" placeholder="Room name" aria-label="Room name" required>
+    <input id="deviceName" placeholder="Device ID" aria-label="Device ID" required>
+    <button>Create</button>
+  </form>
+  <pre id="setupResult" class="empty">Nothing yet</pre>
+</section>
+<section>
+  <h2>Simulate observation</h2>
+  <form id="simulate">
+    <input id="device" placeholder="Simulator device ID" aria-label="Simulator device ID" required>
+    <input id="secret" type="password" placeholder="Device secret" aria-label="Device secret" required>
+    <input id="type" placeholder="Observation type" aria-label="Observation type" value="motion_detected" required>
+    <input id="value" placeholder="JSON value" aria-label="JSON value" value="true" required>
+    <button>Send</button>
+  </form>
+  <p id="result"></p>
+</section>
 </main>
 <script>
-const token=prompt('Adam admin token (leave blank for local default)')||'';
-const headers=token?{'x-adam-admin-token':token}:{};
-const format=(value)=>JSON.stringify(value,null,2);
-async function refresh(){try{const response=await fetch('/v1/snapshot',{headers});if(!response.ok)throw Error((await response.json()).error);const data=await response.json();document.querySelector('#environment').textContent=data.environment;for(const key of ['rooms','devices','watches','actions','events'])document.getElementById(key).textContent=format(data[key]);document.getElementById('observations').textContent=data.observations.map(item=>'['+item.source.origin.toUpperCase()+'] '+format(item)).join('\n\n');for(const field of document.querySelectorAll('#setup input,#setup button,#simulate input,#simulate button'))field.disabled=data.environment==='production';document.querySelector('#status').textContent='Live · '+new Date().toLocaleTimeString();}catch(error){document.querySelector('#status').textContent=error.message}}
-document.querySelector('#simulate').addEventListener('submit',async event=>{event.preventDefault();const device=document.querySelector('#device').value;const secret=document.querySelector('#secret').value;let value;try{value=JSON.parse(document.querySelector('#value').value)}catch{document.querySelector('#result').textContent='Value must be JSON';return}const response=await fetch('/v1/devices/'+encodeURIComponent(device)+'/observations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+secret},body:JSON.stringify({protocolVersion:1,messageId:crypto.randomUUID(),timestamp:new Date().toISOString(),type:document.querySelector('#type').value,value})});document.querySelector('#result').textContent=response.ok?'Recorded as simulated':format(await response.json());refresh()});
-document.querySelector('#setup').addEventListener('submit',async event=>{event.preventDefault();const roomResponse=await fetch('/v1/rooms',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({name:document.querySelector('#roomName').value})});const room=await roomResponse.json();if(!roomResponse.ok){document.querySelector('#setupResult').textContent=format(room);return}const deviceResponse=await fetch('/v1/simulator/devices',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({id:document.querySelector('#deviceName').value,roomId:room.id})});const registered=await deviceResponse.json();document.querySelector('#setupResult').textContent=deviceResponse.ok?'Room ID: '+room.id+'\nDevice secret (copy now): '+registered.secret:format(registered);if(deviceResponse.ok){document.querySelector('#device').value=registered.device.id;document.querySelector('#secret').value=registered.secret}refresh()});
-async function stream(){try{const response=await fetch('/v1/stream',{headers});if(!response.ok)throw Error('Stream unavailable');const reader=response.body.getReader();for(;;){const packet=await reader.read();if(packet.done)break;refresh()}}catch{setTimeout(stream,3000)}}
-refresh();stream();setInterval(refresh,10000);
-</script></html>
+const tokenInput = document.querySelector('#adminToken');
+tokenInput.value = sessionStorage.getItem('adam_admin_token') || '';
+function headers() {
+  const token = tokenInput.value.trim();
+  return token ? { 'x-adam-admin-token': token } : {};
+}
+document.querySelector('#auth').addEventListener('submit', (event) => {
+  event.preventDefault();
+  sessionStorage.setItem('adam_admin_token', tokenInput.value.trim());
+  refresh();
+});
+const format = (value) => JSON.stringify(value, null, 2);
+function show(id, value, text) {
+  const el = document.getElementById(id);
+  const empty = value == null || (Array.isArray(value) && value.length === 0) || text === '';
+  el.classList.toggle('empty', empty);
+  el.textContent = empty ? 'Nothing yet' : (text != null ? text : format(value));
+}
+async function refresh() {
+  try {
+    const response = await fetch('/v1/snapshot', { headers: headers() });
+    if (!response.ok) throw Error((await response.json()).error);
+    const data = await response.json();
+    document.querySelector('#environment').textContent = data.environment;
+    for (const key of ['rooms', 'devices', 'watches', 'actions', 'events']) show(key, data[key]);
+    const observations = Array.isArray(data.observations) ? data.observations : [];
+    show('observations', observations, observations.map(item => '[' + item.source.origin.toUpperCase() + '] ' + format(item)).join('\n\n'));
+    const locked = data.environment === 'production';
+    for (const field of document.querySelectorAll('#setup input, #setup button, #simulate input, #simulate button')) field.disabled = locked;
+    document.querySelector('#status').textContent = 'Live · ' + new Date().toLocaleTimeString();
+  } catch (error) {
+    document.querySelector('#status').textContent = error.message;
+  }
+}
+document.querySelector('#simulate').addEventListener('submit', async event => {
+  event.preventDefault();
+  const device = document.querySelector('#device').value;
+  const secret = document.querySelector('#secret').value;
+  let value;
+  try { value = JSON.parse(document.querySelector('#value').value); }
+  catch { document.querySelector('#result').textContent = 'Value must be JSON'; return; }
+  const response = await fetch('/v1/devices/' + encodeURIComponent(device) + '/observations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + secret },
+    body: JSON.stringify({ protocolVersion: 1, messageId: crypto.randomUUID(), timestamp: new Date().toISOString(), type: document.querySelector('#type').value, value })
+  });
+  document.querySelector('#result').textContent = response.ok ? 'Recorded as simulated' : format(await response.json());
+  refresh();
+});
+document.querySelector('#setup').addEventListener('submit', async event => {
+  event.preventDefault();
+  const roomResponse = await fetch('/v1/rooms', {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: document.querySelector('#roomName').value })
+  });
+  const room = await roomResponse.json();
+  const setupResult = document.querySelector('#setupResult');
+  if (!roomResponse.ok) { setupResult.classList.remove('empty'); setupResult.textContent = format(room); return; }
+  const deviceResponse = await fetch('/v1/simulator/devices', {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: document.querySelector('#deviceName').value, roomId: room.id })
+  });
+  const registered = await deviceResponse.json();
+  setupResult.classList.remove('empty');
+  setupResult.textContent = deviceResponse.ok
+    ? 'Room ID: ' + room.id + '\nDevice secret (copy now): ' + registered.secret
+    : format(registered);
+  if (deviceResponse.ok) {
+    document.querySelector('#device').value = registered.device.id;
+    document.querySelector('#secret').value = registered.secret;
+  }
+  refresh();
+});
+async function stream() {
+  try {
+    const response = await fetch('/v1/stream', { headers: headers() });
+    if (!response.ok) throw Error('Stream unavailable');
+    const reader = response.body.getReader();
+    for (;;) {
+      const packet = await reader.read();
+      if (packet.done) break;
+      refresh();
+    }
+  } catch { setTimeout(stream, 3000); }
+}
+refresh();
+stream();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

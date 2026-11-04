@@ -1,87 +1,255 @@
-/* Oxy Web PWA Design Tokens - Aligned to iOS AppTheme (warm, clear, capable)
-   Use these in the served index.html / React styles.
-   Match the native system for consistency across the whole app.
-*/
+/* Adam public pages. Same colours as the iOS app (AppTheme): warm canvas,
+   forest-green actions in light appearance, ivory actions in dark. */
 
 :root {
-  /* Backgrounds */
-  --app-background: #0f0f12; /* rich dark */
-  --app-surface: #1f1f21;
-  --app-surface-2: #29292b;
-
-  /* Accent - teal for energy and CTAs */
-  --app-accent: #00b5a1;
-  --app-on-accent: #000000;
-
-  /* Text */
-  --app-ink: #f2f2f0;
-  --app-muted: #8c8c8a;
-
-  /* Hairline */
-  --app-hairline: rgba(255, 255, 255, 0.08);
-
-  /* Semantics */
-  --app-success: #4dbf7f;
-  --app-live: #33d98c;
-  --app-warning: #f2b340;
-  --app-danger: #eb7666;
-
-  /* Typography (approximate for web) */
-  --app-display: "Didot", "Times New Roman", serif;
-  --app-body: "Inter", system-ui, -apple-system, sans-serif;
-  --app-mono: ui-monospace, monospace;
-
-  /* Radii */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
-  --radius-bubble: 18px;
-  --radius-card: 10px;
-
-  /* Motion */
-  --motion-fast: 0.15s ease-in-out;
-  --motion-standard: 0.22s ease-in-out;
-  --motion-relax: 0.4s ease-in-out;
+  color-scheme: light dark;
+  --app-background: #faf9f5;
+  --app-surface: #ffffff;
+  --app-ink: #161613;
+  --app-muted: #6b675f;
+  --app-hairline: rgba(22, 22, 19, 0.12);
+  --app-accent: #123829;
+  --app-accent-hover: #1c4e3a;
+  --app-on-accent: #ffffff;
+  --app-link: #123829;
+  --app-danger: #8d3b2e;
+  --app-success: #146b40;
+  --app-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --app-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* Light mode overrides if needed */
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --app-background: #f5f4f0;
-    --app-surface: #ffffff;
-    --app-surface-2: #f0efeb;
-    --app-ink: #1a1a1a;
-    --app-muted: #6b6b69;
-    --app-hairline: rgba(0, 0, 0, 0.1);
-    /* adjust others as per TodayPalette light */
+    --app-background: #0b0c0c;
+    --app-surface: #151617;
+    --app-ink: #f2ede4;
+    --app-muted: #b7b0a8;
+    --app-hairline: rgba(242, 237, 228, 0.16);
+    --app-accent: #f2ede4;
+    --app-accent-hover: #ffffff;
+    --app-on-accent: #0b0c0c;
+    --app-link: #d7e6dc;
+    --app-danger: #f0a598;
+    --app-success: #8fd4ad;
   }
 }
 
-/* Example usage for chat etc. */
-.chat-bubble-user {
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--app-background);
+  color: var(--app-ink);
+  font: 17px/1.6 var(--app-body);
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: -48px;
   background: var(--app-accent);
   color: var(--app-on-accent);
+  padding: 8px 12px;
+  border-radius: 10px;
+  z-index: 2;
 }
 
-.chat-bubble-assistant {
-  background: var(--app-surface);
+.skip:focus { top: 12px; }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 22px 20px 0;
+}
+
+.top nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+.word {
   color: var(--app-ink);
-  border: 0.5px solid var(--app-hairline);
+  font-weight: 650;
+  text-decoration: none;
+  letter-spacing: -0.01em;
 }
 
-.action-card {
+.top nav a {
+  color: var(--app-muted);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.top nav a:hover { color: var(--app-ink); }
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 20px 72px;
+}
+
+main.card {
+  max-width: 420px;
+  margin-top: 36px;
   background: var(--app-surface);
-  border: 0.5px solid var(--app-hairline);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--app-hairline);
+  border-radius: 16px;
+  padding: 28px 24px 32px;
 }
 
-.primary-button {
-  background: var(--app-ink);
-  color: var(--app-background);
-  border-radius: 999px;
+h1 {
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  margin: 0 0 12px;
 }
 
-.toggle {
-  /* custom capsule toggle styles */
+h2 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 650;
+  margin: 36px 0 8px;
+}
+
+h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 650;
+  margin: 22px 0 6px;
+}
+
+p, li { color: var(--app-ink); }
+
+p { margin: 0 0 14px; }
+
+li { margin: 6px 0; }
+
+a { color: var(--app-link); text-underline-offset: 3px; }
+
+a:hover { text-decoration-thickness: 2px; }
+
+.meta, .lede-quiet { color: var(--app-muted); font-size: 15px; }
+
+.meta { margin: 0 0 28px; }
+
+.facts {
+  list-style: none;
+  padding: 8px 0 0;
+  margin: 28px 0 0;
+}
+
+.facts li {
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--app-hairline);
+}
+
+.facts h2 { font-size: 17px; margin: 0 0 4px; }
+
+.facts p { margin: 0; }
+
+label {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+  margin: 16px 0 6px;
+}
+
+input[type="password"],
+input[type="text"],
+input[type="email"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--app-hairline);
+  background: var(--app-background);
+  color: var(--app-ink);
+  font: 17px/1.4 var(--app-body);
+}
+
+main.card input { background: var(--app-background); }
+
+button {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
+  font: 600 17px/1 var(--app-body);
+  cursor: pointer;
+}
+
+button:hover { background: var(--app-accent-hover); }
+
+button:active { transform: translateY(1px); }
+
+button:disabled { opacity: 0.55; cursor: default; }
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 8px 0 16px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 520px;
+  font-size: 15px;
+}
+
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid var(--app-hairline);
+}
+
+th {
+  color: var(--app-muted);
+  font-weight: 650;
+  font-size: 13px;
+}
+
+footer {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-hairline);
+  color: var(--app-muted);
+  font-size: 14px;
+}
+
+footer a { color: var(--app-muted); }
+
+:focus { outline: none; }
+
+:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 30px; }
+  .top { padding-top: 16px; }
+  main.card { margin-top: 20px; padding: 22px 18px 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  button:active { transform: none; }
 }
