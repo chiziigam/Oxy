@@ -1527,7 +1527,7 @@ const ACTION_CONTRACTS = {
     failureSummary: 'Could not check',
     confirmation: 'none',
     executionMode: 'direct',
-    guidance: 'Read the page to find out whether a payment actually went through. Use it after a bank approval, or any time you are not certain — "I pressed the button" is not the same as "it was paid".'
+    guidance: 'Read the page to find out whether a payment actually went through. It only reads: it never clicks, fills or retries a payment. Use it after a bank approval, or any time you are not certain — "I pressed the button" is not the same as "it was paid".'
   },
   browser_fill_known_details: {
     adapter: { kind: 'inline' },

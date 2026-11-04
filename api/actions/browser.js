@@ -389,7 +389,7 @@ async function transactionAuthorize({ userId, context, deps }) {
 
 async function transactionStatus({ userId, context, deps }) {
   try {
-    return finishTransaction(userId, await transaction.watch(userId, {}), deps, context);
+    return finishTransaction(userId, await transaction.inspect(userId), deps, context);
   } catch (e) {
     if (e.code === 'NO_SESSION') return noSession();
     return { success: false, error: `Could not check: ${e.message}` };

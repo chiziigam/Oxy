@@ -261,10 +261,13 @@ test('only a confirmed charge consumes the daily spend cap, and it is recorded o
 
 test('checking status after a bank approval reports the real outcome', async () => {
   const restore = withFakeSession('u1', { committedTotal: '£10.00' });
+  const originalInspect = transaction.inspect;
   const originalWatch = transaction.watch;
   const originalRecord = transaction.recordConfirmedPurchase;
   const originalRead = browserEnvironment.readPageText;
-  transaction.watch = async () => ({ state: 'confirmed', amount: { raw: '£10.00', amount: 10, currency: 'GBP' } });
+  // Status must read only. If it called watch(), this stub would click the pay control.
+  transaction.watch = async () => { throw new Error('status must not click'); };
+  transaction.inspect = async () => ({ state: 'confirmed', amount: { raw: '£10.00', amount: 10, currency: 'GBP' } });
   transaction.recordConfirmedPurchase = async () => 'purchase-2';
   browserEnvironment.readPageText = async () => 'Payment successful';
   try {
@@ -272,9 +275,27 @@ test('checking status after a bank approval reports the real outcome', async () 
     assert.equal(result.success, true);
     assert.match(result.text, /went through/);
   } finally {
+    transaction.inspect = originalInspect;
     transaction.watch = originalWatch;
     transaction.recordConfirmedPurchase = originalRecord;
     browserEnvironment.readPageText = originalRead;
+    restore();
+  }
+});
+
+test('checking status never clicks a pay control', async () => {
+  const restore = withFakeSession('u1', { committedTotal: '£10.00' });
+  const originalInspect = transaction.inspect;
+  const originalWatch = transaction.watch;
+  let watched = false;
+  transaction.watch = async () => { watched = true; return { state: 'confirmed' }; };
+  transaction.inspect = async () => ({ state: 'unknown', error: 'still waiting' });
+  try {
+    await handlers.transaction_status({ userId: 'u1', context: {}, deps: fakeDeps() });
+    assert.equal(watched, false);
+  } finally {
+    transaction.inspect = originalInspect;
+    transaction.watch = originalWatch;
     restore();
   }
 });

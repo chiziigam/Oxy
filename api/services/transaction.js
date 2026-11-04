@@ -474,6 +474,38 @@ async function commit(userId, { authorize = null, card = null, onProgress = () =
 }
 
 /**
+ * Read the payment state without touching the page. "Check whether it went through" must be a
+ * read: watch() below still clicks controls, and must only run as the aftermath of a commit.
+ */
+async function inspect(userId) {
+  const session = getSession(userId);
+  if (!session) return { state: 'error', error: 'No page is open.' };
+  const page = session.page;
+  const state = await classifyPaymentOutcome(page);
+  touchSession(userId);
+  if (state === 'confirmed') {
+    return { state: 'confirmed', label: session.pendingPaymentLabel, amount: await readAmount(page) };
+  }
+  if (state === 'declined') {
+    return {
+      state: 'declined',
+      error: 'The payment was declined by the card issuer or the site — nothing further was attempted. The page is still open if you want to try a different card.'
+    };
+  }
+  if (state === 'challenge') {
+    return {
+      state: 'awaiting_authorization',
+      text: 'Your bank is asking you to approve this in your banking app. Nothing is charged until you do.'
+    };
+  }
+  return {
+    state: 'unknown',
+    amount: await readAmount(page),
+    error: await describeBlockedPayment(page).catch(() => 'I could not tell whether that went through, so I have not tried again.')
+  };
+}
+
+/**
  * PHASE 3. Watch the aftermath instead of declaring victory on the click. Many checkouts put
  * the card form BEHIND the commit button, and a bank challenge or a decline can follow it.
  */
@@ -589,6 +621,7 @@ module.exports = {
   prepare,
   pendingSummary,
   commit,
+  inspect,
   watch,
   readAmount,
   chargedAmount,
