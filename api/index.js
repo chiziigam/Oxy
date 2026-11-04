@@ -160,6 +160,7 @@ const failureReport = require('./services/failure-report');
 const connectorState = require('./services/connector-state');
 const clientIp = require('./services/client-ip');
 const usageMeter = require('./services/usage-meter');
+const userBudget = require('./services/user-budget');
 const researchSynthesis = require('./services/research-synthesis');
 const homeModel = require('./services/home-model');
 const agentProjectRuntime = require('./services/agent-project-runtime');
@@ -7374,9 +7375,16 @@ async function respondWithResult({ res, streaming, wantsTTS, settings, trace, us
 function chatUsageMeter(req, res, next) {
   usageMeter.runWithMeter((turn) => {
     const json = res.json.bind(res);
-    res.json = (body) => (body && typeof body === 'object' && !Array.isArray(body) && body.error === undefined && turn.calls
-      ? json({ ...body, usage: usageMeter.summarise(turn) })
-      : json(body));
+    res.json = (body) => {
+      const summary = usageMeter.summarise(turn);
+      // What this turn cost goes on the person's daily total, so the ceiling means something.
+      if (summary.calls) {
+        userBudget.addSpend(supabase, req.body?.userId, summary.estimatedUsd, summary.calls).catch(() => {});
+      }
+      return (body && typeof body === 'object' && !Array.isArray(body) && body.error === undefined && turn.calls
+        ? json({ ...body, usage: summary })
+        : json(body));
+    };
     next();
   });
 }
@@ -7390,6 +7398,11 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
   try {
     const { message, userId, settings: rawSettings, location = null, nativeHints = null, chatStartedAt = null, channel = null } = req.body;
     if (!requireMatchingUser(req, res, userId)) return;
+    // One account must not be able to spend the whole inference budget for the month.
+    const budget = await userBudget.checkBudget(supabase, userId);
+    if (!budget.ok) {
+      return res.status(429).json({ error: budget.error, budget: { used: budget.used, cap: budget.cap } });
+    }
     const settings = rawSettings && typeof rawSettings === 'object' && !Array.isArray(rawSettings) ? { ...rawSettings } : {};
     // The saved guard mode applies even when this client did not send it.
     if ((await getChatSettings(supabase, userId)).guardMode === true) settings.guardMode = true;
