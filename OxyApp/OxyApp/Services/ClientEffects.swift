@@ -24,7 +24,8 @@ enum ClientEffects {
         switch (effect.setting, effect.value) {
         case ("ask_before_acting", "off"), ("ask_before_private_apps", "off"),
              ("how_proactive", "proactive"), ("how_proactive", "autonomous"),
-             ("learn_from_photos", "on"), ("listen_for_sounds", "on"):
+             ("learn_from_photos", "on"), ("learn_from_photos", "scan_now"),
+             ("listen_for_sounds", "on"):
             return true
         default:
             return false

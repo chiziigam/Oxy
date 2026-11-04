@@ -25,7 +25,8 @@ struct ChatService {
         if interfaceRequest { body["interactionOrigin"] = "task_interface" }
 
         if incognito {
-            body["incognito"] = true
+            // The server has no "incognito" flag; not persisting is what keeps the turn out of history.
+            body["persistConversation"] = false
         }
 
         if let chatStartedAt {
