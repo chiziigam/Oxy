@@ -20,15 +20,22 @@ struct AdamHomeView: View {
 
     private var doneItems: [BoardItem] {
         var seen = Set<String>()
-        let all = (model.finished + model.board.changed + model.board.completed).filter { seen.insert($0.id).inserted }
+        let all = (model.finished + model.board.completed).filter { seen.insert($0.id).inserted }
         return all.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
     }
 
-    private var doneToday: [BoardItem] {
-        doneItems.filter { $0.date.map(Calendar.current.isDateInToday) ?? false }
+    /// Things Adam noticed but did not do: a delivery, a change at home. Not finished work.
+    private var noticedItems: [BoardItem] {
+        model.board.changed.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
     }
 
-    private var nothingToShow: Bool { model.needsYou.isEmpty && model.working.isEmpty && doneItems.isEmpty }
+    private var doneLabel: String {
+        doneItems.allSatisfy { $0.date.map(Calendar.current.isDateInToday) ?? false } ? "Done today" : "Done"
+    }
+
+    private var nothingToShow: Bool {
+        model.needsYou.isEmpty && model.working.isEmpty && noticedItems.isEmpty && doneItems.isEmpty
+    }
 
     var body: some View {
         ZStack {
@@ -54,7 +61,14 @@ struct AdamHomeView: View {
                 AskAdamBar(text: $draft, isRecording: voice.isRecording, onSend: send, onMic: toggleVoice)
             }
         }
-        .task { await model.refresh() }
+        .task {
+            await model.refresh()
+            #if DEBUG
+            if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION"] != nil {
+                conversation = ConversationRequest(text: "")
+            }
+            #endif
+        }
         .onChange(of: scenePhase) { if scenePhase == .active { Task { await model.refresh() } } }
         .onChange(of: voice.isRecording) {
             if !voice.isRecording, !voice.transcript.isEmpty { draft = voice.transcript }
@@ -99,7 +113,9 @@ struct AdamHomeView: View {
             AdamCard {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Couldn't load").font(.adamTitle).foregroundStyle(Color.adamInk)
-                    AdamButton(title: "Retry", prominent: true) { Task { await model.refresh() } }
+                    Text("Check your connection and try again.")
+                        .font(.adamBody).foregroundStyle(Color.adamMuted)
+                    AdamButton(title: "Try again", prominent: true) { Task { await model.refresh() } }
                 }
             }
         } else if nothingToShow {
@@ -117,8 +133,14 @@ struct AdamHomeView: View {
                     AdamWorkingCard(item: item, model: model) { open(item) }
                 }
             }
+            if !noticedItems.isEmpty {
+                sectionLabel("Noticed")
+                ForEach(noticedItems) { item in
+                    AdamDoneRow(item: item)
+                }
+            }
             if !doneItems.isEmpty {
-                sectionLabel("Done today")
+                sectionLabel(doneLabel)
                 ForEach(shownDone) { item in
                     AdamDoneRow(item: item) { open(item) }
                 }
@@ -136,14 +158,13 @@ struct AdamHomeView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Nothing needs you").font(.adamTitle).foregroundStyle(Color.adamInk)
-            if !doneToday.isEmpty {
-                Text(doneToday.count == 1 ? "Adam finished 1 thing today" : "Adam finished \(doneToday.count) things today")
-                    .font(.adamBody).foregroundStyle(Color.adamInk.opacity(0.75))
-            }
+            Text("Adam will tell you when something does.")
+                .font(.adamBody).foregroundStyle(Color.adamMuted)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 120)
     }
 

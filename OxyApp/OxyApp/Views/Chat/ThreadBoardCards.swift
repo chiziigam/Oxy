@@ -113,6 +113,7 @@ final class ThreadBoardModel {
             absorbFinished()
         } catch {
             refreshFailed = true
+            hasLoaded = true
         }
         await verifyDecisionReplies()
         if let displays = try? await PairedDisplaysService.fetchDisplays() {
