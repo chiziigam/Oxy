@@ -3,12 +3,28 @@ import SwiftUI
 struct AskAdamBar: View {
     @Binding var text: String
     var isRecording = false
+    var error: String?
     let onSend: () -> Void
     let onMic: () -> Void
 
     private var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            bar
+            if let error, !error.isEmpty {
+                Text(error)
+                    .font(.appBody(12))
+                    .foregroundStyle(Color.adamMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, AdamLayout.gutter + 10)
+                    .accessibilityLabel(error)
+            }
+        }
+        .padding(.bottom, 8)
+    }
+
+    private var bar: some View {
         HStack(spacing: 8) {
             TextField("Ask Adam", text: $text, axis: .vertical)
                 .font(.adamBody)
@@ -40,6 +56,5 @@ struct AskAdamBar: View {
         .background(Color.adamCard, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(Color.adamCardEdge, lineWidth: 0.5))
         .padding(.horizontal, AdamLayout.gutter)
-        .padding(.bottom, 8)
     }
 }

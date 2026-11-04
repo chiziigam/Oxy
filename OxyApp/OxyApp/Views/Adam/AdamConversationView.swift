@@ -19,7 +19,7 @@ struct AdamConversationView: View {
             VStack(spacing: 0) {
                 header
                 transcript
-                AskAdamBar(text: $draft, isRecording: voice.isRecording, onSend: send, onMic: toggleVoice)
+                AskAdamBar(text: $draft, isRecording: voice.isRecording, error: voice.errorMessage, onSend: send, onMic: toggleVoice)
             }
         }
         .task {

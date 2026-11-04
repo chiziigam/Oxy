@@ -151,8 +151,8 @@ private struct SceneWebView: UIViewRepresentable {
         }
 
         // The page loads once from a string. Any link, redirect or script navigation is refused.
-        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            let url = action.request.url?.absoluteString
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            let url = navigationAction.request.url?.absoluteString
             decisionHandler(url == nil || url == "about:blank" ? .allow : .cancel)
         }
     }
