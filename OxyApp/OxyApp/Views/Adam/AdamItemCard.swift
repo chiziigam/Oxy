@@ -131,9 +131,22 @@ struct AdamWorkingCard: View {
                     .accessibilityHidden(true)
                 }
                 if canStop {
-                    AdamButton(title: model.stopping.contains(item.id) ? "Stopping" : "Stop", isEnabled: !model.stopping.contains(item.id)) {
+                    Button {
                         Task { await model.stop(item) }
+                    } label: {
+                        Text(model.stopping.contains(item.id) ? "Stopping" : "Stop")
+                            .font(.adamLabel)
+                            .foregroundStyle(Color.adamInk)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 38)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous)
+                                    .strokeBorder(Color.adamInk.opacity(0.28), lineWidth: 1)
+                            }
                     }
+                    .buttonStyle(.appScale)
+                    .disabled(model.stopping.contains(item.id))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
