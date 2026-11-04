@@ -214,8 +214,8 @@ struct PairedDisplaysView: View {
             code = ""
             HapticManager.shared.success()
         } catch {
+            // Keep the code on failure: re-reading four rotating digits makes a typo worse.
             errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn’t add that screen."
-            code = ""
             HapticManager.shared.error()
         }
         isWorking = false

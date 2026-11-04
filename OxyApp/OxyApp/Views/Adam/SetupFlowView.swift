@@ -168,8 +168,17 @@ struct SetupFlowView: View {
 
     private func checkGoogle() async {
         guard let data = try? await APIClient.shared.request(path: "/connectors/\(appState.userId)"),
-              let response = try? JSONDecoder().decode(ConnectorsResponse.self, from: data) else { return }
-        let connected = response.connectors.contains { $0.id == "google" && $0.enabled }
-        if connected { googleConnected = true; waitingForGoogle = false }
+              let response = try? JSONDecoder().decode(ConnectorsResponse.self, from: data) else {
+            message = "Couldn't check yet. Try again."
+            return
+        }
+        let connected = response.connectors.contains {
+            $0.id == "google" && $0.connectionState == "connected"
+        }
+        if connected {
+            message = nil
+            googleConnected = true
+            waitingForGoogle = false
+        }
     }
 }

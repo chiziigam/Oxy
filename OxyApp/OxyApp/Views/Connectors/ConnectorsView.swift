@@ -113,7 +113,9 @@ struct ConnectorsView: View {
 
     private func isConnected(_ entry: Entry) -> Bool {
         switch entry.source {
-        case .own: return connector(entry)?.enabled == true
+        // `enabled` only says the flag is on. The server's connectionState says whether a real
+        // account/token is behind it, which is what "Connected" has to mean.
+        case .own: return connector(entry)?.connectionState == "connected"
         case .catalogue(let slug): return catalogueConnected.contains(slug)
         }
     }
@@ -376,9 +378,16 @@ struct ConnectorsView: View {
                 let path = id == "microsoft" ? "/auth/microsoft/start" : "/auth/google/start"
                 let data = try await APIClient.shared.request(path: path, queryItems: [URLQueryItem(name: "userId", value: appState.userId)])
                 try await open(data, key: "url")
-            case .own(let id):
-                _ = try await APIClient.shared.request(path: "/connectors", method: "POST", body: ["userId": appState.userId, "connectorId": id, "enabled": true])
-                await load()
+            case .own(let id) where id == "telegram":
+                let data = try await APIClient.shared.request(path: "/connectors/telegram-bot/link")
+                try await open(data, key: "deepLink")
+            case .own:
+                // There is no per-user sign-in for these yet. Flipping the flag would render
+                // "Connected" with no account behind it, which is exactly the lie this fixes.
+                await MainActor.run {
+                    pending = nil
+                    message = "\(entry.name) can't be connected here yet."
+                }
             }
         } catch {
             await MainActor.run { pending = nil; message = "Couldn't connect \(entry.name). Try again." }
