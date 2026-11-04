@@ -53,6 +53,30 @@ struct AdamConversationView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    if let error = viewModel.networkError {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(error)
+                                .font(.appBody(12))
+                                .foregroundStyle(Color.adamMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            Button("Try again") {
+                                Task { await viewModel.loadHistory(userId: appState.userId) }
+                            }
+                            .font(.adamLabel)
+                            .foregroundStyle(Color.adamInk)
+                        }
+                        .padding(.top, 10)
+                    }
+                    if viewModel.hasOlderHistory && !viewModel.messages.isEmpty {
+                        Button("Load earlier") {
+                            Task { _ = await viewModel.loadOlder(userId: appState.userId) }
+                        }
+                        .font(.adamLabel)
+                        .foregroundStyle(Color.adamMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
                     if viewModel.isLoadingHistory && viewModel.messages.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity)

@@ -257,11 +257,19 @@ final class APIClient: @unchecked Sendable {
                         return
                     }
                     guard (200...299).contains(http.statusCode) else {
+                        // The stream path used to discard the body, so every 400/409/429 became
+                        // "Server error". Read the bounded body and show the server's reason.
+                        var data = Data()
+                        for try await byte in bytes {
+                            data.append(byte)
+                            if data.count >= 4096 { break }
+                        }
+                        let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error
                         if http.statusCode == 401 {
                             self.handleUnauthorized()
-                            continuation.yield(.error("Session expired. Please sign in again."))
+                            continuation.yield(.error(message ?? "Session expired. Please sign in again."))
                         } else {
-                            continuation.yield(.error("Server error"))
+                            continuation.yield(.error(message ?? "Server error"))
                         }
                         continuation.finish()
                         return
