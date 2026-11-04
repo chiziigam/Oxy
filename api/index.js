@@ -9211,11 +9211,14 @@ app.get('/agent/home', requireSessionAuth, async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const pairedDisplays = require('./services/paired-displays');
-    const [nativeContext, displays, schedules] = await Promise.all([
+    const homeAssistant = require('../connectors/home-assistant');
+    const [nativeContext, displays, schedules, controls] = await Promise.all([
       supabase.from('native_context').select('location, settings, updated_at').eq('user_id', userId).maybeSingle(),
       pairedDisplays.listDisplays(supabase, userId),
       supabase.from('scheduled_tasks').select('id, title, recurrence, next_run_at, condition, active, watch_state')
-        .eq('user_id', userId).eq('active', true).order('next_run_at', { ascending: true }).limit(24)
+        .eq('user_id', userId).eq('active', true).order('next_run_at', { ascending: true }).limit(24),
+      // Read-only smart-home state; a slow or missing server becomes an explicit source state.
+      homeAssistant.listControls().catch(() => ({ status: 'unavailable', detail: null, controls: [] }))
     ]);
     const now = new Date();
     res.json(homeModel.buildHomeModel({
@@ -9224,11 +9227,59 @@ app.get('/agent/home', requireSessionAuth, async (req, res) => {
       scheduledRows: schedules.data || [],
       // No hardware reports observations yet. When it does, they arrive from their own store, never from chat.
       observations: [],
+      controls,
       now
     }));
   } catch (e) {
     log('warn', 'home.load.failed', { userId, error: e.message });
     res.status(503).json({ error: 'Home details are unavailable right now.' });
+  }
+});
+
+// One tap on a device's Home control. The command goes through the same execution boundary as
+// anything Adam does (action-execution.js → control_smart_home → Home Assistant connector), is
+// logged to the action log, and is reported only after the device's state is read back.
+// The route checks the device and command against what the device reports it can do; it never
+// widens what the capability allows, and guard mode still parks it for review.
+app.post('/agent/home/controls/:id', requireSessionAuth, async (req, res) => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const entityId = String(req.params.id || '').trim().toLowerCase();
+  const command = String(req.body?.command || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!/^[a-z][a-z0-9_]+\.[a-z0-9_]+$/.test(entityId) || !command || command.length > 40) {
+    return res.status(400).json({ error: 'A device and command are required.' });
+  }
+  try {
+    const homeAssistant = require('../connectors/home-assistant');
+    const before = await homeAssistant.listControls();
+    if (before.status !== 'ok') {
+      return res.status(503).json({ error: before.status === 'not_configured' ? 'Smart-home control is not set up.' : 'Smart-home control is unavailable right now.', status: before.status });
+    }
+    const control = before.controls.find(item => item.id === entityId);
+    if (!control) return res.status(404).json({ error: 'That device is not available.' });
+    if (!homeAssistant.directCommandAllowed(control, command)) {
+      return res.status(422).json({ error: `${control.name} can't do that from here.` });
+    }
+    const { guardMode } = await getChatSettings(supabase, userId);
+    const [entry] = await executeActions(userId, [{ type: 'control_smart_home', input: { device: entityId, command } }], {
+      userMessage: `Home control: ${command} ${control.name}`,
+      directControl: true,
+      guardMode: guardMode === true
+    });
+    const result = entry?.result || {};
+    const after = await homeAssistant.listControls().catch(() => null);
+    const updated = after?.controls?.find(item => item.id === entityId) || null;
+    const pending = result.pending === true || result.outcome === 'awaiting_user';
+    res.status(result.success || pending ? 200 : 502).json({
+      success: result.success === true,
+      pending,
+      outcome: result.outcome || null,
+      error: result.success || pending ? null : (result.error || 'The device did not confirm the change.'),
+      control: updated ? homeModel.normalizeControl(updated) : null
+    });
+  } catch (e) {
+    log('warn', 'home.control.failed', { userId, error: e.message });
+    res.status(500).json({ error: 'Could not change that device.' });
   }
 });
 

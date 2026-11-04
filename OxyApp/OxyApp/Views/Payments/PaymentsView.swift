@@ -98,7 +98,7 @@ struct PaymentsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Ending in").font(.appBody(14)).foregroundStyle(Color.appMuted)
                         Text(agentCard.last4)
-                            .font(.title.monospaced().weight(.medium))
+                            .font(.system(.title).weight(.semibold).monospacedDigit())
                             .accessibilityLabel("Card ending in \(agentCard.last4)")
                     }
                     VStack(alignment: .leading, spacing: 4) {
@@ -108,9 +108,7 @@ struct PaymentsView: View {
                     }
                 }
                 .foregroundStyle(Color.appInk)
-                .padding(22)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: 16))
+                .appCard(padding: 22)
                 cardButton
             } else {
                 VStack(alignment: .leading, spacing: 12) {
@@ -134,13 +132,8 @@ struct PaymentsView: View {
             if agentCard == nil { showAgentCardSheet = true } else { confirmRemove = true }
         } label: {
             Text(agentCard == nil ? "Add a card" : "Remove card")
-                .font(.appBody(14, weight: .medium))
-                .foregroundStyle(agentCard == nil ? Color.appOnAction : Color.appDestructive)
-                .padding(.horizontal, agentCard == nil ? 16 : 8)
-                .frame(minHeight: 44)
-                .background { if agentCard == nil { Capsule().fill(Color.appAction) } }
         }
-        .buttonStyle(.appScale(0.96))
+        .buttonStyle(.app(agentCard == nil ? AppButtonKind.primary : AppButtonKind.destructive, fullWidth: false))
         .disabled(!agentCardLoaded || isRefreshing)
         .accessibilityLabel(agentCard == nil ? "Add a checkout card" : "Remove checkout card")
     }

@@ -98,13 +98,8 @@ struct PlaceResultsCard: View {
                 UIApplication.shared.open(url)
             } label: {
                 Text("Open in Maps")
-                    .font(.appBody(14, weight: .medium))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.app(.primary, fullWidth: false))
             .disabled(place.link == nil)
         }
         .padding(14)

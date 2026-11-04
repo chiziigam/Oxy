@@ -147,16 +147,10 @@ struct PairedDisplaysView: View {
                         HStack(spacing: 8) {
                             if isWorking { ProgressView().tint(Color.appOnAction) }
                             Text(isWorking ? "Pairing…" : "Pair screen")
-                                .font(.appBody(16, weight: .semibold))
                         }
-                        .foregroundStyle(Color.appOnAction)
-                        .padding(.horizontal, 20)
-                        .frame(minHeight: 48)
-                        .background(Color.appAction, in: Capsule())
                     }
-                    .buttonStyle(.appScale)
+                    .buttonStyle(.appPrimary)
                     .disabled(code.count != 4 || isWorking)
-                    .opacity(code.count != 4 || isWorking ? 0.5 : 1)
                 }
                 .padding(.vertical, 8)
             }

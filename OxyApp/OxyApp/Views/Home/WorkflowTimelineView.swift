@@ -143,8 +143,11 @@ struct WorkflowTimelineView: View {
 
     private func checkpointSection(_ checkpoint: WorkflowCheckpoint) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Decision").font(.appBody(14, weight: .semibold)).foregroundStyle(Color.appInk)
-                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: AppSpacing.sm) {
+                Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8).accessibilityHidden(true)
+                Text("Needs you").font(.role(.footnote, weight: .semibold)).foregroundStyle(Color.appNeedsYou)
+            }
+            .accessibilityAddTraits(.isHeader)
             Text(checkpoint.prompt)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.appInk)
@@ -185,9 +188,7 @@ struct WorkflowTimelineView: View {
                     .disabled(resolvingCheckpointID != nil || errorMessage != nil)
                     .opacity(resolvingCheckpointID != nil || errorMessage != nil ? 0.45 : 1)
                 } else {
-                    let layout = typeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
-                    layout {
+                    VStack(spacing: AppSpacing.xs) {
                         decisionButton("Approve", primary: true) { resolve(checkpoint, approved: true, choice: nil) }
                         decisionButton("Decline", primary: false) { resolve(checkpoint, approved: false, choice: nil) }
                     }
@@ -197,21 +198,18 @@ struct WorkflowTimelineView: View {
             }
             Color.clear.frame(height: 1).id("decision-end-\(checkpoint.id)")
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.appDecisionSurface, in: RoundedRectangle(cornerRadius: 16))
+        .appCard(padding: 20)
+        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
+            .strokeBorder(Color.appNeedsYou.opacity(0.35), lineWidth: 1))
     }
 
     private func decisionButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        // One filled action; Decline is quiet text, never as loud as the action it declines.
         Button(action: action) {
-            Text(title).font(.body.weight(.semibold))
-                .foregroundStyle(primary ? Color.appBackground : Color.appInk)
+            Text(title)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .padding(.vertical, 8)
-                .background(primary ? Color.appInk : Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(.appScale)
+        .buttonStyle(.app(primary ? AppButtonKind.primary : AppButtonKind.quiet))
     }
 
     private func documentsSection(_ documents: [WorkflowDocument]) -> some View {

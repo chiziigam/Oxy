@@ -1,8 +1,9 @@
 import AVFoundation
 import SwiftUI
 
-/// The first screen, laid out like the app for a home device: the home drawn as a map with Adam's
-/// devices on it, then what needs you, a short summary of what happened, work running, and earlier events.
+/// Now: the first screen. One column, in order of what matters: the most important decision,
+/// work Adam is doing (each with Stop), a compact entry to Your home, and what happened earlier.
+/// The greeting and one-line status live in the header above (see `ThreadHeader`).
 struct HomeNowView: View {
     var model: ThreadBoardModel
     var onSetUp: () -> Void
@@ -13,45 +14,77 @@ struct HomeNowView: View {
     private var devices: [HomeModel.Device] { home?.devices ?? [] }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.lg) {
-            if let home {
-                if devices.isEmpty {
-                    HomeMapEmpty(onSetUp: onSetUp)
-                } else if devices.contains(where: \.online) {
-                    HomeMap(rooms: HomeMap.rooms(from: home), compact: !model.needsYou.isEmpty)
+        VStack(alignment: .leading, spacing: AppSpacing.xl) {
+            if !model.hasLoaded && home == nil {
+                if model.refreshFailed {
+                    VStack(alignment: .leading, spacing: AppSpacing.md) {
+                        Text("Couldn't reach Adam.").font(.role(.body)).foregroundStyle(Color.appInk)
+                        Button("Try again") { Task { await model.refresh() } }
+                            .buttonStyle(.app(.secondary, fullWidth: false))
+                    }
                 } else {
-                    HomeOfflineDisplays(devices: devices, onFix: onSetUp)
+                    ProgressView().tint(Color.appMuted)
+                        .frame(maxWidth: .infinity, minHeight: 160)
+                        .accessibilityLabel("Loading")
                 }
-            } else if model.refreshFailed {
-                Text("Couldn't reach Adam.").font(.role(.body)).foregroundStyle(Color.appMuted)
-                    .padding(.vertical, AppSpacing.xxl)
-            } else {
-                ProgressView().tint(Color.appMuted).frame(maxWidth: .infinity, minHeight: 220)
             }
-            ForEach(model.needsYou.prefix(2)) { item in
-                HomeAskCard(item: item, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
+
+            if let first = model.needsYou.first {
+                HomeDecision(item: first, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
+                    .id("board-decision-\(first.id)")
+            } else if model.hasLoaded {
+                Text(model.working.isEmpty ? "Nothing needs you right now." : "Nothing needs you. Adam is working.")
+                    .font(.role(.body)).foregroundStyle(Color.appMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if model.needsYou.isEmpty, let summary {
-                HomeSummary(title: Self.partOfDay(), text: summary)
+
+            if model.needsYou.count > 1 {
+                HomeSection(title: "Also needs you") {
+                    ForEach(model.needsYou.dropFirst().prefix(3)) { item in
+                        HomeCompactRow(icon: "person-check", iconTint: .appNeedsYou, title: item.title,
+                                       detail: item.detail, trailing: nil,
+                                       action: opener(item.workflowId))
+                    }
+                }
             }
-            ForEach(model.working.prefix(3)) { item in
-                HomeWorkCard(item: item, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
+
+            if !model.working.isEmpty {
+                HomeSection(title: "Working on") {
+                    ForEach(model.working.prefix(4)) { item in
+                        HomeWorkRow(item: item, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
+                            .id("board-work-\(item.id)")
+                    }
+                }
+                .id("board-work")
             }
+
+            if home != nil || model.hasLoaded {
+                HomeSection(title: nil) {
+                    HomeCompactRow(icon: "wheel-home", iconTint: .appAccent, title: "Your home",
+                                   detail: Self.homeSummary(home), trailing: nil, chevron: true,
+                                   attention: devices.contains(where: { !$0.online }),
+                                   action: onSetUp)
+                }
+                .id("overview-context")
+            }
+
             if !earlier.isEmpty {
-                HomeEarlier(lines: earlier) { openWorkflow = HomeOpenWorkflow(id: $0) }
-                    .padding(.top, AppSpacing.sm)
-                    .id("board-noticed")
+                HomeSection(title: "Earlier") {
+                    ForEach(earlier) { line in
+                        HomeCompactRow(icon: line.icon, iconTint: line.failed ? .appDanger : .appMuted,
+                                       title: line.title, detail: line.detail, trailing: line.date.map(Self.shortWhen),
+                                       action: opener(line.workflowID))
+                    }
+                }
+                .id("board-noticed")
             }
-            if let watches = home?.watches, !watches.isEmpty {
-                HomeWatching(watches: watches)
-                    .padding(.top, AppSpacing.sm)
-            }
+
             if model.refreshFailed && home != nil {
                 Text("Couldn't refresh. Showing what was saved.")
                     .font(.role(.footnote)).foregroundStyle(Color.appMuted)
             }
             if let message = model.errorMessage {
-                Text(message).font(.role(.footnote)).foregroundStyle(Color.appMuted)
+                Text(message).font(.role(.footnote)).foregroundStyle(Color.appDanger)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,56 +94,66 @@ struct HomeNowView: View {
         }
     }
 
-    // MARK: Status line under the title
+    private func opener(_ workflowID: String?) -> (() -> Void)? {
+        guard let workflowID else { return nil }
+        return { openWorkflow = HomeOpenWorkflow(id: workflowID) }
+    }
 
-    /// One plain line for the header: the most important thing about home.
+    // MARK: Header greeting and status
+
+    /// "Good evening, Chizi": warm and personal, from the time of day and the name in You.
+    static func greeting(name: String = SettingsStore.load().userName, date: Date = Date()) -> String {
+        let part: String
+        switch Calendar.current.component(.hour, from: date) {
+        case 5..<12: part = "Good morning"
+        case 12..<18: part = "Good afternoon"
+        default: part = "Good evening"
+        }
+        let first = name.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ").first.map(String.init) ?? ""
+        return first.isEmpty ? part : "\(part), \(first)"
+    }
+
+    /// One plain line for the header: the most important thing right now.
     static func status(_ model: ThreadBoardModel) -> (text: String, color: Color)? {
-        guard model.hasLoaded, let home = model.home else { return nil }
+        guard model.hasLoaded else { return nil }
         let needs = model.needsYou.count
-        if needs == 1 { return ("One thing needs you", .appNeedsYou) }
-        if needs > 1 { return ("\(needs) things need you", .appNeedsYou) }
-        if home.devices.isEmpty { return ("No display yet", .appMuted) }
+        if needs == 1 { return ("One thing needs you", Color.appNeedsYou) }
+        if needs > 1 { return ("\(needs) things need you", Color.appNeedsYou) }
         let stuck = model.working.filter { $0.stalled == true }.count
         let running = model.working.count - stuck
-        if running == 1 { return ("Working on one thing", .appSuccess) }
-        if running > 1 { return ("Working on \(running) things", .appSuccess) }
-        if stuck > 0 { return (stuck == 1 ? "One thing is stuck" : "\(stuck) things are stuck", .appNeedsYou) }
-        let on = home.devices.filter(\.online)
-        if on.isEmpty { return (home.devices.count == 1 ? "Display offline" : "Displays offline", .appMuted) }
-        let rooms = Set(on.compactMap(\.room))
-        if rooms.count == 1, let room = rooms.first { return ("On in the \(room.lowercased())", .appSuccess) }
-        return (on.count == 1 ? "1 display on" : "\(on.count) displays on", .appSuccess)
+        if running == 1 { return ("Working on one thing", Color.appSuccess) }
+        if running > 1 { return ("Working on \(running) things", Color.appSuccess) }
+        if stuck > 0 { return (stuck == 1 ? "One thing is stuck" : "\(stuck) things are stuck", Color.appNeedsYou) }
+        guard let home = model.home else { return ("All quiet", Color.appMuted) }
+        let anythingOn = home.devices.contains(where: \.online) || (home.controls ?? []).contains(where: \.isOn)
+        let tint: Color = anythingOn ? Color.appSuccess : Color.appMuted
+        return (homeSummary(home), tint)
     }
 
-    // MARK: Summary written from real events
-
-    private static func partOfDay(_ date: Date = Date()) -> String {
-        switch Calendar.current.component(.hour, from: date) {
-        case 5..<12: return "This morning"
-        case 12..<18: return "This afternoon"
-        default: return "This evening"
+    /// "3 rooms · 2 devices on", built only from what the home model reports.
+    static func homeSummary(_ home: HomeModel?) -> String {
+        guard let home else { return "Not loaded yet" }
+        let controls = home.controls ?? []
+        let total = home.devices.count + controls.count
+        if total == 0 {
+            return home.controlSource?.status == "unavailable" ? "Devices unavailable" : "Nothing set up yet"
         }
-    }
-
-    /// Up to three of today's facts, newest first, as plain sentences. Nothing is inferred or invented.
-    private var summary: String? {
-        var facts: [(Date, String)] = []
-        // When every display is off, the card above already says so.
-        for device in devices where !device.online && devices.contains(where: \.online) {
-            if let seen = device.lastSeenAt.flatMap(DisplayTimestampParser.date(from:)), Calendar.current.isDateInToday(seen) {
-                facts.append((seen, "The \(device.name.lowercasedFirst) went offline at \(Self.clock(seen))."))
-            }
-        }
-        for line in earlier where !line.failed {
-            guard let date = line.date, Calendar.current.isDateInToday(date) else { continue }
-            facts.append((date, "\(line.title.trimmingCharacters(in: CharacterSet(charactersIn: "."))) at \(Self.clock(date))."))
-        }
-        let picked = facts.sorted { $0.0 > $1.0 }.prefix(3).map(\.1)
-        return picked.isEmpty ? nil : picked.joined(separator: " ")
+        let rooms = Set(home.devices.compactMap(\.room) + controls.compactMap(\.room)).count
+        let on = home.devices.filter(\.online).count + controls.filter(\.isOn).count
+        let offline = home.devices.filter { !$0.online }.count + controls.filter { !$0.available }.count
+        var parts: [String] = []
+        if rooms > 0 { parts.append(rooms == 1 ? "1 room" : "\(rooms) rooms") }
+        parts.append(on == 1 ? "1 device on" : "\(on) devices on")
+        if offline > 0 { parts.append("\(offline) offline") }
+        return parts.joined(separator: " · ")
     }
 
     static func clock(_ date: Date) -> String {
         date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+    }
+
+    static func shortWhen(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date) ? clock(date) : date.formatted(.dateTime.weekday(.abbreviated))
     }
 
     // MARK: Earlier: finished work, updates, device reports and sounds
@@ -148,8 +191,310 @@ struct HomeLine: Identifiable {
     var failed = false
 }
 
-private extension String {
-    var lowercasedFirst: String { prefix(1).lowercased() + dropFirst() }
+// MARK: - Sections and rows
+
+/// A titled group of flat rows. Sections never sit on cards: only the decision is raised.
+struct HomeSection<Content: View>: View {
+    let title: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            if let title { AppSectionHeader(title: title) }
+            VStack(spacing: 0) { content }
+        }
+    }
+}
+
+/// The compact row used across Now: an icon well, a title, one muted line, and a time or chevron.
+struct HomeCompactRow: View {
+    let icon: String
+    var iconTint: Color = .appMuted
+    let title: String
+    var detail: String?
+    var trailing: String?
+    var chevron = false
+    var attention = false
+    var action: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        if let action {
+            Button {
+                HapticManager.shared.impact(.light)
+                action()
+            } label: { row }
+                .buttonStyle(.appScale(0.99))
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
+        HStack(alignment: .center, spacing: AppSpacing.md) {
+            if !typeSize.isAccessibilitySize {
+                AppIcon(icon, size: 15)
+                    .foregroundStyle(iconTint)
+                    .frame(width: 34, height: 34)
+                    .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        if attention {
+                            Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8)
+                                .overlay(Circle().strokeBorder(Color.appBackground, lineWidth: 1.5))
+                                .offset(x: 2, y: -2)
+                        }
+                    }
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.rowTitle).foregroundStyle(Color.appInk)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail, !detail.isEmpty {
+                    Text(detail).font(.rowSecondary).foregroundStyle(Color.appMuted)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing {
+                Text(trailing).font(.reading(.footnote)).foregroundStyle(Color.appMuted)
+            }
+            if chevron {
+                AppIcon("chevron-right", size: 12).foregroundStyle(Color.appMuted).accessibilityHidden(true)
+            }
+        }
+        .padding(.vertical, AppSpacing.md)
+        .frame(minHeight: 56)
+        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(attention ? "Needs attention" : "")
+    }
+}
+
+/// The most important decision: the question, the amount and facts, one primary action,
+/// and Decline as quiet text. The only raised card on Now.
+struct HomeDecision: View {
+    let item: BoardItem
+    var model: ThreadBoardModel
+    var open: (String) -> Void
+
+    private var question: String {
+        if item.title.lowercased().contains("needs your approval"),
+           let prompt = item.prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty { return prompt }
+        return item.title
+    }
+
+    private var facts: ApprovalFacts { ApprovalFacts(detail: item.detail == question ? nil : item.detail) }
+
+    private var factLine: String {
+        var parts = facts.others
+        if let card = facts.card { parts.append("Card ending \(card)") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var busy: Bool { model.submittingDecisions.contains(item.id) || model.acknowledged[item.id] != nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            HStack(spacing: AppSpacing.sm) {
+                Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8).accessibilityHidden(true)
+                Text("Needs you").font(.role(.footnote, weight: .semibold)).foregroundStyle(Color.appNeedsYou)
+            }
+            Text(question)
+                .font(.role(.title, weight: .bold))
+                .tracking(-0.3)
+                .foregroundStyle(Color.appInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let amount = facts.amount {
+                HStack(alignment: .firstTextBaseline, spacing: AppSpacing.sm) {
+                    Text(amount).font(.system(.title).weight(.bold)).monospacedDigit()
+                        .foregroundStyle(Color.appInk)
+                    if let qualifier = facts.qualifier {
+                        Text(qualifier.lowercased() == "up to" ? "at most" : qualifier.lowercased())
+                            .font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appMuted)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if !factLine.isEmpty {
+                Text(factLine).font(.role(.footnote)).foregroundStyle(Color.appMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if busy {
+                HStack(spacing: AppSpacing.sm) {
+                    ProgressView().tint(Color.appMuted)
+                    Text(model.submittingDecisions.contains(item.id) ? "Sending your answer" : "Updating")
+                        .font(.role(.footnote)).foregroundStyle(Color.appMuted)
+                }
+                .frame(minHeight: 50)
+            } else {
+                if let error = model.decisionErrors[item.id] {
+                    Text(error).font(.role(.callout)).foregroundStyle(Color.appDanger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                buttons
+            }
+        }
+        .appCard(padding: AppSpacing.lg)
+        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
+            .strokeBorder(Color.appNeedsYou.opacity(0.35), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var buttons: some View {
+        VStack(spacing: AppSpacing.xs) {
+            if let workflowID = item.workflowId {
+                Button(facts.amount != nil ? "Review and pay" : "Review") {
+                    HapticManager.shared.impact(.light)
+                    open(workflowID)
+                }
+                .buttonStyle(.appPrimary)
+                .disabled(model.refreshFailed)
+            } else if item.hasDecision, let options = item.options, !options.isEmpty {
+                ForEach(options) { option in
+                    Button(option.label) {
+                        HapticManager.shared.impact(.light)
+                        Task { await model.decide(item, approved: true, choice: option.id) }
+                    }
+                    .buttonStyle(.app(option.id == options.first?.id ? AppButtonKind.primary : AppButtonKind.secondary))
+                }
+            } else if item.hasDecision {
+                Button("Approve") {
+                    HapticManager.shared.impact(.light)
+                    Task { await model.decide(item, approved: true) }
+                }
+                .buttonStyle(.appPrimary)
+            }
+            if item.hasDecision {
+                Button("Decline") { Task { await model.decide(item, approved: false) } }
+                    .buttonStyle(.app(.quiet))
+                    .accessibilityHint("Adam won't go ahead with this")
+            }
+        }
+    }
+}
+
+/// Work running now, as one compact row: live state, title, step, and a separate Stop.
+struct HomeWorkRow: View {
+    let item: BoardItem
+    var model: ThreadBoardModel
+    var open: (String) -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var waiting: Bool { item.waitingExternal == true }
+    private var stalled: Bool { item.stalled == true }
+    private var canStop: Bool { item.taskId != nil || item.canStop == true }
+
+    /// The step happening now. A trailing ellipsis reads as cut-off text, and the live dot already says "ongoing".
+    private var step: String? {
+        guard let d = item.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty, d != item.title else { return nil }
+        var text = d
+        while text.hasSuffix("…") || text.hasSuffix(".") { text.removeLast() }
+        return text
+    }
+
+    private func when(_ date: Date, now: Date) -> String {
+        let minutes = Int(now.timeIntervalSince(date) / 60)
+        if minutes < 1 { return "just now" }
+        if minutes < 60 { return "\(minutes) min ago" }
+        if Calendar.current.isDate(date, inSameDayAs: now) { return "at \(HomeNowView.clock(date))" }
+        return date.formatted(.dateTime.weekday(.wide))
+    }
+
+    private func line(_ now: Date) -> String {
+        if stalled {
+            guard let date = item.date else { return "Stuck · stop it, or ask Adam to try again" }
+            return "Stuck · nothing new since \(when(date, now: now).replacingOccurrences(of: "at ", with: ""))"
+        }
+        var parts: [String] = []
+        if let p = item.progress, p.total > 0 { parts.append("Step \(min(p.done + 1, p.total)) of \(p.total)") }
+        if let step { parts.append(step) } else { parts.append(waiting ? "Waiting for a reply" : "Working on it") }
+        if let date = item.date, parts.count < 3 { parts.append("updated \(when(date, now: now))") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var tint: Color { stalled ? Color.appNeedsYou : (waiting ? Color.appMuted : Color.appSuccess) }
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppSpacing.sm))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: AppSpacing.md))
+        layout {
+            Button {
+                if let id = item.workflowId { open(id) }
+            } label: {
+                HStack(alignment: .center, spacing: AppSpacing.md) {
+                    LiveDot(active: !waiting && !stalled, color: tint)
+                        .frame(width: 34, height: 34)
+                        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).font(.rowTitle).foregroundStyle(Color.appInk)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            Text(line(context.date)).font(.rowSecondary).foregroundStyle(stalled ? Color.appNeedsYou : Color.appMuted)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.appScale(0.99))
+            .disabled(item.workflowId == nil)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(item.workflowId == nil ? "" : "Shows what it has done")
+            if canStop {
+                let stopping = model.stopping.contains(item.id)
+                Button {
+                    Task { await model.stop(item) }
+                } label: {
+                    HStack(spacing: AppSpacing.sm) {
+                        if stopping { ProgressView().tint(Color.appInk) }
+                        else { RoundedRectangle(cornerRadius: 2).fill(Color.appInk).frame(width: 9, height: 9) }
+                        Text(stopping ? "Stopping" : "Stop")
+                    }
+                }
+                .buttonStyle(.app(.secondary, fullWidth: false))
+                .disabled(stopping)
+                .accessibilityLabel("Stop \(item.title)")
+            }
+        }
+        .padding(.vertical, AppSpacing.md)
+        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
+    }
+}
+
+/// A small green light that breathes while work is running. Holds still with Reduce Motion.
+private struct LiveDot: View {
+    var active: Bool
+    var color: Color = .appSuccess
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            if active && !reduceMotion {
+                Circle().fill(color.opacity(0.35))
+                    .scaleEffect(pulse ? 2.2 : 1).opacity(pulse ? 0 : 1)
+            }
+            Circle().fill(color)
+        }
+        .frame(width: 8, height: 8)
+        .accessibilityHidden(true)
+        .onAppear {
+            guard active, !reduceMotion else { return }
+            withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { pulse = true }
+        }
+    }
 }
 
 // MARK: - The map
@@ -387,486 +732,6 @@ struct DisplayGlyph: View {
     }
 }
 
-/// Every display is off: say so plainly, say what to check, and give the one button that fixes it.
-private struct HomeOfflineDisplays: View {
-    let devices: [HomeModel.Device]
-    var onFix: () -> Void
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    private var neverConnected: Bool { devices.allSatisfy { $0.lastSeenAt == nil } }
-
-    private func title(_ device: HomeModel.Device) -> String {
-        guard let room = device.room, !device.name.localizedCaseInsensitiveContains(room) else { return device.name }
-        return "\(room) display"
-    }
-
-    var body: some View {
-        HomePanel {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                VStack(spacing: AppSpacing.md) {
-                    ForEach(devices.prefix(3)) { device in
-                        let row = typeSize.isAccessibilitySize
-                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppSpacing.sm))
-                            : AnyLayout(HStackLayout(spacing: AppSpacing.md))
-                        row {
-                            DisplayGlyph(online: false).frame(width: 40)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(title(device)).font(.role(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Text(DisplayGlyph.offline([device])).font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
-                Text(neverConnected
-                     ? "It hasn't come online yet. Plug it in and connect it to your Wi\u{2011}Fi."
-                     : devices.count == 1
-                        ? "Adam can't hear or show anything until it's back. Check it's plugged in and on your Wi\u{2011}Fi."
-                        : "Adam can't hear or show anything until they're back. Check they're plugged in and on your Wi\u{2011}Fi.")
-                    .font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                HomeButton(title: neverConnected ? "Connect it" : "Reconnect", primary: true, action: onFix)
-            }
-        }
-    }
-}
-
-/// Nothing paired: one empty room outline and the way to add a display.
-private struct HomeMapEmpty: View {
-    var onSetUp: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.lg) {
-            ZStack {
-                IsoOutline()
-                    .stroke(Color.appInk.opacity(0.24), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .frame(width: 236, height: 136)
-                VStack(spacing: 2) {
-                    Text("No display yet").font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appInk)
-                    Text("NOTHING PAIRED").font(.reading(.caption)).tracking(0.5).foregroundStyle(Color.appMuted)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 210)
-            .accessibilityElement(children: .combine)
-            Text("Add a display and Home shows each room, and whether Adam can hear it.")
-                .font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                .fixedSize(horizontal: false, vertical: true)
-            HomeButton(title: "Add a display", primary: true, action: onSetUp)
-        }
-    }
-}
-
-private struct IsoOutline: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.closeSubpath()
-        return path
-    }
-}
-
-// MARK: - Panels
-
-struct HomePanel<Content: View>: View {
-    var outline: Color? = nil
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(AppSpacing.lg)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.appSurface, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .overlay {
-                if let outline {
-                    RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous).strokeBorder(outline, lineWidth: 1)
-                }
-            }
-    }
-}
-
-/// What Adam wants to do, what it costs, one clear button and a way out.
-struct HomeAskCard: View {
-    let item: BoardItem
-    var model: ThreadBoardModel
-    var open: (String) -> Void
-
-    private var question: String {
-        if item.title.lowercased().contains("needs your approval"),
-           let prompt = item.prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty { return prompt }
-        return item.title
-    }
-
-    private var facts: ApprovalFacts { ApprovalFacts(detail: item.detail == question ? nil : item.detail) }
-
-    private var factLine: String {
-        var parts = facts.others
-        if let card = facts.card { parts.append("card \(card)") }
-        return parts.joined(separator: " · ")
-    }
-
-    private var busy: Bool { model.submittingDecisions.contains(item.id) || model.acknowledged[item.id] != nil }
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        let lead = typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppSpacing.md))
-            : AnyLayout(HStackLayout(alignment: .top, spacing: AppSpacing.md))
-        return HomePanel(outline: Color.appNeedsYou.opacity(0.3)) {
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                lead {
-                    AppIcon(facts.amount != nil ? "card" : "person-check", size: 18)
-                        .foregroundStyle(Color.appNeedsYou)
-                        .frame(width: 40, height: 40)
-                        .background(Color.appNeedsYou.opacity(0.12), in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text(question).font(.role(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if !factLine.isEmpty {
-                            Text(factLine).font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                if let amount = facts.amount {
-                    HStack(alignment: .firstTextBaseline, spacing: AppSpacing.sm) {
-                        Text(amount).font(.system(.title).weight(.bold)).monospacedDigit()
-                            .tracking(-0.6).foregroundStyle(Color.appInk)
-                        if let qualifier = facts.qualifier {
-                            Text(qualifier.lowercased() == "up to" ? "at most" : qualifier.lowercased())
-                                .font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appMuted)
-                        }
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-                if busy {
-                    HStack(spacing: AppSpacing.sm) {
-                        ProgressView().tint(Color.appMuted)
-                        Text(model.submittingDecisions.contains(item.id) ? "Sending your answer" : "Waiting for confirmation")
-                            .font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                    }
-                    .frame(minHeight: 44)
-                } else {
-                    if let error = model.decisionErrors[item.id] {
-                        Text(error).font(.role(.callout)).foregroundStyle(Color.appDanger)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    buttons
-                }
-            }
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var buttons: some View {
-        VStack(spacing: AppSpacing.sm) {
-            if let workflowID = item.workflowId {
-                HomeButton(title: facts.amount != nil ? "Review and pay" : "Review", primary: true) { open(workflowID) }
-                    .disabled(model.refreshFailed)
-            } else if item.hasDecision, let options = item.options, !options.isEmpty {
-                ForEach(options) { option in
-                    HomeButton(title: option.label, primary: option.id == options.first?.id) {
-                        Task { await model.decide(item, approved: true, choice: option.id) }
-                    }
-                }
-            } else if item.hasDecision {
-                HomeButton(title: "Approve", primary: true) { Task { await model.decide(item, approved: true) } }
-            }
-            if item.hasDecision {
-                HomeButton(title: "Decline", primary: false) { Task { await model.decide(item, approved: false) } }
-            }
-        }
-    }
-}
-
-struct HomeButton: View {
-    let title: String
-    var primary = true
-    var ink: Color? = nil
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            HapticManager.shared.impact(.light)
-            action()
-        } label: {
-            Text(title)
-                .font(.role(.callout, weight: .semibold))
-                .foregroundStyle(primary ? (ink ?? Color.appOnAction) : Color.appInk)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, AppSpacing.lg)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background {
-                    if primary { Capsule().fill(Color.appAction) }
-                    else { Capsule().strokeBorder(Color.appCardOutline, lineWidth: 1) }
-                }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.appScale(0.97))
-    }
-}
-
-/// A few plain sentences about today, built only from events the app has.
-private struct HomeSummary: View {
-    let title: String
-    let text: String
-
-    var body: some View {
-        HomePanel {
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text(title).font(.role(.caption, weight: .semibold)).foregroundStyle(Color.appMuted)
-                    .accessibilityAddTraits(.isHeader)
-                Text(text).font(.role(.callout)).foregroundStyle(Color.appInk.opacity(0.9))
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-/// Work running now: that it is live, what it's doing this moment, how far along, and what you can do about it.
-struct HomeWorkCard: View {
-    let item: BoardItem
-    var model: ThreadBoardModel
-    var open: (String) -> Void
-
-    private var waiting: Bool { item.waitingExternal == true }
-    private var stalled: Bool { item.stalled == true }
-    private var canStop: Bool { item.taskId != nil || item.canStop == true }
-
-    /// The step happening now. A trailing ellipsis reads as cut-off text, and the live dot already says "ongoing".
-    private var step: String? {
-        guard let d = item.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty, d != item.title else { return nil }
-        var text = d
-        while text.hasSuffix("…") || text.hasSuffix(".") { text.removeLast() }
-        return text
-    }
-
-    private func when(_ date: Date, now: Date) -> String {
-        let minutes = Int(now.timeIntervalSince(date) / 60)
-        if minutes < 1 { return "just now" }
-        if minutes < 60 { return "\(minutes) min ago" }
-        if Calendar.current.isDate(date, inSameDayAs: now) { return "at \(HomeNowView.clock(date))" }
-        return date.formatted(.dateTime.weekday(.wide))
-    }
-
-    private func liveLine(_ now: Date) -> String {
-        if stalled {
-            guard let date = item.date else { return "Stuck" }
-            return "Stuck · nothing new since \(when(date, now: now).replacingOccurrences(of: "at ", with: ""))"
-        }
-        let lead = waiting ? "Waiting for a reply" : "Working on it"
-        guard let date = item.date else { return lead }
-        return "\(lead) · updated \(when(date, now: now))"
-    }
-
-    private var lineColor: Color { stalled ? Color.appNeedsYou : (waiting ? Color.appMuted : Color.appSuccess) }
-
-    var body: some View {
-        HomePanel {
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    HStack(spacing: AppSpacing.sm) {
-                        LiveDot(active: !waiting && !stalled, color: lineColor)
-                        Text(liveLine(context.date)).font(.role(.caption, weight: .medium))
-                            .foregroundStyle(lineColor)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title).font(.role(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if stalled {
-                        Text("It stopped partway and isn't doing anything now. Stop it, or ask Adam to try again.")
-                            .font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else if let step {
-                        Text(step).font(.role(.footnote)).foregroundStyle(Color.appMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                if stalled {
-                    EmptyView()
-                } else if let p = item.progress, p.total > 0 {
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Capsule().fill(Color.appInk.opacity(0.14)).frame(height: 4)
-                            .overlay(alignment: .leading) {
-                                GeometryReader { geo in
-                                    Capsule().fill(Color.appInk).frame(width: max(4, geo.size.width * p.fraction))
-                                }
-                            }
-                        Text("Step \(min(p.done + 1, p.total)) of \(p.total)").font(.role(.footnote)).monospacedDigit()
-                            .foregroundStyle(Color.appMuted)
-                    }
-                    .accessibilityElement(children: .combine)
-                } else if !waiting {
-                    WorkingBar()
-                }
-                actions
-            }
-        }
-    }
-
-    @ViewBuilder private var actions: some View {
-        let stopping = model.stopping.contains(item.id)
-        if item.workflowId != nil || canStop {
-            HStack(spacing: AppSpacing.sm) {
-                if let id = item.workflowId {
-                    HomeButton(title: "What it's done", primary: false) { open(id) }
-                }
-                if canStop {
-                    Button { Task { await model.stop(item) } } label: {
-                        HStack(spacing: AppSpacing.sm) {
-                            if stopping { ProgressView().tint(Color.appInk) }
-                            else { RoundedRectangle(cornerRadius: 2).fill(Color.appInk).frame(width: 9, height: 9) }
-                            Text(stopping ? "Stopping" : "Stop").font(.role(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
-                        }
-                        .padding(.horizontal, AppSpacing.lg)
-                        .frame(minWidth: 96, minHeight: 44)
-                        .background(Color.appSurface2, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.appCardOutline, lineWidth: 1))
-                    }
-                    .buttonStyle(.appScale(0.97))
-                    .disabled(stopping)
-                    .accessibilityLabel("Stop \(item.title)")
-                }
-            }
-        }
-    }
-}
-
-/// A small green light that breathes while work is running. Holds still with Reduce Motion.
-private struct LiveDot: View {
-    var active: Bool
-    var color: Color = .appSuccess
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
-
-    var body: some View {
-        ZStack {
-            if active && !reduceMotion {
-                Circle().fill(color.opacity(0.35))
-                    .scaleEffect(pulse ? 2.2 : 1).opacity(pulse ? 0 : 1)
-            }
-            Circle().fill(color)
-        }
-        .frame(width: 7, height: 7)
-        .accessibilityHidden(true)
-        .onAppear {
-            guard active, !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { pulse = true }
-        }
-    }
-}
-
-/// For work with no step count: a slow sweep that says "still going" without inventing a percentage.
-private struct WorkingBar: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var sweep = false
-
-    var body: some View {
-        Capsule().fill(Color.appInk.opacity(0.14)).frame(height: 4)
-            .overlay(alignment: .leading) {
-                GeometryReader { geo in
-                    Capsule().fill(Color.appSuccess.opacity(0.85))
-                        .frame(width: geo.size.width * 0.28)
-                        .offset(x: reduceMotion ? 0 : (sweep ? geo.size.width * 0.72 : 0))
-                }
-            }
-            .clipShape(Capsule())
-            .accessibilityHidden(true)
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { sweep = true }
-            }
-    }
-}
-
-/// Earlier events: an icon, what happened, and the time on the right.
-private struct HomeEarlier: View {
-    let lines: [HomeLine]
-    var open: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Earlier").font(.role(.footnote, weight: .semibold)).foregroundStyle(Color.appMuted)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, AppSpacing.xs)
-            ForEach(lines) { line in
-                if let id = line.workflowID {
-                    Button { open(id) } label: { row(line) }.buttonStyle(.plain)
-                } else {
-                    row(line)
-                }
-            }
-        }
-    }
-
-    private func row(_ line: HomeLine) -> some View {
-        HStack(alignment: .center, spacing: AppSpacing.md) {
-            AppIcon(line.icon, size: 15)
-                .foregroundStyle(line.failed ? Color.appDanger : Color.appMuted)
-                .frame(width: 32, height: 32)
-                .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(line.title).font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appInk)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let detail = line.detail, !detail.isEmpty {
-                    Text(detail).font(.role(.caption)).foregroundStyle(Color.appMuted)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if let date = line.date {
-                Text(Calendar.current.isDateInToday(date) ? HomeNowView.clock(date) : date.formatted(.dateTime.weekday(.abbreviated)))
-                    .font(.reading(.caption, weight: .medium)).foregroundStyle(Color.appMuted)
-            }
-        }
-        .padding(.vertical, AppSpacing.md)
-        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct HomeWatching: View {
-    let watches: [HomeModel.Watch]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Watching").font(.role(.footnote, weight: .semibold)).foregroundStyle(Color.appMuted)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, AppSpacing.xs)
-            ForEach(watches.prefix(4)) { watch in
-                HStack(alignment: .center, spacing: AppSpacing.md) {
-                    AppIcon("clock", size: 15).foregroundStyle(Color.appSuccess)
-                        .frame(width: 32, height: 32)
-                        .background(Color.appSuccess.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(watch.title).font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appInk)
-                        if let detail = watch.detail, !detail.isEmpty {
-                            Text(detail).font(.role(.caption)).foregroundStyle(Color.appMuted)
-                        }
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, AppSpacing.md)
-                .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
-                .accessibilityElement(children: .combine)
-            }
-        }
-    }
-}
-
 // MARK: - Alarm takeover
 
 /// A serious sound heard in the last few minutes takes over the screen until it is dealt with.
@@ -926,8 +791,8 @@ struct HomeAlarmView: View {
                 .frame(height: 100)
                 .padding(.top, AppSpacing.xxl)
                 .accessibilityHidden(true)
-                Text("HEARD \(HomeNowView.clock(clip.heardAt)) · \(ago)")
-                    .font(.reading(.caption, weight: .medium)).tracking(0.5)
+                Text("Heard at \(HomeNowView.clock(clip.heardAt)) · \(ago)")
+                    .font(.reading(.footnote, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.top, AppSpacing.md)
                 Spacer(minLength: AppSpacing.xxl)
@@ -972,7 +837,7 @@ struct HomeAlarmView: View {
 
     private var ago: String {
         let seconds = max(0, Int(now.timeIntervalSince(clip.heardAt)))
-        return seconds < 60 ? "\(seconds) SECONDS AGO" : "\(seconds / 60) MIN AGO"
+        return seconds < 60 ? "\(seconds) seconds ago" : "\(seconds / 60) min ago"
     }
 
     private func play() {
@@ -998,26 +863,5 @@ struct HomeAlarmView: View {
         }
         let top = max(out.max() ?? 1, 0.001)
         return out.map { $0 / top }
-    }
-}
-
-/// In the conversation: the same ask and work cards as Home, at the moment they matter.
-struct HomeMomentCards: View {
-    var model: ThreadBoardModel
-    @State private var openWorkflow: HomeOpenWorkflow?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
-            ForEach(model.needsYou.prefix(2)) { item in
-                HomeAskCard(item: item, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
-                    .id("board-decision-\(item.id)")
-            }
-            ForEach(model.working.prefix(2)) { item in
-                HomeWorkCard(item: item, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
-            }
-        }
-        .sheet(item: $openWorkflow) { open in
-            WorkflowTimelineView(workflowId: open.id, onChanged: { Task { await model.refresh() } })
-        }
     }
 }

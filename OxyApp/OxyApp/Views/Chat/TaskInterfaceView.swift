@@ -188,11 +188,9 @@ struct TaskInterfaceView: View {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                             if let ask = item.ask {
                                 Button { send(ask) } label: {
-                                    Text("Choose").font(.control).foregroundStyle(Color.appOnAction)
-                                        .frame(maxWidth: .infinity, minHeight: 44)
-                                        .background(Capsule().fill(Color.appAction))
+                                    Text("Choose")
                                 }
-                                .buttonStyle(.appScale(0.97))
+                                .buttonStyle(.appPrimary)
                                 .accessibilityLabel("Choose \(item.title ?? "option")")
                             } else { Color.clear.frame(maxWidth: .infinity) }
                         }
@@ -277,11 +275,9 @@ struct TaskInterfaceView: View {
                 }
                 send(([block.ask ?? "Use these details"] + details).joined(separator: "\n"))
             } label: {
-                Text(block.submit ?? "Continue").font(.control)
-                    .foregroundStyle(Color.appOnAction).frame(maxWidth: .infinity, minHeight: 48)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.appAction))
+                Text(block.submit ?? "Continue")
             }
-            .buttonStyle(.appScale(0.98))
+            .buttonStyle(.appPrimary)
             .accessibilityIdentifier("interface-submit")
         }
     }

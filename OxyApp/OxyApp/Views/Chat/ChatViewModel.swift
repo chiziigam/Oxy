@@ -443,6 +443,10 @@ final class ChatViewModel {
                         guard updateAssistantMessage(id: assistantID, { $0.actions.merging(results) }) else { return }
                         openDeepLinks(results)
                         ClientEffects.applyAll(results, userId: userId)
+                        // A device Adam changed from the conversation re-reads on Now and Your home.
+                        if results.contains(where: { $0.action == "control_smart_home" }) {
+                            NotificationCenter.default.post(name: HomeService.changedNotification, object: nil)
+                        }
                         if results.contains(where: { $0.isCompleted }) {
                             HapticManager.shared.success()
                         } else if results.contains(where: { $0.isFailure }) {

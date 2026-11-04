@@ -46,6 +46,14 @@ function commandToService(entityId, command) {
     return { domain, service, data: { entity_id: entityId } };
   }
 
+  const brightness = text.match(/^brightness\s+(\d{1,3})\s*%?$/i);
+  if (brightness) {
+    if (domain !== 'light') return { error: 'A brightness command requires a light entity.' };
+    const pct = Math.min(100, Math.max(0, Number(brightness[1])));
+    if (pct === 0) return { domain, service: 'turn_off', data: { entity_id: entityId } };
+    return { domain, service: 'turn_on', data: { entity_id: entityId, brightness_pct: pct } };
+  }
+
   const temperature = text.match(/^set(?:\s+temperature)?\s+(-?\d+(?:\.\d+)?)\s*(?:°?c)?$/i);
   if (temperature) {
     if (domain !== 'climate') return { error: 'A temperature command requires a climate entity.' };
@@ -56,7 +64,130 @@ function commandToService(entityId, command) {
     };
   }
 
-  return { error: 'Supported smart-home commands are on, off, toggle, or set <temperature>.' };
+  return { error: 'Supported smart-home commands are on, off, toggle, brightness <0-100>, or set <temperature>.' };
+}
+
+// The domains Home lists as controls. Covers (garage doors, blinds) are shown with their state but
+// get no one-tap control: opening one stays a request to Adam, which goes through review.
+const CONTROL_DOMAINS = new Set(['light', 'switch', 'fan', 'input_boolean', 'climate', 'cover']);
+const TOGGLE_DOMAINS = new Set(['light', 'switch', 'fan', 'input_boolean']);
+const MAX_CONTROLS = 40;
+const ENTITY_RE = /^[a-z][a-z0-9_]+\.[a-z0-9_]+$/;
+
+function parseJsonObject(raw) {
+  try {
+    const value = JSON.parse(String(raw || '{}'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+// Entities the household has named for Adam: HOME_ASSISTANT_ENTITY_MAP aliases and
+// HOME_ASSISTANT_ENTITY_<ALIAS> variables. When none are named, Home lists every controllable entity.
+function configuredEntities(env = process.env) {
+  const named = new Map();
+  for (const [alias, entity] of Object.entries(parseJsonObject(env.HOME_ASSISTANT_ENTITY_MAP))) {
+    const id = String(entity || '').trim().toLowerCase();
+    if (ENTITY_RE.test(id) && !named.has(id)) named.set(id, clean(alias, 60));
+  }
+  for (const [key, value] of Object.entries(env)) {
+    const match = key.match(/^HOME_ASSISTANT_ENTITY_([A-Z0-9_]+)$/);
+    if (!match || match[1] === 'MAP') continue;
+    const id = String(value || '').trim().toLowerCase();
+    if (ENTITY_RE.test(id) && !named.has(id)) named.set(id, clean(match[1].replace(/_/g, ' ').toLowerCase(), 60));
+  }
+  return [...named.entries()].map(([entityId, alias]) => ({ entityId, alias }));
+}
+
+function titleCase(text) {
+  return String(text || '').replace(/(^|\s)\S/g, ch => ch.toUpperCase());
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(n) ? n : null;
+}
+
+// One Home Assistant state object as a Home control. Unknown and unavailable stay explicit.
+function describeEntity(stateObject, { alias = null, room = null } = {}) {
+  const entityId = String(stateObject?.entity_id || '').toLowerCase();
+  if (!ENTITY_RE.test(entityId)) return null;
+  const [domain] = entityId.split('.');
+  const attributes = stateObject?.attributes && typeof stateObject.attributes === 'object' ? stateObject.attributes : {};
+  const rawState = clean(stateObject?.state || 'unknown', 40).toLowerCase();
+  const available = !['unavailable', 'unknown', ''].includes(rawState);
+  const capabilities = [];
+  if (available && TOGGLE_DOMAINS.has(domain)) capabilities.push('toggle');
+  const modes = Array.isArray(attributes.supported_color_modes) ? attributes.supported_color_modes : [];
+  if (available && domain === 'light' && (finiteNumber(attributes.brightness) !== null || modes.some(mode => mode !== 'onoff'))) {
+    capabilities.push('brightness');
+  }
+  if (available && domain === 'climate') capabilities.push('temperature');
+  const brightness = finiteNumber(attributes.brightness);
+  const isOn = available && (domain === 'climate' ? rawState !== 'off' : (domain === 'cover' ? rawState === 'open' : rawState === 'on'));
+  return {
+    id: entityId,
+    name: clean(alias ? titleCase(alias) : (attributes.friendly_name || entityId.split('.')[1].replace(/_/g, ' ')), 60),
+    room: clean(room, 40) || null,
+    kind: domain,
+    state: available ? rawState : (rawState === 'unavailable' ? 'unavailable' : 'unknown'),
+    available,
+    isOn,
+    brightness: brightness === null || rawState !== 'on' ? null : Math.round((brightness / 255) * 100),
+    temperature: finiteNumber(attributes.current_temperature),
+    targetTemperature: finiteNumber(attributes.temperature),
+    minTemperature: finiteNumber(attributes.min_temp),
+    maxTemperature: finiteNumber(attributes.max_temp),
+    capabilities,
+    updatedAt: clean(stateObject?.last_updated || stateObject?.last_changed, 40) || null
+  };
+}
+
+// What Home shows about smart-home devices: read-only, never a side effect. A missing server
+// configuration is "not_configured"; an unreachable server is "unavailable", never an empty home.
+async function listControls({ config = homeAssistantConfig(), env = process.env, request = axios, timeout = 4000 } = {}) {
+  if (!config) return { status: 'not_configured', detail: null, controls: [] };
+  const headers = { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' };
+  const rooms = parseJsonObject(env.HOME_ASSISTANT_ROOM_MAP);
+  const named = configuredEntities(env);
+  try {
+    let objects;
+    if (named.length) {
+      const settled = await Promise.allSettled(named.slice(0, MAX_CONTROLS).map(item =>
+        request.get(`${config.baseUrl}/api/states/${item.entityId}`, { headers, timeout })));
+      objects = settled.map((entry, index) => entry.status === 'fulfilled' && entry.value?.data
+        ? entry.value.data
+        : { entity_id: named[index].entityId, state: 'unavailable', attributes: {} });
+    } else {
+      const response = await request.get(`${config.baseUrl}/api/states`, { headers, timeout });
+      objects = (Array.isArray(response?.data) ? response.data : [])
+        .filter(item => CONTROL_DOMAINS.has(String(item?.entity_id || '').split('.')[0]))
+        .slice(0, MAX_CONTROLS);
+    }
+    const aliasFor = new Map(named.map(item => [item.entityId, item.alias]));
+    const controls = objects
+      .filter(item => CONTROL_DOMAINS.has(String(item?.entity_id || '').split('.')[0]))
+      .map(item => describeEntity(item, {
+        alias: aliasFor.get(String(item.entity_id).toLowerCase()) || null,
+        room: rooms[String(item.entity_id).toLowerCase()] || null
+      }))
+      .filter(Boolean);
+    return { status: 'ok', detail: null, controls };
+  } catch {
+    return { status: 'unavailable', detail: 'Home Assistant did not answer.', controls: [] };
+  }
+}
+
+// The commands a person can send from a Home control, checked against what the device reports.
+function directCommandAllowed(control, command) {
+  const text = String(command || '').trim().toLowerCase();
+  if (!control?.available) return false;
+  const caps = new Set(control.capabilities || []);
+  if (['on', 'off', 'toggle'].includes(text)) return caps.has('toggle');
+  if (/^brightness\s+\d{1,3}$/.test(text)) return caps.has('brightness');
+  if (/^set\s+-?\d+(?:\.\d+)?$/.test(text)) return caps.has('temperature');
+  return false;
 }
 
 async function executeConfigured({ config, device, command, request = axios } = {}) {
@@ -124,6 +255,10 @@ async function execute(_userId, action, params = {}) {
 module.exports = {
   execute,
   commandToService,
+  configuredEntities,
+  describeEntity,
+  directCommandAllowed,
+  listControls,
   homeAssistantConfig,
   resolveEntityId,
   executeConfigured

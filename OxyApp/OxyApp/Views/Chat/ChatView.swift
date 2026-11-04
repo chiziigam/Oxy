@@ -351,6 +351,27 @@ struct ChatView: View {
         }
     }
 
+    /// The conversation's heading: the newest request in the user's own words, cut at a word
+    /// boundary so it never ends mid-word or reads as a fragment of a longer sentence.
+    private var conversationTitle: String {
+        guard let latest = exchanges.last(where: { exchange in exchange.messages.contains { $0.role == .user } }) else {
+            return "Conversation"
+        }
+        return Self.cleanTitle(latest.title)
+    }
+
+    static func cleanTitle(_ raw: String, limit: Int = 42) -> String {
+        let text = raw.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        guard !text.isEmpty else { return "Conversation" }
+        guard text.count > limit else { return text }
+        var cut = String(text.prefix(limit))
+        if let space = cut.lastIndex(of: " "), cut.distance(from: cut.startIndex, to: space) > limit / 2 {
+            cut = String(cut[..<space])
+        }
+        while let last = cut.last, ",;:-–—".contains(last) { cut.removeLast() }
+        return cut + "…"
+    }
+
     /// What the user has asked here, so work that already answered in the thread isn't repeated as a card.
     private var askedInThread: [String] {
         viewModel.messages.suffix(60).filter { $0.role == .user }.map { ThreadBoardModel.normalized($0.content) }
@@ -403,6 +424,7 @@ struct ChatView: View {
                                 isComposing: isInputFocused,
                                 showsStatus: !showsOverview,
                                 onHome: showsOverview ? nil : { withAnimation(.appStandard) { overviewSelected = true } },
+                                title: isIncognito ? "Private" : (showsOverview ? HomeNowView.greeting() : conversationTitle),
                                 homeStatus: showsOverview ? HomeNowView.status(boardModel) : nil,
                                 wheelOpen: $wheelOpen,
                                 hubCenter: $hubCenter
@@ -487,7 +509,7 @@ struct ChatView: View {
                                 if showsOverview {
                                     overview
                                 } else {
-                                if viewModel.messages.isEmpty && boardModel.isEmpty {
+                                if viewModel.messages.isEmpty {
                                     quietConversation
                                 }
                                 if viewModel.hasOlderHistory, !viewModel.messages.isEmpty, didSettleAtBottom {
@@ -498,10 +520,6 @@ struct ChatView: View {
                                 ForEach(exchanges) { exchange in
                                     exchangeSection(exchange)
                                 }
-
-                                HomeMomentCards(model: boardModel)
-                                    .padding(.horizontal, AppSpacing.chatMargin)
-                                    .padding(.top, boardModel.isEmpty ? 0 : 14)
 
                                 }
                                 Color.clear
@@ -766,6 +784,9 @@ struct ChatView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await boardModel.refresh() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: HomeService.changedNotification)) { _ in
+                Task { await boardModel.refresh() }
             }
             .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { note in
                 guard let text = note.object as? String else { return }
@@ -1634,20 +1655,12 @@ private struct ActionReviewSheet: View {
             VStack(spacing: 8) {
                 Button(action: onConfirm) {
                     Text(confirmLabel)
-                        .font(.appBody(17, weight: .semibold))
-                        .foregroundStyle(Color.appOnAction)
-                        .frame(maxWidth: .infinity, minHeight: 54)
-                        .padding(.vertical, 4)
-                        .background(Color.appAction, in: RoundedRectangle(cornerRadius: 18))
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.appPrimary)
                 Button(action: onCancel) {
                     Text("Cancel")
-                        .font(.appBody(17, weight: .medium))
-                        .foregroundStyle(Color.appMuted)
-                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.app(.quiet))
             }
             .padding(.horizontal, 26)
             .padding(.top, 14)
@@ -2072,12 +2085,8 @@ private struct PrivateModeSheet: View {
                 dismiss()
             } label: {
                 Text("Got it")
-                    .font(.appBody(16, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.98))
+            .buttonStyle(.appPrimary)
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)

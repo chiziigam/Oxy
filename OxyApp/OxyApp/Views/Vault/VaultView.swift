@@ -118,13 +118,8 @@ struct VaultView: View {
                 Task { await authenticateAndLoad() }
             } label: {
                 Text("Unlock")
-                    .font(.appBody(15, weight: .medium))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 22)
-                    .frame(minHeight: 44)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.app(.primary, fullWidth: false))
         }
         .padding(.horizontal, AppSpacing.margin)
         .padding(.top, 96)

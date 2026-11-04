@@ -41,12 +41,40 @@ struct HomeModel: Codable, Equatable {
         let source: String
     }
 
+    /// A smart-home device Adam can read and, where its capabilities say so, control
+    /// (lights, switches, fans, climate; covers are read-only here). Unknown stays unknown.
+    struct Control: Codable, Equatable, Hashable, Identifiable {
+        let id: String
+        let name: String
+        let room: String?
+        let kind: String
+        let state: String
+        let available: Bool
+        let isOn: Bool
+        var brightness: Double? = nil
+        var temperature: Double? = nil
+        var targetTemperature: Double? = nil
+        var minTemperature: Double? = nil
+        var maxTemperature: Double? = nil
+        var capabilities: [String]? = nil
+        var updatedAt: String? = nil
+
+        func can(_ capability: String) -> Bool { capabilities?.contains(capability) == true }
+    }
+    /// Where controls come from: "ok", "not_configured" (no smart-home server) or "unavailable".
+    struct ControlSource: Codable, Equatable, Hashable {
+        let status: String
+        var detail: String? = nil
+    }
+
     let presence: Presence
     let devices: [Device]
     let rooms: [Room]
     let unassignedDevices: [Device]
     let watches: [Watch]
     let observations: [Observation]
+    var controls: [Control]? = nil
+    var controlSource: ControlSource? = nil
 
     static let empty = HomeModel(
         presence: Presence(state: "unknown", homeConfigured: false),
@@ -55,9 +83,27 @@ struct HomeModel: Codable, Equatable {
 }
 
 enum HomeService {
+    /// Posted after a device changes from Home, so Now's summary can re-read the home.
+    static let changedNotification = Notification.Name("AdamHomeChanged")
+
     static func fetch() async throws -> HomeModel {
         let data = try await APIClient.shared.request(path: "/agent/home")
         return try JSONDecoder().decode(HomeModel.self, from: data)
+    }
+
+    struct CommandResult: Decodable {
+        let success: Bool
+        var pending: Bool? = nil
+        var error: String? = nil
+        var control: HomeModel.Control? = nil
+    }
+
+    /// Sends one command from a device's control: on, off, toggle, brightness N or set N.
+    /// The server runs it through Adam's action boundary and reads the device back.
+    static func command(_ controlID: String, _ command: String) async throws -> CommandResult {
+        let encoded = controlID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? controlID
+        let data = try await APIClient.shared.request(path: "/agent/home/controls/\(encoded)", method: "POST", body: ["command": command])
+        return try JSONDecoder().decode(CommandResult.self, from: data)
     }
 }
 
@@ -76,6 +122,9 @@ enum AskAdam {
 
 // MARK: - Your home
 
+/// The home as a control screen: rooms as sections, each device a tile with its state and
+/// one-tap controls where the device supports them. Unknown, unavailable and not configured
+/// are always said plainly; nothing is drawn that a device did not report.
 struct YourHomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -90,57 +139,86 @@ struct YourHomeView: View {
     @State private var showsDisplaySetup = false
     @State private var selectedDevice: HomeModel.Device?
     @State private var showsSettings = false
+    @State private var showsMap = false
     @State private var urgentChoice: [String: Bool] = [:]
     @State private var urgentErrors: [String: String] = [:]
     @State private var urgentPending: Set<String> = []
+    /// Commands in flight, by control id, and the value shown while they run.
+    @State private var pendingControls: Set<String> = []
+    @State private var optimisticOn: [String: Bool] = [:]
+    @State private var draftBrightness: [String: Double] = [:]
+    @State private var controlErrors: [String: String] = [:]
 
-    private var hasDevices: Bool { !home.devices.isEmpty }
-    private var onlineCount: Int { home.devices.filter(\.online).count }
+    private var controls: [HomeModel.Control] { home.controls ?? [] }
+    private var hasDevices: Bool { !home.devices.isEmpty || !controls.isEmpty }
     private var needsAddress: Bool { settings.homeLatitude == nil && settings.homeAddress.isEmpty }
+    private var controlStatus: String { home.controlSource?.status ?? "not_configured" }
+
+    /// Room names in a stable order: rooms with something on first, then by name.
+    private var roomNames: [String] {
+        let names = Set(home.devices.compactMap(\.room) + controls.compactMap(\.room))
+        return names.sorted { a, b in
+            let aOn = isAnythingOn(in: a), bOn = isAnythingOn(in: b)
+            return aOn != bOn ? aOn : a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+        }
+    }
+
+    private func isAnythingOn(in room: String) -> Bool {
+        home.devices.contains { $0.room == room && $0.online } || controls.contains { $0.room == room && $0.isOn }
+    }
+
+    private func tiles(in room: String?) -> [HomeTileItem] {
+        home.devices.filter { $0.room == room }.map(HomeTileItem.display)
+            + controls.filter { $0.room == room }.map(HomeTileItem.control)
+    }
+
+    private var columns: [GridItem] {
+        typeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.flexible(), spacing: AppSpacing.md), GridItem(.flexible(), spacing: AppSpacing.md)]
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-            ScreenHeaderView(title: "Your home", onBack: revealClose == nil ? { dismiss() } : nil)
-            GeometryReader { geometry in
-              ScrollViewReader { proxy in
-              ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppSpacing.xxl) {
-                    if failed {
-                        ErrorBanner(message: "Couldn't load your home.", onRetry: { Task { await load() } })
-                            .disabled(isRefreshing)
-                    }
+                ScreenHeaderView(title: "Your home", onBack: revealClose == nil ? { dismiss() } : nil)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                        if failed {
+                            ErrorBanner(message: loaded && hasDevices ? "Couldn't refresh. Showing what was saved." : "Couldn't load your home.",
+                                        onRetry: { Task { await load() } })
+                                .disabled(isRefreshing)
+                        }
 
-                    if !loaded {
-                        OxySkeletonCard(height: 88)
-                        OxySkeletonCard(height: 144)
-                    } else if hasDevices {
-                        stateHeader
-                        devicesSection
-                    } else if loaded && !failed {
-                        notConnected
-                    }
+                        if !loaded {
+                            OxySkeletonCard(height: 24)
+                            OxySkeletonCard(height: 132)
+                            OxySkeletonCard(height: 132)
+                        } else if hasDevices {
+                            Text(summaryLine)
+                                .font(.role(.body)).foregroundStyle(Color.appMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            controlSourceNotice
+                            ForEach(roomNames, id: \.self) { room in
+                                roomSection(room, tiles: tiles(in: room))
+                            }
+                            let loose = tiles(in: nil)
+                            if !loose.isEmpty {
+                                roomSection(roomNames.isEmpty ? "Devices" : "Not in a room", tiles: loose)
+                            }
+                            mapSection
+                        } else if !failed {
+                            notConnected
+                        }
 
-                    watchingSection
-                    if hasDevices { noticedSection }
-                    addressSection
+                        watchingSection
+                        if hasDevices { noticedSection }
+                        setUpSection
+                    }
+                    .padding(.horizontal, AppSpacing.margin)
+                    .padding(.top, AppSpacing.sm)
+                    .padding(.bottom, 40)
                 }
-                .frame(width: max(0, geometry.size.width - AppSpacing.margin * 2), alignment: .leading)
-                .padding(.horizontal, AppSpacing.margin)
-                .padding(.top, 10)
-                .padding(.bottom, 40)
-              }
-              #if DEBUG
-              .task(id: home) {
-                  guard PreviewData.isIsolated, let focus = ProcessInfo.processInfo.environment["OXY_DEBUG_HOME_FOCUS"] else { return }
-                  try? await Task.sleep(for: .seconds(1))
-                  guard !Task.isCancelled else { return }
-                  let device = focus == "last-device" ? home.devices.last : home.devices.first
-                  if let device { proxy.scrollTo("home-device-\(device.id)", anchor: .bottom) }
-              }
-              #endif
-              }
-            }
             }
             .background(Color.appBackground.ignoresSafeArea())
             .refreshable { await load() }
@@ -155,6 +233,15 @@ struct YourHomeView: View {
             }
             #endif
         }
+        // Devices also change from chat, voice and the devices themselves: re-read while this is open.
+        .task(id: loaded) {
+            guard loaded else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled, pendingControls.isEmpty else { continue }
+                await load()
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, loaded { Task { await load() } }
         }
@@ -164,7 +251,7 @@ struct YourHomeView: View {
             } else {
                 SettingsPage(title: "Display") {
                     Text("This display is no longer available.")
-                        .font(.appBody(16)).foregroundStyle(Color.appMuted)
+                        .font(.role(.body)).foregroundStyle(Color.appMuted)
                 }
             }
         }
@@ -179,107 +266,361 @@ struct YourHomeView: View {
         }
     }
 
+    // MARK: Summary
+
+    private var summaryLine: String {
+        let presence: String
+        switch home.presence.state {
+        case "home" where home.presence.homeConfigured: presence = "You're home."
+        case "away" where home.presence.homeConfigured: presence = "You're out."
+        default: presence = "Location unknown."
+        }
+        return "\(HomeNowView.homeSummary(home)). \(presence)"
+    }
+
+    /// Smart-home control's own state, said once, above the rooms.
+    @ViewBuilder
+    private var controlSourceNotice: some View {
+        if controlStatus == "unavailable" {
+            HStack(alignment: .firstTextBaseline, spacing: AppSpacing.sm) {
+                StatusDot(color: .appNeedsYou)
+                Text("Smart-home devices are unavailable right now. Their last state isn't shown.")
+                    .font(.role(.footnote)).foregroundStyle(Color.appInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    // MARK: Rooms and tiles
+
+    private func roomSection(_ title: String, tiles: [HomeTileItem]) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(.role(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: AppSpacing.sm)
+                Text(roomState(tiles)).font(.role(.footnote)).foregroundStyle(Color.appMuted)
+            }
+            LazyVGrid(columns: columns, alignment: .leading, spacing: AppSpacing.md) {
+                ForEach(tiles) { tile in
+                    switch tile {
+                    case .display(let device): displayTile(device).id("home-device-\(device.id)")
+                    case .control(let control): controlTile(control).id("home-control-\(control.id)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func roomState(_ tiles: [HomeTileItem]) -> String {
+        let on = tiles.filter { tile in
+            switch tile {
+            case .display(let device): return device.online
+            case .control(let control): return isOn(control)
+            }
+        }.count
+        if on == 0 { return "All off" }
+        return on == tiles.count ? (tiles.count == 1 ? "On" : "All on") : "\(on) of \(tiles.count) on"
+    }
+
+    private func isOn(_ control: HomeModel.Control) -> Bool { optimisticOn[control.id] ?? control.isOn }
+
+    private func icon(for control: HomeModel.Control) -> String {
+        switch control.kind {
+        case "light": return "bulb"
+        case "fan": return "fan"
+        case "climate": return "thermometer"
+        case "cover": return "blinds"
+        default: return "power"
+        }
+    }
+
+    private func stateText(_ control: HomeModel.Control) -> String {
+        guard control.available else { return control.state == "unavailable" ? "Unavailable" : "Unknown" }
+        if pendingControls.contains(control.id) { return "Updating" }
+        switch control.kind {
+        case "climate":
+            var parts: [String] = []
+            if let now = control.temperature { parts.append("\(Self.degrees(now)) now") }
+            if let target = control.targetTemperature { parts.append("set to \(Self.degrees(target))") }
+            if control.state == "off" { parts.insert("Off", at: 0) }
+            return parts.isEmpty ? control.state.capitalized : parts.joined(separator: " · ")
+        case "cover":
+            return control.state.capitalized
+        default:
+            guard isOn(control) else { return "Off" }
+            if let level = draftBrightness[control.id] ?? control.brightness { return "On · \(Int(level.rounded()))%" }
+            return "On"
+        }
+    }
+
+    static func degrees(_ value: Double) -> String {
+        value.rounded() == value ? "\(Int(value))°" : String(format: "%.1f°", value)
+    }
+
+    private func tileIcon(_ name: String, on: Bool) -> some View {
+        AppIcon(name, size: 18)
+            .foregroundStyle(on ? Color.appAccent : Color.appMuted)
+            .frame(width: 40, height: 40)
+            .background(on ? Color.appAccentSoft : Color.appSurface2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    private func controlTile(_ control: HomeModel.Control) -> some View {
+        let on = isOn(control)
+        let busy = pendingControls.contains(control.id)
+        return VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            HStack(alignment: .center) {
+                tileIcon(icon(for: control), on: on && control.available)
+                Spacer(minLength: AppSpacing.sm)
+                if busy {
+                    ProgressView().tint(Color.appMuted).frame(minWidth: 44, minHeight: 44)
+                } else if control.can("toggle") {
+                    SettingsToggle(isOn: Binding(
+                        get: { isOn(control) },
+                        set: { send(control, $0 ? "on" : "off", optimistic: $0) }
+                    ))
+                    .accessibilityLabel(control.name)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(control.name).font(.rowTitle).foregroundStyle(Color.appInk)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(stateText(control)).font(.rowSecondary)
+                    .foregroundStyle(control.available ? Color.appMuted : Color.appNeedsYou)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            if control.can("brightness") && on && !busy {
+                Slider(
+                    value: Binding(
+                        get: { draftBrightness[control.id] ?? control.brightness ?? 100 },
+                        set: { draftBrightness[control.id] = $0 }
+                    ),
+                    in: 1...100,
+                    step: 1,
+                    onEditingChanged: { editing in
+                        guard !editing, let level = draftBrightness[control.id] else { return }
+                        send(control, "brightness \(Int(level.rounded()))", optimistic: true)
+                    }
+                )
+                .tint(Color.appAccent)
+                .accessibilityLabel("\(control.name) brightness")
+                .accessibilityValue("\(Int((draftBrightness[control.id] ?? control.brightness ?? 100).rounded())) percent")
+            }
+            if control.can("temperature"), let target = control.targetTemperature, !busy {
+                HStack(spacing: AppSpacing.sm) {
+                    temperatureButton(control, target: target, step: -0.5)
+                    Text(Self.degrees(target)).font(.reading(.callout, weight: .semibold)).foregroundStyle(Color.appInk)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityHidden(true)
+                    temperatureButton(control, target: target, step: 0.5)
+                }
+            }
+            if control.kind == "cover" && control.available {
+                Button("Ask Adam") {
+                    AskAdam.draft("\(control.state == "open" ? "Close" : "Open") the \(control.name.lowercased())")
+                }
+                .buttonStyle(.app(.secondary, fullWidth: true))
+                .accessibilityHint("Opens a draft in the conversation. Adam asks before opening or closing it.")
+            }
+            if let error = controlErrors[control.id] {
+                Text(error).font(.role(.footnote)).foregroundStyle(Color.appDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .appCard(padding: AppSpacing.md)
+    }
+
+    private func temperatureButton(_ control: HomeModel.Control, target: Double, step: Double) -> some View {
+        let next = min(control.maxTemperature ?? 30, max(control.minTemperature ?? 7, target + step))
+        return Button {
+            send(control, "set \(next)", optimistic: nil)
+        } label: {
+            AppIcon(step < 0 ? "minus" : "plus", size: 14)
+        }
+        .buttonStyle(.app(.secondary, fullWidth: false))
+        .disabled(next == target)
+        .accessibilityLabel(step < 0 ? "Lower \(control.name) to \(Self.degrees(next))" : "Raise \(control.name) to \(Self.degrees(next))")
+    }
+
+    private func displayTile(_ device: HomeModel.Device) -> some View {
+        Button { selectedDevice = device } label: {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                HStack {
+                    tileIcon("display", on: device.online && !failed)
+                    Spacer(minLength: AppSpacing.sm)
+                    AppIcon("chevron-right", size: 12).foregroundStyle(Color.appMuted).accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(device.name).font(.rowTitle).foregroundStyle(Color.appInk)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(displayState(device)).font(.rowSecondary).foregroundStyle(Color.appMuted)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+            .appCard(padding: AppSpacing.md)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.appScale(0.98))
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Display details")
+    }
+
+    private func displayState(_ device: HomeModel.Device) -> String {
+        if failed { return device.online ? "Last reported online" : "Last reported offline" }
+        return device.online ? "Online" : "Offline · \(lastSeen(device))"
+    }
+
+    // MARK: Commands
+
+    private func send(_ control: HomeModel.Control, _ command: String, optimistic: Bool?) {
+        guard !pendingControls.contains(control.id) else { return }
+        HapticManager.shared.impact(.light)
+        pendingControls.insert(control.id)
+        controlErrors[control.id] = nil
+        if let optimistic { optimisticOn[control.id] = optimistic }
+        Task {
+            defer {
+                pendingControls.remove(control.id)
+                optimisticOn[control.id] = nil
+                draftBrightness[control.id] = nil
+            }
+            do {
+                let result = try await HomeService.command(control.id, command)
+                if let updated = result.control { replace(updated) }
+                if result.pending == true {
+                    controlErrors[control.id] = "Waiting for your approval in the conversation."
+                } else if !result.success {
+                    controlErrors[control.id] = result.error ?? "\(control.name) didn't confirm the change."
+                    HapticManager.shared.error()
+                } else {
+                    HapticManager.shared.success()
+                }
+            } catch let APIError.server(status, message) where status < 500 && status != 401 {
+                controlErrors[control.id] = message
+                HapticManager.shared.error()
+            } catch {
+                controlErrors[control.id] = "Couldn't reach \(control.name). Nothing was changed."
+                HapticManager.shared.error()
+            }
+            NotificationCenter.default.post(name: HomeService.changedNotification, object: nil)
+        }
+    }
+
+    /// Puts the state the device reported after a command into the screen, nothing more.
+    private func replace(_ control: HomeModel.Control) {
+        guard var list = home.controls, let index = list.firstIndex(where: { $0.id == control.id }) else { return }
+        list[index] = control
+        home.controls = list
+    }
+
+    // MARK: Map
+
+    /// The room map stays out of the way: a quiet disclosure, shown only when displays are placed in rooms.
+    @ViewBuilder
+    private var mapSection: some View {
+        let mapRooms = HomeMap.rooms(from: home)
+        if !home.devices.isEmpty && home.devices.contains(where: { $0.room != nil }) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Button {
+                    withAnimation(.appStandard) { showsMap.toggle() }
+                } label: {
+                    HStack {
+                        Text(showsMap ? "Hide room map" : "Show room map").font(.role(.callout, weight: .medium))
+                            .foregroundStyle(Color.appInk)
+                        Spacer()
+                        AppIcon("chevron-down", size: 12).foregroundStyle(Color.appMuted)
+                            .rotationEffect(.degrees(showsMap ? 180 : 0))
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(showsMap ? "Shown" : "Hidden")
+                if showsMap {
+                    HomeMap(rooms: mapRooms, compact: true)
+                        .appCard(padding: AppSpacing.sm)
+                    Text("Drawn from the rooms you've named, not a measured plan.")
+                        .font(.role(.caption)).foregroundStyle(Color.appMuted)
+                }
+            }
+        }
+    }
+
     // MARK: Not connected
 
     private var notConnected: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.lg) {
-            Text("Nothing is paired yet.")
-                .font(.role(.title)).foregroundStyle(Color.appInk)
-            Text("Pair a display and its status shows here.")
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            Text("Nothing set up yet.")
+                .font(.role(.title, weight: .bold)).foregroundStyle(Color.appInk)
+            Text(controlStatus == "unavailable"
+                 ? "Smart-home devices are unavailable right now. Pair a display, or try again later."
+                 : "Pair a display, or connect a smart-home server, and each room shows here.")
                 .font(.role(.body)).foregroundStyle(Color.appMuted)
                 .fixedSize(horizontal: false, vertical: true)
-            Button {
+            Button("Add a display") {
                 HapticManager.shared.impact(.medium)
                 showsDisplaySetup = true
-            } label: {
-                Text("Add a display")
-                    .font(.role(.callout, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, AppSpacing.xl)
-                    .frame(minHeight: 48)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.appPrimary)
         }
     }
 
-    // MARK: Connected
-
-    private var stateHeader: some View {
-        Text(failed ? "Status unavailable. Last loaded: \(subline)." : "\(subline). \(headline).")
-            .font(.role(.body)).foregroundStyle(Color.appMuted)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var headline: String {
-        switch home.presence.state {
-        case "home" where home.presence.homeConfigured: return "You're home"
-        case "away" where home.presence.homeConfigured: return "You're out"
-        default: return "Location unknown"
-        }
-    }
-
-    private var subline: String {
-        let noun = home.devices.count == 1 ? "display" : "displays"
-        return "\(onlineCount) of \(home.devices.count) \(noun) online"
-    }
-
-    private var devicesSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            HStack(alignment: .firstTextBaseline, spacing: AppSpacing.md) {
-                Text("Devices").font(.role(.title)).foregroundStyle(Color.appInk)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                Button { showsDisplaySetup = true } label: {
-                    Text("Add").font(.role(.callout, weight: .semibold))
-                        .foregroundStyle(Color.appAccent).frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add a display")
-            }
-            VStack(spacing: 0) {
-                ForEach(home.devices) { device in
-                    deviceRow(device).id("home-device-\(device.id)")
-                }
-            }
-        }
-    }
-
-    /// A device is an object with a name and a state: one row each, the state in words beside a dot.
-    private func deviceRow(_ device: HomeModel.Device) -> some View {
-        Button { selectedDevice = device } label: {
-            HStack(alignment: .firstTextBaseline, spacing: AppSpacing.md) {
-                StatusDot(color: device.online && !failed ? Color.appSuccess : Color.appMuted.opacity(0.45))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(device.name).font(.role(.body, weight: .semibold)).foregroundStyle(Color.appInk)
-                    Text(deviceState(device)).font(.role(.callout)).foregroundStyle(Color.appMuted)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                AppIcon("chevron-right", size: 13).foregroundStyle(Color.appMuted).accessibilityHidden(true)
-            }
-            .padding(.vertical, AppSpacing.md)
-            .frame(minHeight: 60)
-            .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func deviceState(_ device: HomeModel.Device) -> String {
-        let state = failed ? (device.online ? "Last reported online" : "Last reported offline")
-            : (device.online ? "Online" : "Offline · \(lastSeen(device))")
-        return [device.room, state].compactMap { $0 }.joined(separator: " · ")
-    }
+    // MARK: Watching, noticed, set up
 
     @ViewBuilder
     private var watchingSection: some View {
         if !home.watches.isEmpty {
             section("Watching") {
-                ForEach(Array(home.watches.enumerated()), id: \.element.id) { index, watch in
-                                        row(title: watch.title, detail: watch.detail ?? nextCheck(watch), dot: .appWorking) {
+                ForEach(home.watches) { watch in
+                    row(title: watch.title, detail: watch.detail ?? nextCheck(watch), dot: .appWorking) {
                         AskAdam.draft("What's happening with: \(watch.title)?")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Only what a device sensed or Adam inferred. Empty until hardware reports something.
+    @ViewBuilder
+    private var noticedSection: some View {
+        section("Noticed") {
+            if home.observations.isEmpty {
+                Text("Nothing reported by your devices yet.")
+                    .font(.role(.footnote)).foregroundStyle(Color.appMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, AppSpacing.sm)
+            } else {
+                ForEach(home.observations) { item in
+                    row(title: item.summary, detail: observationDetail(item), dot: nil) {
+                        AskAdam.draft("Tell me more about: \(item.summary)")
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var setUpSection: some View {
+        if loaded {
+            section("Set up") {
+                row(title: "Add a display", detail: nil, dot: nil, chevron: true) { showsDisplaySetup = true }
+                if controlStatus == "not_configured" {
+                    row(title: "Smart-home control", detail: "Not configured", dot: nil, chevron: false) {
+                        AskAdam.draft("How do I connect my smart-home devices?")
+                    }
+                }
+                if needsAddress {
+                    row(title: "Set your home location", detail: "For arrival and leaving reminders", dot: nil, chevron: true) {
+                        showsSettings = true
                     }
                 }
             }
@@ -289,24 +630,21 @@ struct YourHomeView: View {
     /// Urgent alerts are a choice made per screen: pairing a screen is not consent to put an alarm on it.
     private func deviceDetails(_ device: HomeModel.Device) -> some View {
         SettingsPage(title: device.name) {
-            VStack(alignment: .leading, spacing: 18) {
-                AppIcon(device.kind == "browser" ? "display" : "cube", size: 44)
-                    .foregroundStyle(Color.appInk).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                tileIcon(device.kind == "browser" ? "display" : "cube", on: device.online && !failed)
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(failed ? "Status unavailable" : (device.online ? "Online" : "Offline"))
-                        .font(.title2.weight(.bold)).foregroundStyle(Color.appInk)
+                        .font(.role(.title, weight: .bold)).foregroundStyle(Color.appInk)
                     if let date = Date.oxyParse(device.lastSeenAt) {
                         Text("Last seen \(date.formatted(.relative(presentation: .named)))")
-                            .font(.appBody(15)).foregroundStyle(Color.appInk)
+                            .font(.role(.callout)).foregroundStyle(Color.appMuted)
                     } else {
-                        Text("Last seen unknown").font(.appBody(15)).foregroundStyle(Color.appInk)
+                        Text("Last seen unknown").font(.role(.callout)).foregroundStyle(Color.appMuted)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(20).frame(maxWidth: .infinity, alignment: .leading)
-            .background(device.online && !failed ? Color.appHomeSurface : Color.appSurface2,
-                        in: RoundedRectangle(cornerRadius: 16))
+            .appCard()
             .accessibilityElement(children: .combine)
             SettingsList {
                 SettingsRow(title: "Room", subtitle: device.room ?? "Not assigned")
@@ -320,27 +658,20 @@ struct YourHomeView: View {
                     .accessibilityLabel("Urgent alerts on \(device.name)")
                 }
                 if urgentPending.contains(device.id) {
-                    Text("Saving…").font(.appBody(14)).foregroundStyle(Color.appMuted)
+                    Text("Saving…").font(.role(.footnote)).foregroundStyle(Color.appMuted)
                         .padding(.bottom, 12)
                 }
                 if let error = urgentErrors[device.id] {
-                    Text(error).font(.appBody(14)).foregroundStyle(Color.appDestructive)
+                    Text(error).font(.role(.footnote)).foregroundStyle(Color.appDanger)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 12)
                 }
             }
-            Button {
+            Button("Ask about this display") {
                 selectedDevice = nil
                 AskAdam.draft("How is the \(device.name) doing?")
-            } label: {
-                Text("Ask about this display")
-                    .font(.appBody(16, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 20)
-                    .frame(minHeight: 48)
-                    .background(Color.appAction, in: Capsule())
             }
-            .buttonStyle(.appScale)
+            .buttonStyle(.appSecondary)
             .accessibilityHint("Opens a draft in the conversation")
         }
         .refreshable { await load() }
@@ -374,55 +705,13 @@ struct YourHomeView: View {
         let urgent: Bool
     }
 
-    /// Only what a device sensed or Adam inferred. Empty until hardware reports something.
-    @ViewBuilder
-    private var noticedSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            sectionTitle("Noticed")
-            if home.observations.isEmpty {
-                Text("Nothing reported by your devices yet.")
-                    .font(.role(.body)).foregroundStyle(Color.appMuted)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(home.observations.enumerated()), id: \.element.id) { index, item in
-                                                row(title: item.summary, detail: observationDetail(item), dot: nil) {
-                            AskAdam.draft("Tell me more about: \(item.summary)")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var addressSection: some View {
-        if loaded && needsAddress {
-            section("Set up") {
-                row(title: "Set your home location", detail: "For arrival and leaving reminders", dot: nil, chevron: true) {
-                    showsSettings = true
-                }
-            }
-        }
-    }
-
     // MARK: Building blocks
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.role(.title))
-            .foregroundStyle(Color.appInk)
-            .accessibilityAddTraits(.isHeader)
-    }
-
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            sectionTitle(title)
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            AppSectionHeader(title: title)
             VStack(spacing: 0) { content() }
         }
-    }
-
-    private var divider: some View {
-        SettingsRule()
     }
 
     private func row(title: String, detail: String?, dot: Color?, chevron: Bool = false, action: @escaping () -> Void) -> some View {
@@ -431,13 +720,15 @@ struct YourHomeView: View {
                 if let dot { StatusDot(color: dot, hollow: true) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.role(.body, weight: .medium))
+                        .font(.rowTitle)
                         .foregroundStyle(Color.appInk)
+                        .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if let detail, !detail.isEmpty {
                         Text(detail)
-                            .font(.role(.callout))
+                            .font(.rowSecondary)
                             .foregroundStyle(Color.appMuted)
+                            .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -456,7 +747,7 @@ struct YourHomeView: View {
     // MARK: Formatting
 
     private func lastSeen(_ device: HomeModel.Device) -> String {
-        guard let raw = device.lastSeenAt, let date = Date.oxyParse(raw) else { return "Last seen unknown" }
+        guard let raw = device.lastSeenAt, let date = Date.oxyParse(raw) else { return "last seen unknown" }
         return "last seen \(date.formatted(.relative(presentation: .named)))"
     }
 
@@ -528,7 +819,17 @@ struct YourHomeView: View {
             rooms: [.init(name: "Living room", devices: [living], active: true), .init(name: "Kitchen", devices: [kitchen], active: false)],
             unassignedDevices: [],
             watches: [.init(id: "w1", title: "Flight price check", detail: "Tell me when the price drops", nextRunAt: nil)],
-            observations: []
+            observations: [],
+            controls: [
+                HomeModel.Control(id: "light.living_room_lamp", name: "Lamp", room: "Living room", kind: "light", state: "on", available: true, isOn: true,
+                      brightness: 60, capabilities: ["toggle", "brightness"]),
+                HomeModel.Control(id: "switch.kettle", name: "Kettle", room: "Kitchen", kind: "switch", state: "off", available: true, isOn: false,
+                      capabilities: ["toggle"]),
+                HomeModel.Control(id: "climate.hall", name: "Heating", room: nil, kind: "climate", state: "heat", available: true, isOn: true,
+                      temperature: 19.5, targetTemperature: 21, minTemperature: 7, maxTemperature: 30, capabilities: ["temperature"]),
+                HomeModel.Control(id: "light.porch", name: "Porch light", room: nil, kind: "light", state: "unavailable", available: false, isOn: false)
+            ],
+            controlSource: HomeModel.ControlSource(status: "ok")
         )
     }()
     static var sampleOnline: HomeModel {
@@ -552,4 +853,17 @@ struct YourHomeView: View {
             unassignedDevices: [], watches: sampleConnected.watches, observations: [])
     }
     #endif
+}
+
+/// One tile on Your home: a paired display or a smart-home control.
+enum HomeTileItem: Identifiable, Hashable {
+    case display(HomeModel.Device)
+    case control(HomeModel.Control)
+
+    var id: String {
+        switch self {
+        case .display(let device): return "display-\(device.id)"
+        case .control(let control): return "control-\(control.id)"
+        }
+    }
 }

@@ -254,7 +254,7 @@ struct ConnectorsView: View {
                     .frame(width: 38, height: 38)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.name).font(.appRounded(17, weight: .semibold, relativeTo: .headline)).foregroundStyle(Color.appInk)
+                    Text(entry.name).font(.rowTitle).foregroundStyle(Color.appInk)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
                         Circle().fill(Color.appSuccess).frame(width: 6, height: 6)
@@ -264,9 +264,8 @@ struct ConnectorsView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.settingsRaised))
-
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .settingsSurface()
+            .contentShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
         }
         .buttonStyle(.appScale(0.97))
         .accessibilityLabel("\(entry.name), connected")
@@ -312,16 +311,8 @@ struct ConnectorsView: View {
         } else {
             Button { Task { await connect(entry) } } label: {
                 Text(connector(entry)?.connectionState == "needs_reconnect" ? "Reconnect" : "Connect")
-                    .font(.appBody(14, weight: .semibold))
-                    .foregroundStyle(Color.appInk)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.white.opacity(0.06)))
-                    .overlay(Capsule().strokeBorder(Color.appHairline, lineWidth: 0.7))
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.app(.secondary, fullWidth: false))
         }
     }
 

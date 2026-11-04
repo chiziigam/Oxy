@@ -166,13 +166,8 @@ private struct PendantPairingSection: View {
             action()
         } label: {
             Text(title)
-                .font(.appBody(15, weight: .medium))
-                .foregroundStyle(primary ? Color.appOnAction : (destructive ? Color.appDestructive : Color.appInk))
-                .padding(.horizontal, 22)
-                .frame(minHeight: 44)
-                .background(Capsule().fill(primary ? Color.appAction : Color.appInk.opacity(0.10)))
         }
-        .buttonStyle(.appScale(0.97))
+        .buttonStyle(.app(primary ? AppButtonKind.primary : (destructive ? AppButtonKind.destructive : AppButtonKind.secondary), fullWidth: false))
         .padding(.top, 4)
     }
 

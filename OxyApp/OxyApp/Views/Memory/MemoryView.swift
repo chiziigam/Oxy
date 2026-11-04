@@ -433,8 +433,7 @@ private struct MemorySearchField: View {
         .frame(minHeight: 44)
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .background(Color.settingsRaised)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+        .settingsSurface()
     }
 }
 
@@ -555,19 +554,13 @@ private struct MemoryDropBox: View {
                     HStack(spacing: 8) {
                         if isSaving {
                             ProgressView()
-                                .scaleEffect(0.6)
-                                .tint(Color.appMuted)
+                                .scaleEffect(0.7)
+                                .tint(Color.appOnAccent)
                         }
                         Text(isSaving ? "Saving" : "Save")
-                            .font(.appBody(12, weight: .semibold))
                     }
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
-                    .background(Color.appAction, in: Capsule())
-                    .opacity(canSave ? 1 : 0.45)
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.app(.primary, fullWidth: false))
                 .disabled(!canSave)
             }
         }

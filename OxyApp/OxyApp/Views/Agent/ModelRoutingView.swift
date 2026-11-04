@@ -56,13 +56,8 @@ struct ModelRoutingView: View {
                     Task { await save() }
                 } label: {
                     Text(isSaving ? "Saving…" : "Use \(providerName(selectedProvider))")
-                        .font(.appBody(15, weight: .medium))
-                        .foregroundStyle(Color.appOnAction)
-                        .padding(.horizontal, 20)
-                        .frame(minHeight: 44)
-                        .background(Capsule().fill(Color.appAction))
                 }
-                .buttonStyle(.appScale(0.97))
+                .buttonStyle(.app(.primary, fullWidth: false))
                 .disabled(isSaving)
             }
             .padding(16)

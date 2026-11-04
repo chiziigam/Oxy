@@ -193,12 +193,13 @@ struct HomeAddressPage: View {
 
     private func buttonLabel(_ title: String, busy: Bool, filled: Bool) -> some View {
         ZStack {
-            if busy { ProgressView().scaleEffect(0.7) } else { Text(title).font(.appBody(14, weight: .semibold)) }
+            if busy { ProgressView().scaleEffect(0.7).tint(filled ? Color.appOnAccent : Color.appInk) } else { Text(title) }
         }
+        .font(.role(.callout, weight: .semibold))
         .foregroundStyle(filled ? Color.appOnAction : Color.appInk)
-        .frame(minWidth: 64, minHeight: 38)
-        .background(Capsule().fill(filled ? Color.appAction : Color.appAdaptive(dark: .white.opacity(0.1), light: Color.appSurface2)))
-        .frame(minHeight: 44)
+        .padding(.horizontal, AppSpacing.lg)
+        .frame(minWidth: 64, minHeight: 44)
+        .background(filled ? Color.appAction : Color.appSurface2, in: RoundedRectangle(cornerRadius: AppRadius.button, style: .continuous))
         .contentShape(Rectangle())
     }
 

@@ -55,9 +55,7 @@ struct TodaySuggestionsContent: View {
             } else if failed {
                 quietState("Couldn't load today", detail: "", icon: "refresh")
                 Button("Try again") { Task { await load() } }
-                    .font(.appBody(17, weight: .semibold))
-                    .foregroundStyle(Color.appAccent)
-                    .frame(minHeight: 44)
+                    .buttonStyle(.app(.secondary, fullWidth: false))
             } else if let first = visible.first {
                 if limit == nil {
                     featured(first)
@@ -65,9 +63,7 @@ struct TodaySuggestionsContent: View {
                     suggestion(first)
                 }
                 if limit == nil && visible.count > 1 {
-                    Text("More for today")
-                        .font(.sectionTitle)
-                        .foregroundStyle(Color.appInk)
+                    AppSectionHeader(title: "More for today")
                         .padding(.top, 14)
                     VStack(spacing: 0) {
                         ForEach(Array(visible.dropFirst())) { card in
@@ -132,8 +128,8 @@ struct TodaySuggestionsContent: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(title(card, question: parts.0))
-                        .font(.title3.weight(.semibold))
-                        .tracking(-0.5)
+                        .font(.role(.title, weight: .bold))
+                        .tracking(-0.3)
                         .foregroundStyle(Color.appInk)
                         .fixedSize(horizontal: false, vertical: true)
                     if let context = parts.1 {
@@ -149,33 +145,26 @@ struct TodaySuggestionsContent: View {
             }
             .padding(.horizontal, 20).padding(.bottom, 20)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .appCard(padding: 0)
         .accessibilityElement(children: .contain)
     }
 
     private func primaryAction(_ card: HomeCard, onFeature: Bool = false) -> some View {
         Button { ask(card) } label: {
-            HStack(spacing: 12) {
-                Text("Ask Adam").font(.appBody(16, weight: .semibold))
-                AppIcon("arrow-up-right", size: 16)
+            HStack(spacing: AppSpacing.sm) {
+                Text("Ask Adam")
+                AppIcon("arrow-up-right", size: 14)
             }
-            .foregroundStyle(onFeature ? Color(red: 0.04, green: 0.29, blue: 0.96) : Color.appOnAction)
-            .padding(.horizontal, 22).padding(.vertical, 15)
-            .frame(minHeight: 50)
-            .background(onFeature ? Color.white : Color.appAction, in: Capsule())
         }
-        .buttonStyle(.appScale(0.97))
+        .buttonStyle(.app(.primary, fullWidth: false))
         .accessibilityHint("Asks Adam to help with this suggestion")
     }
 
     private func laterAction(_ card: HomeCard, onFeature: Bool = false) -> some View {
         Button { dismiss(card) } label: {
-            Text("Not now").font(.appBody(15, weight: .medium))
-                .foregroundStyle(onFeature ? Color.white : Color.appMuted)
-                .padding(.horizontal, 14).frame(minHeight: 50)
+            Text("Not now")
         }
-        .buttonStyle(.appScale(0.97))
+        .buttonStyle(.app(.quiet))
     }
 
     private func suggestion(_ card: HomeCard) -> some View {
@@ -186,7 +175,7 @@ struct TodaySuggestionsContent: View {
                     sourceIcon(card, size: 28).frame(width: 36, height: 40)
                     VStack(alignment: .leading, spacing: 7) {
                         Text(title(card, question: parts.0))
-                            .font(.appBody(18, weight: .medium))
+                            .font(.rowTitle)
                             .foregroundStyle(Color.appInk)
                             .fixedSize(horizontal: false, vertical: true)
                         if let detail = parts.1 {
