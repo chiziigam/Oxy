@@ -176,3 +176,17 @@ test('the Microsoft OAuth browser redirect reaches its callback instead of a 401
     server.close();
   }
 });
+
+test('the mailer reports its no-provider mode instead of pretending to send', async () => {
+  const previous = process.env.RESEND_API_KEY;
+  delete process.env.RESEND_API_KEY;
+  try {
+    const { sendEmail } = require('../../api/services/email');
+    const result = await sendEmail({ to: 'a@example.com', subject: 'Hello', text: 'Body' });
+    assert.equal(result.dev, true);
+    assert.equal(Boolean(result.ok) && result.dev !== true, false, 'a no-op must not count as a send');
+  } finally {
+    if (previous === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = previous;
+  }
+});

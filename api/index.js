@@ -4561,11 +4561,19 @@ app.post('/auth/verify-email', async (req, res) => {
     const { error: tokenError } = await supabase.from('password_reset_tokens').insert({ user_id: userId, token, expires_at: expiresAt });
     if (tokenError) throw tokenError;
     const verifyUrl = `${process.env.APP_URL || ''}/auth/verify-email/confirm?token=${token}`;
+    let sent = false;
     try {
       const { sendVerificationEmail } = require('./services/email');
-      await sendVerificationEmail(account.email, verifyUrl);
+      const result = await sendVerificationEmail(account.email, verifyUrl);
+      // Without a provider the mail service is a no-op; claiming it was sent sends the person
+      // to an inbox that will never receive the link.
+      sent = Boolean(result?.ok) && result?.dev !== true;
+      if (!sent) log('warn', 'email.verify.unconfigured', { userId });
     } catch (e) {
       log('warn', 'email.verify.failed', { error: e.message });
+    }
+    if (!sent) {
+      return res.status(503).json({ error: 'The verification email could not be sent. Try again later.' });
     }
     res.json({ success: true, message: 'Verification email sent.' });
   } catch (err) {
