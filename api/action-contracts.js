@@ -620,6 +620,8 @@ const ACTION_CONTRACTS = {
       quiet_hours: 'e.g. "22:00-07:00" — non-urgent notifications wait until it ends rather than being dropped',
       email_to: 'a specific address to send to, if not the account address or connected mailbox'
     },
+    // Redirecting notification mail changes where private content is delivered.
+    reviewWhen: input => Boolean(String(input?.email_to || '').trim()),
     guidance: 'Use when the user says how they want to be told about things: "email me if that price drops" (channel:"email"), "use Telegram for price watches but email my morning brief" (two calls: category:"watch" channel:"telegram", then category:"digest" channel:"email"), "keep things that need me in the app" (category:"action_required" channel:"in_app"), "don\'t email me — Telegram only" (channel:"telegram", no fallback), "send urgent alerts to Telegram" (urgency:"urgent" channel:"telegram"), "use email if Telegram fails" (channel:"telegram" fallback:"email"), "only send urgent things", "nothing after 10pm". An explicit channel choice is exclusive: it does NOT silently fall back to whatever else happens to be configured, so "Telegram only" actually means only Telegram unless the user also names a fallback. Never set both category and urgency in the same call — category is "this KIND of thing", urgency is "things THIS SERIOUS", and they answer different requests. Relay the returned `unavailable` list honestly — if a channel is not actually configured, say what it will do instead (fall back, or land in the app) rather than implying it will arrive there. Do not invent channels: only push, email, Telegram and the in-app card exist.',
     successSummary: 'Notification preference updated',
     failureSummary: 'Could not change that preference',

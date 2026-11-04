@@ -218,3 +218,24 @@ test('a hosting platform tenant is its own site, not the whole platform', () => 
   assert.equal(registrableSite('shop.co.uk'), 'shop.co.uk');
   assert.equal(registrableSite('www.johnlewis.com'), 'johnlewis.com');
 });
+
+test('changing where notification email goes waits for approval', () => {
+  const { getActionContract } = require('../../api/action-contracts');
+  const contract = getActionContract('set_notification_preference');
+  assert.equal(contract.reviewWhen({ email_to: 'somewhere@example.com' }), true);
+  assert.equal(contract.reviewWhen({ channel: 'email' }), false);
+  assert.equal(contract.reviewWhen({ category: 'watch', channel: 'telegram' }), false);
+});
+
+test('test-mode inventory is not described as a real, sellable fare', () => {
+  const { formatTravelResults } = require('../../api/services/travel-search');
+  const text = formatTravelResults('flights', [{
+    kind: 'flight', airline: 'Duffel Airways', price: 100, currency: 'GBP',
+    priceBasis: 'return', priceIsTotal: true, passengers: 1, inventory: true,
+    source: 'Duffel (test mode — fictional inventory)',
+    caveat: 'Sandbox data from Duffel Airways, not a real fare.',
+    dateMatch: 'exact', matchesRequestedDates: true
+  }], { searched: 'London to Paris' });
+  assert.doesNotMatch(text, /real, sellable/i);
+  assert.match(text, /example data|test-mode/i);
+});
