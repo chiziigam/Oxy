@@ -56,6 +56,23 @@ function observationResult(observation, extra = {}) {
   };
 }
 
+
+// A page that wants a person gets a link, not a struggle. The person finishes the one step and
+// the agent carries on from the same session.
+function withTakeover(result, userId) {
+  if (!result || !result.needsHuman || result.takeoverUrl) return result;
+  try {
+    const { createTakeoverUrl } = require('../services/browser-takeover');
+    return {
+      ...result,
+      takeoverUrl: createTakeoverUrl(userId),
+      text: `${result.text}\n\nThis step needs you: open the link, finish it, then tell me to carry on.`,
+    };
+  } catch {
+    return result;
+  }
+}
+
 function noSession() {
   return { success: false, error: 'No page is open. Use browser_open first.' };
 }
@@ -136,7 +153,7 @@ async function browserOpen({ userId, params, context }) {
 
 async function browserObserve({ userId }) {
   try {
-    return observationResult(await browserEnvironment.observe(userId));
+    return withTakeover(observationResult(await browserEnvironment.observe(userId)), userId);
   } catch (e) {
     if (e.code === 'NO_SESSION') return noSession();
     return { success: false, error: `Could not read the page: ${e.message}` };
@@ -155,12 +172,12 @@ async function browserAct({ userId, params }) {
       submit: params?.submit,
     });
     const moved = observation.changed?.url || observation.changed?.content;
-    return observationResult(observation, {
+    return withTakeover(observationResult(observation, {
       changed: observation.changed,
       // Stated plainly because "I clicked it" is not "it worked" — the loop needs to see the
       // difference to decide whether to move on or try something else.
       note: moved ? 'The page changed after that step.' : 'The page did NOT visibly change after that step.',
-    });
+    }), userId);
   } catch (e) {
     if (e.code === 'NO_SESSION') return noSession();
     return { success: false, error: e.message, recoverable: true };

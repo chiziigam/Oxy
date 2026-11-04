@@ -66,22 +66,28 @@ const CHROMIUM_LAUNCH_ARGS = [
 const BROWSER_LAUNCH_TIMEOUT_MS = envInt('OXY_BROWSER_LAUNCH_TIMEOUT_MS', 45000);
 const BROWSER_CLOSE_TIMEOUT_MS = 5000;
 
+// A household can lend its own connection: the browser then leaves through the house's network
+// rather than a datacenter, which is what a retailer's fraud layer expects to see.
+const BROWSER_PROXY = String(process.env.OXY_BROWSER_PROXY || '').trim();
+
 async function launchLocalBrowser() {
   const before = directChildPids(process.pid);
   const wantHeadless = process.env.BROWSER_HEADLESS !== 'false';
+  const proxy = BROWSER_PROXY ? { server: BROWSER_PROXY } : undefined;
   let browser;
   try {
     browser = await chromium.launch({
       headless: wantHeadless,
       args: CHROMIUM_LAUNCH_ARGS,
       timeout: BROWSER_LAUNCH_TIMEOUT_MS,
+      ...(proxy ? { proxy } : {}),
     });
   } catch (error) {
     // A headed launch needs a display. If xvfb did not come up, run headless rather than
     // leaving the app unable to browse at all.
     if (wantHeadless) throw error;
     console.warn(`[browser-session] headed launch failed (${error.message.split('\n')[0]}); falling back to headless`);
-    browser = await chromium.launch({ headless: true, args: CHROMIUM_LAUNCH_ARGS, timeout: BROWSER_LAUNCH_TIMEOUT_MS });
+    browser = await chromium.launch({ headless: true, args: CHROMIUM_LAUNCH_ARGS, timeout: BROWSER_LAUNCH_TIMEOUT_MS, ...(proxy ? { proxy } : {}) });
   }
   // This Playwright build doesn't expose browser.process() on a locally launched browser, so
   // stash the OS PID from the before/after child diff for the force-kill in closeSession.
@@ -93,7 +99,7 @@ async function launchLocalBrowser() {
 
 // Warm pool: a cold Chromium launch is ~4s, paid on the first step of a turn inside the
 // client's watchdog. Keep one spare launched so a turn grabs it instantly.
-const WARM_POOL_ENABLED = process.env.OXY_BROWSER_WARM_POOL !== 'false';
+const WARM_POOL_ENABLED = process.env.OXY_BROWSER_WARM_POOL !== 'false' && !BROWSER_PROXY;
 let warmSpare = null;
 let warmingPromise = null;
 

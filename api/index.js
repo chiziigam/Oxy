@@ -418,6 +418,40 @@ app.use(cors({
   credentials: true
 }));
 
+// ── Browser takeover ─────────────────────────────────────────────────────────────────────
+// When a site demands a step only a person can do, the agent hands over the live screen instead
+// of failing or fighting it. The link is signed and short-lived; whoever holds it can act on
+// that one browser session, so it is only ever given to the person the agent is working for.
+app.get('/takeover/:token', (req, res) => {
+  const takeover = require('./services/browser-takeover');
+  if (!takeover.readTakeoverToken(req.params.token)) {
+    return res.status(410).type('html').send('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p style="font:17px -apple-system,system-ui,sans-serif;padding:28px">That link has expired. Ask Adam to try again.</p>');
+  }
+  res.type('html').send(takeover.pageHtml());
+});
+
+app.get('/takeover/:token/frame', async (req, res) => {
+  const takeover = require('./services/browser-takeover');
+  const claim = takeover.readTakeoverToken(req.params.token);
+  if (!claim) return res.status(410).end();
+  try {
+    res.type('jpeg').send(await takeover.frame(claim.userId));
+  } catch (error) {
+    res.status(409).json({ error: error.message });
+  }
+});
+
+app.post('/takeover/:token/action', express.json({ limit: '8kb' }), async (req, res) => {
+  const takeover = require('./services/browser-takeover');
+  const claim = takeover.readTakeoverToken(req.params.token);
+  if (!claim) return res.status(410).json({ error: 'That link has expired.' });
+  try {
+    res.json(await takeover.applyAction(claim.userId, req.body || {}));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripeClient || !process.env.STRIPE_WEBHOOK_SECRET) {
     return res.status(500).json({ error: 'Stripe webhook is not configured on the server.' });

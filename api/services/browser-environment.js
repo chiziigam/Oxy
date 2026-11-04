@@ -493,6 +493,27 @@ async function observePage(page, { includeScreenshot = false } = {}) {
   return observationFrom(page, await perceive(page), { includeScreenshot });
 }
 
+
+// A step only a person can take: a bot check, a one-time code, a passkey, or the bank's own
+// confirmation. The agent stops and hands the live screen over rather than fighting it.
+const HUMAN_STEP_PATTERNS = [
+  /captcha|recaptcha|hcaptcha|turnstile|i'?m not a robot|verify (?:that )?you(?:'re| are) (?:a )?human/i,
+  /one[- ]time (?:pass)?code|verification code|enter the code|code we (?:sent|emailed|texted)|authenticator app/i,
+  /3-?d ?secure|strong customer authentication|approve (?:the |this )?(?:payment|purchase) in your|banking app|verify (?:the )?payment/i,
+  /passkey|security key|sign in with your fingerprint|use your face ?id/i,
+];
+
+function humanStepFrom(perceived) {
+  const elementText = (perceived.elements || []).map((el) => el.text || '').join(' ');
+  const haystack = `${perceived.text || ''} ${elementText} ${perceived.dialogText || ''}`.slice(0, 8000);
+  if (!haystack.trim()) return null;
+  return HUMAN_STEP_PATTERNS.some((pattern) => pattern.test(haystack)) ? 'verification' : null;
+}
+
+async function screenshotJpeg(page) {
+  return page.screenshot({ type: 'jpeg', quality: 70 });
+}
+
 async function observationFrom(page, perceived, { includeScreenshot = false } = {}) {
   const { elements } = perceived;
   const observation = {
@@ -503,6 +524,7 @@ async function observationFrom(page, perceived, { includeScreenshot = false } = 
     text: String(perceived.text || '').slice(0, OBSERVATION_TEXT_LIMIT),
     blocked: wallFrom(perceived) || null,
     pageProblem: problemFrom(perceived, page.url()),
+    ...(humanStepFrom(perceived) ? { needsHuman: humanStepFrom(perceived) } : {}),
   };
   if (includeScreenshot) {
     observation.screenshot = await captureMarkedScreenshot(page, elements).catch(() => null);
@@ -704,6 +726,50 @@ function resolveElement(session, elements, elementId) {
   throw new Error(`elementId ${elementId} is not on the current page (0–${Math.max(0, elements.length - 1)}). Observe again before acting.${examples ? ` The controls start: ${examples}.` : ''}`);
 }
 
+
+// A person moves the mouse and types at a human pace. Bot walls read exactly that, so the
+// browser does the same thing rather than teleporting a cursor and filling a field in one go.
+const HUMAN_INPUT = process.env.OXY_HUMAN_INPUT !== '0';
+const humanPause = (min, max) => new Promise((resolve) => setTimeout(resolve, min + Math.random() * (max - min)));
+
+async function humanClickPoint(page, x, y) {
+  if (!HUMAN_INPUT) return page.mouse.click(x, y);
+  // Approach from a slightly different place each time, in a few steps, then press.
+  await page.mouse.move(x - 12 + Math.random() * 24, y - 10 + Math.random() * 20, { steps: 2 }).catch(() => {});
+  await page.mouse.move(x, y, { steps: 8 });
+  await humanPause(30, 90);
+  await page.mouse.down();
+  await humanPause(40, 110);
+  await page.mouse.up();
+}
+
+async function humanClickLocator(page, locator) {
+  if (!HUMAN_INPUT) return locator.click({ timeout: 10000 });
+  // A mouse clicks what is on screen. Anything below the fold is scrolled to first, and if it
+  // still sits outside the viewport the locator's own click handles it.
+  await locator.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+  const box = await locator.boundingBox().catch(() => null);
+  if (!box) return locator.click({ timeout: 10000 });
+  const viewport = page.viewportSize() || { width: 1280, height: 800 };
+  const y = box.y + box.height / 2;
+  if (y <= 0 || y >= viewport.height) return locator.click({ timeout: 10000 });
+  const x = box.x + box.width / 2 + (Math.random() - 0.5) * Math.min(8, box.width / 3);
+  return humanClickPoint(page, x, y + (Math.random() - 0.5) * Math.min(8, box.height / 3));
+}
+
+async function humanTypeText(page, locator, text) {
+  const value = String(text ?? '');
+  if (!HUMAN_INPUT) {
+    await locator.fill(value, { timeout: 10000 });
+    return;
+  }
+  await humanClickLocator(page, locator);
+  // Clear what is there the way a person would, then type character by character.
+  await locator.fill('').catch(() => {});
+  await humanPause(80, 200);
+  await page.keyboard.type(value, { delay: 28 + Math.random() * 40 });
+}
+
 // The general browser is not a payment rail. A control that would charge must go through
 // transaction_prepare/transaction_authorize, where the amount is read and a person approves it.
 // Lazy require: transaction.js imports this module at load time.
@@ -747,11 +813,11 @@ async function act(userId, step = {}) {
       const point = stale?.fastClick;
       if (point) {
         usedCoordinateClick = true;
-        await page.mouse.click(point.x, point.y);
+        await humanClickPoint(page, point.x, point.y);
       } else {
         const target = resolveElement(session, elements, step.elementId);
         try {
-          await target.click({ timeout: 10000 });
+          await humanClickLocator(page, target);
         } catch (error) {
           const message = String(error?.message || '');
           // A dialog that appeared between the dismissal above and this click: clear it and retry once.
@@ -777,8 +843,11 @@ async function act(userId, step = {}) {
     }
     case 'type': {
       const target = resolveElement(session, elements, step.elementId);
-      await target.fill(String(step.value ?? ''), { timeout: 10000 });
-      if (step.submit !== false) await page.keyboard.press('Enter').catch(() => {});
+      await humanTypeText(page, target, step.value ?? '');
+      if (step.submit !== false) {
+        await humanPause(120, 320);
+        await page.keyboard.press('Enter').catch(() => {});
+      }
       break;
     }
     case 'select':
@@ -895,7 +964,7 @@ async function act(userId, step = {}) {
       try {
         const target = resolveElement(session, elements, step.elementId);
         await target.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
-        await target.click({ timeout: 8000 });
+        await humanClickLocator(page, target);
         await settleAfterAction(page, kind);
         const retried = await observePage(page);
         changed = {
@@ -929,6 +998,7 @@ async function close(userId) {
 module.exports = {
   // perception
   observePage,
+  screenshotJpeg,
   observe,
   extractClickableElements,
   captureMarkedScreenshot,
