@@ -236,6 +236,17 @@ async function settleApproval(supabase, userId, approvalId, status) {
   return !result.error && Boolean(result.data?.id);
 }
 
+async function findApproval(supabase, userId, approvalId) {
+  if (!approvalId) return null;
+  const result = await supabase.from(APPROVAL_TABLE)
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', approvalId)
+    .maybeSingle();
+  if (result.error || !result.data) return null;
+  return normalizeApproval(result.data);
+}
+
 async function restoreApproval(supabase, userId, approvalId) {
   if (!approvalId) return false;
   const result = await supabase.from(APPROVAL_TABLE)
@@ -272,6 +283,12 @@ function createApprovalRuntime(supabase, { now = () => new Date() } = {}) {
     if (context.approvalId) {
       const restored = await restoreApproval(supabase, userId, context.approvalId);
       if (restored) return { ...payload, approvalId: context.approvalId };
+      // An approval that already settled must never come back as a fresh one. A failure after
+      // execution used to re-park it here, and a second "yes" ran the action again.
+      const existing = await findApproval(supabase, userId, context.approvalId);
+      if (existing) {
+        return { ...payload, approvalId: context.approvalId, alreadySettled: true };
+      }
     }
 
     const stored = await createApproval(supabase, userId, payload);

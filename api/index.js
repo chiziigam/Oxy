@@ -7491,6 +7491,7 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
         // execution of a previously review-gated action, so the trace should capture
         // exactly what is about to run (spend caps still apply downstream regardless).
         trace.log(`pending_action.confirm ${pendingAction.action.type}`, JSON.stringify(pendingAction.action.input || {}));
+        let executed = false;
         try {
           let actionResults = await executeActions(userId, [pendingAction.action], {
             userMessage: pendingAction.userMessage || message,
@@ -7499,6 +7500,9 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             bypassReview: true,
             trace
           }, trace);
+          // From here the side effect may already have happened. A later failure must not
+          // offer the same action again: the money has moved / the message has gone.
+          executed = true;
           actionResults = normalizeActionResultsForClient(actionResults);
           await approvalRuntime.settle(
             userId,
@@ -7527,17 +7531,22 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             actionResults
           });
         } catch (e) {
-          // Execution itself threw, rather than returning an action-level failure. Restore the
-          // claimed action so "yes" can be retried instead of losing the confirmation.
-          await setPendingAction(userId, pendingAction.action, {
-            userMessage: pendingAction.userMessage,
-            location: pendingAction.location,
-            nativeHints: pendingAction.nativeHints,
-            persistedTaskId: pendingAction.taskId,
-            runtimeSessionId: pendingAction.sessionId,
-            taskGoal: pendingAction.taskGoal,
-            approvalId: pendingAction.approvalId
-          }).catch(() => {});
+          // Only restore an approval that never reached execution. Restoring after a side
+          // effect turns one approval into a second charge or a second send.
+          if (!executed) {
+            await setPendingAction(userId, pendingAction.action, {
+              userMessage: pendingAction.userMessage,
+              location: pendingAction.location,
+              nativeHints: pendingAction.nativeHints,
+              persistedTaskId: pendingAction.taskId,
+              runtimeSessionId: pendingAction.sessionId,
+              taskGoal: pendingAction.taskGoal,
+              approvalId: pendingAction.approvalId
+            }).catch(() => {});
+          } else {
+            // Settle it if the failure happened before settlement; settle() is a no-op then.
+            await approvalRuntime.settle(userId, pendingAction, 'failed').catch(() => {});
+          }
           throw e;
         }
       } finally {

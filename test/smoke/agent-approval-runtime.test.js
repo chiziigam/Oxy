@@ -23,9 +23,12 @@ function fakeSupabase() {
       },
       maybeSingle() {
         const row = rows.find(matches);
-        if (!row || state.operation !== 'update') return Promise.resolve({ data: null, error: null });
-        Object.assign(row, state.updatePatch);
-        return Promise.resolve({ data: { id: row.id }, error: null });
+        if (!row) return Promise.resolve({ data: null, error: null });
+        if (state.operation === 'update') {
+          Object.assign(row, state.updatePatch);
+          return Promise.resolve({ data: { id: row.id }, error: null });
+        }
+        return Promise.resolve({ data: { ...row }, error: null });
       }
     };
     return chain;
@@ -177,4 +180,17 @@ test('the push still says something sensible when the action has no detail', () 
   const notice = approvalNotification({ approvalId: 'a2', action: { type: 'confirm_browser_payment' } });
   assert.equal(notice.title, 'Needs a yes');
   assert.ok(notice.body.length > 0);
+});
+
+test('an approval that already settled is never re-armed as a fresh one', async () => {
+  const db = fakeSupabase();
+  const runtime = approvals.createApprovalRuntime(db);
+  const parked = await runtime.park('user-1', action('send_email'), {});
+  assert.equal(await runtime.claim('user-1', parked), true);
+  assert.equal(await runtime.settle('user-1', parked, 'approved'), true);
+
+  const again = await runtime.park('user-1', action('send_email'), { approvalId: parked.approvalId });
+  assert.equal(again.approvalId, parked.approvalId);
+  assert.equal(again.alreadySettled, true);
+  assert.equal(db.rows.length, 1, 'no second approval may be minted');
 });
