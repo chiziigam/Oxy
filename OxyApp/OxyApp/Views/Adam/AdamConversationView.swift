@@ -74,7 +74,10 @@ struct AdamConversationView: View {
                                 message: message,
                                 showsTypingIndicator: false,
                                 showsTimestamp: false,
-                                onActionCommand: { command in viewModel.sendCommand(command, userId: appState.userId) }
+                                onActionCommand: { command in viewModel.sendCommand(command, userId: appState.userId) },
+                                onRetryFailedTurn: viewModel.canRetryFailedMessage(id: message.id)
+                                    ? { viewModel.retryFailedMessage(id: message.id, userId: appState.userId) }
+                                    : nil
                             )
                             .id(message.id)
                         }
@@ -103,9 +106,14 @@ struct AdamConversationView: View {
             if let working {
                 Text(working).font(.adamBody).foregroundStyle(Color.adamMuted)
             }
+            Spacer(minLength: 0)
+            Button("Stop") { viewModel.stopCurrentTurn() }
+                .font(.adamLabel)
+                .foregroundStyle(Color.adamMuted)
+                .frame(minHeight: 44)
         }
         .padding(.top, 12)
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(working ?? "Adam is working")
     }
 
