@@ -413,6 +413,21 @@ async function runAgentLoop({
       break;
     }
 
+    // A lookup that already produced its answer in words does not need another model pass to
+    // re-word it. Every capability says for itself whether its result is speakable.
+    const answeredDirectly = results.length > 0 && results.every((entry) => {
+      const contract = getActionContract(entry.action);
+      return contract?.speaksResult === true && entry.result?.success === true &&
+        typeof entry.result?.text === 'string' && entry.result.text.trim();
+    });
+    if (answeredDirectly) {
+      spoken = results.map((entry) => entry.result.text.trim()).join(' ');
+      logAgentStep(agentTrace, { type: 'answered_directly', iteration: i });
+      agentTrace.status = 'completed';
+      await flushCheckpoints();
+      break;
+    }
+
     // Safety: if many actions or high risk, may stop early in future
   }
 

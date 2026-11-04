@@ -168,6 +168,9 @@ function registerBoxRoutes(app, deps) {
     }
     return ackPending;
   }
+  // Warm it shortly after start-up so the first turn of a process is not the one that pays
+  // for it. Delayed and unref'd so it never holds the process open or slows boot.
+  if (ACK_DELAY_MS > 0) setTimeout(() => { acknowledgementPcm(); }, 2500).unref?.();
 
   // Speaks the reply while the model is still writing: the chat stream already turns complete
   // sentences into audio, so each clip can go to the speaker as soon as it exists.

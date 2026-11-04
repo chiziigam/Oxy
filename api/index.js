@@ -5776,7 +5776,8 @@ async function buildChatContext(userId, message, trace = null, modelName = STREA
 }
 
 const DATA_ACTIONS = new Set(['search_trains', 'get_emails', 'get_calendar_events', 'search_emails', 'get_telegram_contacts']);
-const DIRECT_SUMMARY_ACTIONS = new Set(['search_trains']);
+// A capability says for itself whether its text is already the answer.
+const answersDirectly = action => getActionContract(action)?.speaksResult === true;
 
 async function buildMorningBriefing(userId, now = new Date()) {
   const [memory, history] = await Promise.all([
@@ -6550,7 +6551,7 @@ async function runProactiveSweep(logger = console) {
 
 function canUseDirectActionSummary(actionResults) {
   return actionResults.length > 0 && actionResults.every(entry =>
-    DIRECT_SUMMARY_ACTIONS.has(entry.action) && entry.result?.success && entry.result?.text
+    answersDirectly(entry.action) && entry.result?.success && entry.result?.text
   );
 }
 

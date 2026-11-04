@@ -904,6 +904,7 @@ const ACTION_CONTRACTS = {
   search_trains: {
     risk: 'low',
     required: ['origin', 'destination'],
+    speaksResult: true,
     aliases: { origin: ['from'], destination: ['to'] },
     inputExample: { origin: 'station name or CRS code', destination: 'station name or CRS code' },
     guidance: 'Returns a route summary between two stations, not live times, platforms or fares — prefer a grounded search answer for those. If it returns no route summary, or no journey time, get the journey time and next departures with web_search instead of telling the user you could not. To buy a ticket, use browser_open/browser_act against the rail operator and transaction_authorize only after approval.',
@@ -1344,8 +1345,8 @@ const ACTION_CONTRACTS = {
   // runner treated them as direct-execute. Register them high-risk + review so they can't.
   stripe_payout_to_user: { risk: 'high', required: ['amount'], inputExample: { amount: 50, description: 'payout', destination: 'acct_...' }, successSummary: 'Payout initiated', failureSummary: 'Payout failed', confirmation: 'review', executionMode: 'review', adapter: { kind: 'connector', id: 'stripe' } },
   spend_from_concierge_via_stripe: { risk: 'high', required: ['amount'], inputExample: { amount: 25, description: 'payment' }, successSummary: 'Charged through Stripe', failureSummary: 'Failed', confirmation: 'review', executionMode: 'review', adapter: { kind: 'connector', id: 'stripe' } },
-  get_weather: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, successSummary: 'Weather', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for current conditions. For a future period or weekend forecast, use get_forecast.' },
-  get_forecast: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, optional: ['when'], successSummary: 'Forecast', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for a future weather forecast, including tomorrow or a weekend. Keep the requested city and time period in the call.' },
+  get_weather: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, speaksResult: true, successSummary: 'Weather', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for current conditions. For a future period or weekend forecast, use get_forecast.' },
+  get_forecast: { risk: 'low', required: ['city'], inputExample: { city: 'London' }, optional: ['when'], speaksResult: true, successSummary: 'Forecast', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'weather' }, guidance: 'Use for a future weather forecast, including tomorrow or a weekend. Keep the requested city and time period in the call.' },
   search_amazon: { risk: 'low', required: ['query'], inputExample: { query: 'headphones' }, successSummary: 'Amazon search', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'amazon' } },
   send_slack_message: { risk: 'medium', required: ['channel', 'message'], inputExample: { channel: '#general', message: 'hi' }, successSummary: 'Slack sent', failureSummary: 'Failed', confirmation: 'review_required', executionMode: 'review', adapter: { kind: 'connector', id: 'slack' } },
   book_lyft: { risk: 'low', required: ['destination'], inputExample: { destination: 'airport' }, successSummary: 'Lyft opened', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'lyft' } },
@@ -1389,7 +1390,7 @@ const ACTION_CONTRACTS = {
     confirmation: 'none',
     executionMode: 'direct'
   },
-  get_stock_price: { risk: 'low', required: ['symbol'], inputExample: { symbol: 'AAPL' }, successSummary: 'Stock price', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'stocks' } },
+  get_stock_price: { risk: 'low', required: ['symbol'], inputExample: { symbol: 'AAPL' }, speaksResult: true, successSummary: 'Stock price', failureSummary: 'Failed', confirmation: 'none', adapter: { kind: 'connector', id: 'stocks' } },
   // ── Browser primitives ────────────────────────────────────────────────────────────────
   // The browser as an environment the agent acts in, not a black box that decides on its own
   // when a task is done. These four compose into anything a person does in a browser.

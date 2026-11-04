@@ -81,9 +81,26 @@ test('a browser that keeps making progress keeps the run going, up to a ceiling;
   assert.equal(calls, 14, 'browser steps extend the run to the ceiling and no further');
 
   calls = 0;
-  brainProvider.callToolsBrain = counting('get_weather');
-  await runAgentLoop({ userId: 'u', initialMessage: 'weather again', maxIterations: 2, executeActionsFn: exec });
+  brainProvider.callToolsBrain = counting('get_emails');
+  await runAgentLoop({ userId: 'u', initialMessage: 'email again', maxIterations: 2, executeActionsFn: exec });
   assert.equal(calls, 2, 'a non-browser tool keeps the normal cap');
+});
+
+test('a lookup that already answers in words ends the run without another model pass', async (t) => {
+  const brainProvider = require('../../api/services/brain-provider');
+  const { runAgentLoop } = require('../../api/services/agent-orchestrator');
+  const real = brainProvider.callToolsBrain;
+  t.after(() => { brainProvider.callToolsBrain = real; });
+  let calls = 0;
+  brainProvider.callToolsBrain = async () => {
+    calls += 1;
+    return { text: '', functionCalls: [{ id: 'c', name: 'get_weather', args: {} }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'get_weather', args: {} } }] } }] };
+  };
+  const exec = async (_u, actions) => actions.map(a => ({ action: a.type, result: { success: true, text: 'London: 12°C, overcast.' } }));
+  const out = await runAgentLoop({ userId: 'u', initialMessage: 'weather', maxIterations: 4, executeActionsFn: exec });
+  assert.equal(out.spoken, 'London: 12°C, overcast.');
+  assert.equal(calls, 1, 'the answer was already written; no second model pass');
+  assert.equal(out.agentTrace.status, 'completed');
 });
 
 test('a failed model call after tools ran tells the user so instead of dumping tool JSON', async (t) => {
@@ -94,7 +111,7 @@ test('a failed model call after tools ran tells the user so instead of dumping t
   let n = 0;
   brainProvider.callToolsBrain = async () => {
     n += 1;
-    if (n === 1) return { text: '', functionCalls: [{ id: 'c', name: 'get_weather', args: {} }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'get_weather', args: {} } }] } }] };
+    if (n === 1) return { text: '', functionCalls: [{ id: 'c', name: 'get_emails', args: {} }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'get_emails', args: {} } }] } }] };
     throw new Error('provider down');
   };
   const exec = async (_u, actions) => actions.map((a) => ({ action: a.type, result: { success: true, text: 'sunny' } }));
