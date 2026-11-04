@@ -212,6 +212,23 @@ async function listPendingApprovals(supabase, userId) {
   return { available: true, approvals: (result.data || []).map(normalizeApproval).filter(Boolean) };
 }
 
+// A process that died between claim and settle leaves a row nobody can see, cancel or answer.
+// After a grace period it is closed as failed rather than executed a second time.
+async function reapStaleClaims(supabase, { olderThanMs = 15 * 60 * 1000, now = new Date() } = {}) {
+  const cutoff = new Date(now.getTime() - olderThanMs).toISOString();
+  try {
+    const result = await supabase.from(APPROVAL_TABLE)
+      .update({ status: 'failed', settled_at: now.toISOString() })
+      .eq('status', 'claimed')
+      .lt('claimed_at', cutoff)
+      .select('id');
+    if (result.error) return { error: result.error.message };
+    return { reaped: (result.data || []).length };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
 async function claimApproval(supabase, userId, approvalId) {
   if (!approvalId) return false;
   const result = await supabase.from(APPROVAL_TABLE)
@@ -319,6 +336,9 @@ function createApprovalRuntime(supabase, { now = () => new Date() } = {}) {
     },
     async settle(userId, pending, status) {
       return settleApproval(supabase, userId, pending?.approvalId, status);
+    },
+    async reapStale(options = {}) {
+      return reapStaleClaims(supabase, options);
     }
   };
 }
@@ -335,6 +355,7 @@ module.exports = {
   describeAmbiguousApprovals,
   createApproval,
   listPendingApprovals,
+  reapStaleClaims,
   claimApproval,
   createApprovalRuntime,
   settleApproval,

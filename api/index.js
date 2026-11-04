@@ -6316,6 +6316,7 @@ async function runSavedGoal(userId, {
   deviceType = 'ambient_home',
 } = {}) {
   const persistedTask = await delegatedRunLifecycle.create(userId, title, { autonomy: 'Active', metadata });
+  try {
   const claimedTask = await delegatedRunLifecycle.claimStart(userId, persistedTask.id, {
     now,
     runtime: { deviceType, kind: 'task' },
@@ -6363,6 +6364,14 @@ async function runSavedGoal(userId, {
     failed: status === 'error',
     completed: status === 'completed',
   };
+  } catch (error) {
+    // The task row exists even when setup failed. Leaving it 'running' is how a run
+    // disappears from Work with no explanation.
+    await delegatedRunLifecycle
+      .interrupt(userId, persistedTask.id, 'The background run could not start.', { ownerAttempt: persistedTask.attempt })
+      .catch(() => {});
+    throw error;
+  }
 }
 
 async function runScheduledTasksForUser(userId, logger = console, now = new Date()) {
@@ -6504,6 +6513,10 @@ async function runProactiveSweep(logger = console) {
   // Hand back runs abandoned by a dead instance before doing anything else. They are marked
   // 'paused' with their checkpoint intact, so the user (or a later sweep) can resume them
   // instead of finding a task stuck at 'running' with no explanation.
+  try {
+    const claims = await approvalRuntime.reapStale().catch(() => null);
+    if (claims?.reaped) logger.log?.(`[approvals] closed ${claims.reaped} stale claim(s)`);
+  } catch { /* the sweep continues even if the reaper cannot run */ }
   try {
     const recovered = await delegatedRunLifecycle.recoverStale(new Date());
     if (recovered.length) {
@@ -7783,6 +7796,13 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       res.json(result);
       postResponseTasks(userId, message, { persistConversation });
       return;
+    }
+
+    // A revision replaces the parked action. Settle it before the model runs, so a later
+    // "yes" cannot execute the version the person just corrected.
+    if (pendingAction && isPendingRevisionMessage(message)) {
+      const revisionClaimed = await approvalRuntime.claim(userId, pendingAction).catch(() => false);
+      if (revisionClaimed) await approvalRuntime.settle(userId, pendingAction, 'cancelled').catch(() => {});
     }
 
     const requestedChatModel = streaming ? STREAMING_CHAT_MODEL : PRIMARY_CHAT_MODEL;

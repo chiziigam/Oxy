@@ -194,3 +194,39 @@ test('an approval that already settled is never re-armed as a fresh one', async 
   assert.equal(again.alreadySettled, true);
   assert.equal(db.rows.length, 1, 'no second approval may be minted');
 });
+
+test('a claim abandoned by a dead process is closed, not left invisible', async () => {
+  const rows = [
+    { id: 'old', user_id: 'u1', status: 'claimed', claimed_at: '2026-01-01T00:00:00.000Z', created_at: '2026-01-01T00:00:00.000Z' },
+    { id: 'recent', user_id: 'u1', status: 'claimed', claimed_at: '2026-11-04T19:55:00.000Z', created_at: '2026-11-04T19:55:00.000Z' },
+    { id: 'pending', user_id: 'u1', status: 'pending', claimed_at: null, created_at: '2026-11-04T19:00:00.000Z' },
+  ];
+  const supabase = {
+    from() {
+      return {
+        update(patch) {
+          const filters = {};
+          const chain = {
+            eq(column, value) { filters[column] = value; return chain; },
+            lt(column, value) { filters[`lt:${column}`] = value; return chain; },
+            select() {
+              const matched = rows.filter((row) => Object.entries(filters).every(([key, value]) => {
+                if (key.startsWith('lt:')) return String(row[key.slice(3)] || '') < value;
+                return row[key] === value;
+              }));
+              matched.forEach((row) => Object.assign(row, patch));
+              return Promise.resolve({ data: matched.map((row) => ({ id: row.id })), error: null });
+            },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+  const { reapStaleClaims } = require('../../api/services/agent-approval-runtime');
+  const result = await reapStaleClaims(supabase, { now: new Date('2026-11-04T20:00:00.000Z') });
+  assert.equal(result.reaped, 1);
+  assert.equal(rows.find((row) => row.id === 'old').status, 'failed');
+  assert.equal(rows.find((row) => row.id === 'recent').status, 'claimed');
+  assert.equal(rows.find((row) => row.id === 'pending').status, 'pending');
+});
