@@ -174,8 +174,6 @@ static void play(const void *pcm, size_t bytes) {
 
 static void post_sensors(void);
 static void post_sensors_async(void);
-typedef struct drain_job drain_job_t;
-static void drain_task(void *argument);
 
 typedef struct { int64_t started; adam_reply_t *reply; } playback_context_t;
 
@@ -190,60 +188,6 @@ static bool stream_audio(const uint8_t *pcm, size_t bytes, void *context) {
     return esp_codec_dev_write(speaker, (void *)pcm, bytes) == ESP_CODEC_DEV_OK;
 }
 
-typedef struct {
-    size_t bytes;
-    bool speech;
-    int16_t *pcm;
-    SemaphoreHandle_t done;
-} capture_job_t;
-
-static void capture_job_task(void *argument) {
-    capture_job_t *job = (capture_job_t *)argument;
-    job->pcm = record(RECORD_SECONDS, &job->bytes, &job->speech);
-    xSemaphoreGive(job->done);
-}
-
-// Follows the recorder and pushes new samples to the open connection. Reading the shared
-// position under the recording lock, never writing to the buffer.
-struct drain_job {
-    adam_voice_stream_t *stream;
-    volatile bool stop;
-    volatile bool running;
-    volatile bool failed;
-    uint32_t sent;
-};
-
-static void drain_task(void *argument) {
-    drain_job_t *job = (drain_job_t *)argument;
-    job->running = true;
-    while (!job->stop) {
-        portENTER_CRITICAL(&recording_lock);
-        uint32_t position = recording_position;
-        uint8_t *buffer = (uint8_t *)recording_buffer;
-        portEXIT_CRITICAL(&recording_lock);
-        if (buffer && position > job->sent) {
-            if (!adam_net_voice_send(job->stream, (const int16_t *)(buffer + job->sent * 2), (position - job->sent) * 2)) {
-                job->failed = true;
-                break;
-            }
-            job->sent = position;
-        }
-        vTaskDelay(pdMS_TO_TICKS(30));
-    }
-    if (!job->failed) {
-        portENTER_CRITICAL(&recording_lock);
-        uint32_t position = recording_position;
-        uint8_t *buffer = (uint8_t *)recording_buffer;
-        portEXIT_CRITICAL(&recording_lock);
-        if (buffer && position > job->sent) {
-            if (!adam_net_voice_send(job->stream, (const int16_t *)(buffer + job->sent * 2), (position - job->sent) * 2)) job->failed = true;
-            job->sent = position;
-        }
-    }
-    job->running = false;
-    vTaskDelete(NULL);
-}
-
 static void network_turn(void) {
     int64_t started = esp_timer_get_time();
     last_capture_ms = last_first_audio_ms = last_turn_ms = 0;
@@ -253,34 +197,13 @@ static void network_turn(void) {
     voice_busy = true; voice_started = xTaskGetTickCount();
     show_reply("");
     status("Listening");
-
-    // Recording starts before the connection is opened, so the first words are never missed,
-    // and the upload runs behind the microphone instead of after it.
-    capture_job_t capture = {.done = xSemaphoreCreateBinary()};
-    if (!capture.done || xTaskCreate(capture_job_task, "capture", 6144, &capture, 5, NULL) != pdPASS) {
-        if (capture.done) vSemaphoreDelete(capture.done);
-        status("Microphone error");
-        voice_busy = false;
-        return;
-    }
-
-    adam_reply_t reply;
-    playback_context_t playback = {.started = started, .reply = &reply};
-    adam_voice_stream_t *live = adam_net_voice_begin(&reply, stream_audio, &playback);
-    drain_job_t drain = {.stream = live};
-    if (live) xTaskCreate(drain_task, "voice_up", 8192, &drain, 4, NULL);
-
-    xSemaphoreTake(capture.done, portMAX_DELAY);
-    vSemaphoreDelete(capture.done);
-
-    size_t bytes = capture.bytes;
-    bool speech = capture.speech;
-    int16_t *pcm = capture.pcm;
+    size_t bytes = 0;
+    bool speech = false;
+    int16_t *pcm = record(RECORD_SECONDS, &bytes, &speech);
     last_capture_bytes = bytes;
     last_capture_ms = (esp_timer_get_time() - started) / 1000;
+    if (!pcm) { status("Microphone error"); voice_busy = false; return; }
     if (!speech) {
-        // Nothing worth sending: close the connection rather than pay for a round trip.
-        if (live) { drain.stop = true; while (drain.running) vTaskDelay(pdMS_TO_TICKS(10)); adam_net_voice_abort(live); }
         free(pcm);
         show_reply("I didn't catch that.");
         last_turn_ms = (esp_timer_get_time() - started) / 1000;
@@ -288,36 +211,9 @@ static void network_turn(void) {
         return;
     }
     status("Thinking");
-    if (!pcm) {
-        if (live) { drain.stop = true; while (drain.running) vTaskDelay(pdMS_TO_TICKS(10)); adam_net_voice_abort(live); }
-        status("Microphone error");
-        voice_busy = false;
-        return;
-    }
-
-    bool answered;
-    if (live) {
-        drain.stop = true;
-        while (drain.running) vTaskDelay(pdMS_TO_TICKS(10));
-        if (drain.failed) {
-            // The upload broke; send the whole recording the ordinary way rather than lose the turn.
-            adam_net_voice_abort(live);
-            answered = adam_net_voice(pcm, bytes, &reply, stream_audio, &playback);
-        } else {
-            answered = adam_net_voice_finish(live, NULL, 0, &reply);
-            // The streamed request was refused outright (not a policy answer, and nothing was
-            // played yet). The recording is still in memory, so send it the ordinary way.
-            bool refused = !answered || reply.http_status == 400 || reply.http_status >= 500;
-            if (refused && reply.audio_bytes == 0) {
-                memset(&reply, 0, sizeof(reply));
-                playback.reply = &reply;
-                answered = adam_net_voice(pcm, bytes, &reply, stream_audio, &playback);
-            }
-        }
-    } else {
-        answered = adam_net_voice(pcm, bytes, &reply, stream_audio, &playback);
-    }
-
+    adam_reply_t reply;
+    playback_context_t playback = {.started = started, .reply = &reply};
+    bool answered = adam_net_voice(pcm, bytes, &reply, stream_audio, &playback);
     post_sensors_async();
     deaf = false;
     last_voice_status = reply.http_status;
