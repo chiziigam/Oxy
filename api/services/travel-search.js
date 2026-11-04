@@ -390,7 +390,12 @@ function formatTravelResults(kind, options = [], { dropped = [], searched = '', 
   // caveat would flatten a distinction the rest of this file exists to preserve.
   const fromInventory = options.filter(o => o.inventory === true);
   const fromWeb = options.length - fromInventory.length;
-  if (fromInventory.length) {
+  const testInventory = fromInventory.some(o => /test mode|sandbox|fictional/i.test(`${o.source || ''} ${o.caveat || ''}`));
+  if (fromInventory.length && testInventory) {
+    // A sandbox token returns fictional fares. Calling those "real, sellable" would be the
+    // exact claim the rest of this file exists to prevent.
+    parts.push(`${fromInventory.length} of these come from test-mode inventory (Duffel's sandbox), so they are example data, not real fares or availability.`);
+  } else if (fromInventory.length) {
     parts.push(`${fromInventory.length} of these ${fromInventory.length === 1 ? 'is a' : 'are'} real, sellable ${fromInventory.length === 1 ? 'price' : 'prices'} from live inventory — held only until the offer expires, not indefinitely, and still requires actually booking.`);
   }
   if (fromWeb > 0) {
