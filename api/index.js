@@ -1154,7 +1154,8 @@ function buildApnsAuthToken() {
   const header = base64UrlJson({ alg: 'ES256', kid: keyId });
   const payload = base64UrlJson({ iss: teamId, iat: Math.floor(Date.now() / 1000) });
   const signingInput = `${header}.${payload}`;
-  const signature = crypto.sign('sha256', Buffer.from(signingInput), privateKey).toString('base64url');
+  // JOSE ES256 needs the raw 64-byte r‖s signature, not Node's default DER encoding.
+  const signature = crypto.sign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
   return `${signingInput}.${signature}`;
 }
 
@@ -10381,6 +10382,7 @@ module.exports.buildBackgroundSystemPrompt = buildBackgroundSystemPrompt;
 module.exports.buildChatContext = buildChatContext;
 module.exports.buildMorningBriefing = buildMorningBriefing;
 module.exports.checkAdamSendCap = checkAdamSendCap;
+module.exports.buildApnsAuthToken = buildApnsAuthToken;
 module.exports.runAgenticLoop = runAgenticLoop;
 module.exports.forgetMemory = forgetMemory;
 module.exports.delegatedRunLifecycle = delegatedRunLifecycle;
