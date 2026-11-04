@@ -675,7 +675,8 @@ async function act(userId, step = {}) {
       }
       // A click point measured with the controls skips the actionability checks Playwright
       // runs, each a round trip; anything not plainly clickable takes the careful path.
-      const point = elements[Number(step.elementId)]?.fastClick;
+      const stale = elements[Number(step.elementId)];
+      const point = stale?.fastClick;
       if (point) {
         await page.mouse.click(point.x, point.y);
       } else {
@@ -683,11 +684,24 @@ async function act(userId, step = {}) {
         try {
           await target.click({ timeout: 10000 });
         } catch (error) {
+          const message = String(error?.message || '');
           // A dialog that appeared between the dismissal above and this click: clear it and retry once.
-          if (!/intercepts pointer events/i.test(String(error?.message || ''))) throw error;
-          await dismissConsentOnce(page);
-          await settle(page, 300);
-          await target.click({ timeout: 10000 });
+          if (/intercepts pointer events/i.test(message)) {
+            await dismissConsentOnce(page);
+            await settle(page, 300);
+            await target.click({ timeout: 10000 });
+          } else if (/is not on the current page/.test(message) && stale?.text) {
+            // The page re-rendered between the read and the click. Re-read it and find the same
+            // control by its label, rather than failing the step and handing the job back.
+            await settle(page, 800);
+            const fresh = await perceive(page);
+            const wanted = String(stale.text).replace(/\s+/g, ' ').trim().toLowerCase();
+            const match = (fresh.elements || []).find(el => String(el.text || '').replace(/\s+/g, ' ').trim().toLowerCase() === wanted);
+            if (!match) throw error;
+            await page.locator(CLICKABLE_SELECTOR).nth(match.locatorIndex).click({ timeout: 10000 });
+          } else {
+            throw error;
+          }
         }
       }
       break;
