@@ -55,6 +55,32 @@ struct BoardChoice: Codable, Identifiable, Equatable, Hashable {
     let id: String
     let label: String
     let detail: String?
+
+    private enum CodingKeys: String, CodingKey { case id, label, detail }
+
+    init(id: String, label: String, detail: String?) {
+        self.id = id
+        self.label = label
+        self.detail = detail
+    }
+
+    init(from decoder: Decoder) throws {
+        // A model-authored option can be a plain string, or an object missing a field.
+        // One bad choice used to make /agent/state undecodable and blank the whole board.
+        if let container = try? decoder.container(keyedBy: CodingKeys.self) {
+            let label = try container.decodeIfPresent(String.self, forKey: .label)
+            let id = try container.decodeIfPresent(String.self, forKey: .id)
+            self.label = label ?? id ?? "Option"
+            self.id = id ?? label ?? "option"
+            self.detail = try container.decodeIfPresent(String.self, forKey: .detail)
+            return
+        }
+        let single = try decoder.singleValueContainer()
+        let text = (try? single.decode(String.self)) ?? "Option"
+        self.id = text
+        self.label = text
+        self.detail = nil
+    }
 }
 
 struct BoardProgress: Codable, Equatable, Hashable {
