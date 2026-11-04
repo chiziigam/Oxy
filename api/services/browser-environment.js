@@ -714,6 +714,7 @@ async function act(userId, step = {}) {
   const before = { url: page.url(), text: String(seen.text || '').slice(0, 2000) };
   const elements = seen.elements;
   const kind = String(step.action || '').toLowerCase();
+  let usedCoordinateClick = false;
 
   switch (kind) {
     case 'click': {
@@ -728,6 +729,7 @@ async function act(userId, step = {}) {
       const stale = elements[Number(step.elementId)];
       const point = stale?.fastClick;
       if (point) {
+        usedCoordinateClick = true;
         await page.mouse.click(point.x, point.y);
       } else {
         const target = resolveElement(session, elements, step.elementId);
@@ -869,6 +871,25 @@ async function act(userId, step = {}) {
       content: before.text.slice(0, 400) !== observation.text.slice(0, 400),
     };
     noChange = !changed.url && !changed.content;
+    // A coordinate click can land on a banner or an invisible overlay instead of the control it
+    // was measured on. Try the element itself, scrolled into view, before telling the model the
+    // step did nothing.
+    if (noChange && usedCoordinateClick) {
+      try {
+        const target = resolveElement(session, elements, step.elementId);
+        await target.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+        await target.click({ timeout: 8000 });
+        await settleAfterAction(page, kind);
+        const retried = await observePage(page);
+        changed = {
+          url: before.url !== retried.url,
+          urlBefore: before.url,
+          content: before.text.slice(0, 400) !== retried.text.slice(0, 400),
+        };
+        observation = retried;
+        noChange = !changed.url && !changed.content;
+      } catch { /* still nothing: report it honestly below */ }
+    }
   }
   return {
     ...observation,
