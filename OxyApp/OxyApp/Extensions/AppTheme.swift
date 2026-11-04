@@ -884,12 +884,22 @@ struct AdamActivityMark: View {
         let p3 = CGPoint(x: 0.5, y: stemEnd)
         let tail = sampleCount - points.count
         for i in 1...tail {
-            let t = Double(i) / Double(tail)
-            let m = 1 - t
-            points.append(CGPoint(
-                x: m * m * m * p0.x + 3 * m * m * t * c1.x + 3 * m * t * t * c2.x + t * t * t * p3.x,
-                y: m * m * m * p0.y + 3 * m * m * t * c1.y + 3 * m * t * t * c2.y + t * t * t * p3.y
-            ))
+            // Cubic Bézier weights, typed as CGFloat and summed in steps so the type checker stays fast.
+            let t: CGFloat = CGFloat(i) / CGFloat(tail)
+            let m: CGFloat = 1 - t
+            let w0: CGFloat = m * m * m
+            let w1: CGFloat = 3 * m * m * t
+            let w2: CGFloat = 3 * m * t * t
+            let w3: CGFloat = t * t * t
+            var x: CGFloat = w0 * p0.x
+            x += w1 * c1.x
+            x += w2 * c2.x
+            x += w3 * p3.x
+            var y: CGFloat = w0 * p0.y
+            y += w1 * c1.y
+            y += w2 * c2.y
+            y += w3 * p3.y
+            points.append(CGPoint(x: x, y: y))
         }
         return points
     }()
