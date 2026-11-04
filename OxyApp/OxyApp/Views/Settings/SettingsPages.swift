@@ -66,7 +66,7 @@ struct YouPage: View {
             }
 
             SettingsList {
-                SettingsNavRow(title: "Memory", subtitle: "Saved notes and photo context") { destination = .saved }
+                SettingsNavRow(title: "Memory", subtitle: "Notes, and what Adam learned from your photos") { destination = .saved }
             }
 
             if model.isLoading {
@@ -80,7 +80,7 @@ struct YouPage: View {
                 let known = areas.filter { !$0.lines.isEmpty && $0.id != "places" }
                 if !identity.isEmpty || !known.isEmpty {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text("Saved context")
+                        Text("What Adam knows")
                             .font(.appRounded(22, weight: .semibold, relativeTo: .title2))
                             .foregroundStyle(Color.appInk)
                             .accessibilityAddTraits(.isHeader)
@@ -193,12 +193,13 @@ struct HomeAddressPage: View {
 
     private func buttonLabel(_ title: String, busy: Bool, filled: Bool) -> some View {
         ZStack {
-            if busy { ProgressView().scaleEffect(0.7) } else { Text(title).font(.appBody(14, weight: .semibold)) }
+            if busy { ProgressView().scaleEffect(0.7).tint(filled ? Color.appOnAccent : Color.appInk) } else { Text(title) }
         }
+        .font(.role(.callout, weight: .semibold))
         .foregroundStyle(filled ? Color.appOnAction : Color.appInk)
-        .frame(minWidth: 64, minHeight: 38)
-        .background(Capsule().fill(filled ? Color.appAction : Color.appAdaptive(dark: .white.opacity(0.1), light: Color.appSurface2)))
-        .frame(minHeight: 44)
+        .padding(.horizontal, AppSpacing.lg)
+        .frame(minWidth: 64, minHeight: 44)
+        .background(filled ? Color.appAction : Color.appSurface2, in: RoundedRectangle(cornerRadius: AppRadius.button, style: .continuous))
         .contentShape(Rectangle())
     }
 

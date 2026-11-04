@@ -1,5 +1,19 @@
 # Adam interface — local rebuild candidate
 
+## Design system (implemented November 2026)
+
+One system, defined in `OxyApp/OxyApp/Extensions/AppTheme.swift`. Legacy `oxy*` colours in `Color+Oxy.swift` forward to it; new code uses the `app*` roles only.
+
+- **Colour roles.** `appBackground` warm off-white (#F9F7F2) / green-black (#0D1210). `appSurface` white / #161D1A for cards and grouped rows; `appSurface2` warm inset for secondary buttons, icon wells and the wheel hub. `appInk` and `appMuted` for text. `appAccent` is the action colour: forest green #12382A with white ink in light, pale muted green #A9CDB4 with deep-green ink in dark (`appOnAccent`). `appAccentSoft` is its faint wash (user bubbles, "on" tiles). Amber `appNeedsYou` means needs attention; `appSuccess` confirmed/running; `appDanger` failure or removal. The automatic appearance follows the phone; Warm, Sea and Night remain choices.
+- **Type.** System sans only, every role on Dynamic Type: `Font.role(.display/.title/.body/.callout/.footnote/.caption)`. Shared roles: `screenTitle` (every header), `sectionLabel` (muted semibold footnote, sentence case, no uppercase eyebrows), `rowTitle`, `rowSecondary`, `control`. `Font.reading` gives tabular figures in the same face; there is no monospaced status text.
+- **Shape and spacing.** Radii 12 (controls, icon wells), 14 (buttons), 16 (cards). Spacing 4/8/12/16/24/32 (`AppSpacing`), 24pt page margins. All targets at least 44pt.
+- **Buttons.** One family, `AppButtonStyle`: `.appPrimary` (filled green, one per screen or decision), `.appSecondary` (inset fill, for a real alternative), `.app(.quiet)` (text only: Decline, Cancel, Not now), `.appDestructive` (red text on a faint red fill). Decline is never as loud as the action it declines.
+- **Surfaces.** One card, `.appCard()` (= `settingsSurface()`, `TodayCard`): surface fill, one hairline, 16pt corners, no shadow. Lists are flat rows separated by hairlines under a section label; only the thing that needs a decision is raised.
+- **Headers.** `ScreenHeaderView` everywhere a page opens: 44pt circular back control, title in `screenTitle`. The conversation uses the same back control with its request as the title, cut at a word boundary.
+- **Navigation.** The rotary wheel is the only navigation control (no "Menu" text beside it); its accessible list remains the fallback at large text and for VoiceOver.
+- **Now.** Greeting and one-line status in the header; then the most important decision as the one raised card (question, amount, facts, one primary action, quiet Decline); compact "Working on" rows with Stop; a "Your home" row with a factual summary ("3 rooms · 2 devices on"); compact "Earlier" rows. No room map on Now. Home cards never appear inside the conversation.
+- **Your home.** Rooms as sections, each device a tile: icon, name, state in words, and one-tap controls where the device reports the capability (toggle, brightness slider, temperature − / +). Covers are read-only and go through Adam. Unknown, Unavailable and Not configured are always stated. The room map is a quiet disclosure. Controls call `POST /agent/home/controls/:id`, which runs `control_smart_home` through the action-execution boundary and reads the device back; guard mode still parks it for review.
+
 26 October 2026. Chizi chose option A from the colour studies, particularly its decision-heading typography and cohesive brand feel. The generated study is a reference, not evidence of an approved implementation. Operate mode: a native iPhone control surface for a general-purpose personal worker. This replaces the September composition rules. The whole-app rebuild remains local, uncommitted, unaccepted and unfinished. Product truth remains in PRODUCT.md; scope and acceptance remain in docs/ui-loop/EXHAUSTIVE_UI_AUDIT.md.
 
 ## Structure

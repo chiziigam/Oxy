@@ -7,115 +7,102 @@ private func appDynamicColor(dark: Color, light: Color) -> Color {
     Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light) })
 }
 
+// One palette for the whole app (chosen 26 October 2026): a warm off-white canvas with dark ink,
+// deep forest-green actions, amber for anything that needs the user. Dark appearance keeps the
+// same roles on a green-black canvas, with a pale muted green action carrying dark ink.
+// Every other colour in the app is a role defined here; legacy `oxy*` names forward to these.
+private enum Palette {
+    // Light appearance
+    static let canvasLight = Color(red: 0.976, green: 0.969, blue: 0.949)     // #F9F7F2
+    static let surfaceLight = Color.white
+    static let insetLight = Color(red: 0.937, green: 0.929, blue: 0.906)      // #EFEDE7
+    static let inkLight = Color(red: 0.086, green: 0.086, blue: 0.075)        // #161613
+    static let mutedLight = Color(red: 0.420, green: 0.404, blue: 0.373)      // #6B675F
+    static let forest = Color(red: 0.071, green: 0.220, blue: 0.161)          // #12382A
+    // Dark appearance
+    static let canvasDark = Color(red: 0.051, green: 0.071, blue: 0.063)      // #0D1210
+    static let surfaceDark = Color(red: 0.086, green: 0.114, blue: 0.102)     // #161D1A
+    static let insetDark = Color(red: 0.125, green: 0.157, blue: 0.145)       // #202825
+    static let inkDark = Color(red: 0.937, green: 0.929, blue: 0.898)         // #EFEDE5
+    static let mutedDark = Color(red: 0.616, green: 0.635, blue: 0.608)       // #9DA29B
+    static let paleGreen = Color(red: 0.663, green: 0.804, blue: 0.706)       // #A9CDB4
+    static let deepInk = Color(red: 0.059, green: 0.102, blue: 0.078)         // #0F1A14
+}
+
 extension Color {
     static let appBackground = Color(UIColor { trait in
         if let chosen = ThreadBackground.current.uiColor { return chosen }
-        return trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.043, green: 0.047, blue: 0.047, alpha: 1)
-            : UIColor(red: 0.98, green: 0.976, blue: 0.961, alpha: 1)
+        return trait.userInterfaceStyle == .dark ? UIColor(Palette.canvasDark) : UIColor(Palette.canvasLight)
     })
 
-    static let appSurface = appDynamicColor(
-        dark: Color(red: 0.082, green: 0.086, blue: 0.09),
-        light: Color.white
-    )
+    /// Raised surfaces: cards, grouped rows, sheets.
+    static let appSurface = appDynamicColor(dark: Palette.surfaceDark, light: Palette.surfaceLight)
 
-    static let appSurface2 = appDynamicColor(
-        dark: Color(red: 0.114, green: 0.122, blue: 0.125),
-        light: Color(red: 0.93, green: 0.93, blue: 0.91)
-    )
+    /// Inset controls and quiet fills: secondary buttons, icon wells, the wheel hub.
+    static let appSurface2 = appDynamicColor(dark: Palette.insetDark, light: Palette.insetLight)
 
     static let appHairline = appDynamicColor(
-        dark: Color(red: 0.165, green: 0.173, blue: 0.18),
-        light: Color.black.opacity(0.07)
+        dark: Color.white.opacity(0.09),
+        light: Color.black.opacity(0.08)
     )
 
-    /// Warm near-black ink (17:1 on the canvas) and a warm grey for secondary text (5.3:1).
-    static let appInk = appDynamicColor(
-        dark: Color(red: 0.949, green: 0.929, blue: 0.894),   // #F2EDE4, the ivory of Adam's site
-        light: Color(red: 0.086, green: 0.086, blue: 0.075)   // #161613
-    )
+    /// Warm near-black ink and a warm grey for secondary text.
+    static let appInk = appDynamicColor(dark: Palette.inkDark, light: Palette.inkLight)
 
-    static let appMuted = appDynamicColor(
-        dark: Color(red: 0.604, green: 0.584, blue: 0.565),   // #9A9590
-        light: Color(red: 0.420, green: 0.404, blue: 0.373)   // #6B675F
-    )
+    static let appMuted = appDynamicColor(dark: Palette.mutedDark, light: Palette.mutedLight)
 
-    static let appAccent = appDynamicColor(
-        dark: Color(red: 0.949, green: 0.929, blue: 0.894),
-        light: Color(red: 0.07, green: 0.22, blue: 0.16)
-    )
+    /// The action colour: deep forest green in light, pale muted green in dark.
+    static let appAccent = appDynamicColor(dark: Palette.paleGreen, light: Palette.forest)
 
-    /// Each appearance pairs the action colour with contrasting ink.
-    static let appOnAccent = appDynamicColor(
-        dark: Color(red: 0.043, green: 0.047, blue: 0.047),
-        light: Color.white
-    )
+    /// Ink on `appAccent`: white on forest green, deep green-black on pale green.
+    static let appOnAccent = appDynamicColor(dark: Palette.deepInk, light: Color.white)
+
+    /// A faint wash of the action colour, for selected states and icon wells.
+    static let appAccentSoft = appDynamicColor(dark: Palette.paleGreen.opacity(0.14), light: Palette.forest.opacity(0.08))
 
     /// A decision keeps its own visible place until its answer is confirmed.
-    static let appDecisionSurface = appDynamicColor(
-        dark: Color(red: 0.20, green: 0.21, blue: 0.18),
-        light: Color(red: 0.94, green: 0.93, blue: 0.89)
-    )
-    static let appMemorySurface = appDynamicColor(
-        dark: Color(red: 0.18, green: 0.20, blue: 0.18),
-        light: Color(red: 0.93, green: 0.93, blue: 0.91)
-    )
-    static let appHomeSurface = appDynamicColor(
-        dark: Color(red: 0.20, green: 0.21, blue: 0.19),
-        light: Color(red: 0.91, green: 0.92, blue: 0.89)
-    )
+    static let appDecisionSurface = appSurface
+    static let appMemorySurface = appSurface
+    static let appHomeSurface = appAccentSoft
 
     // MARK: - Semantic (for trust and safety)
     static let appSuccess = appDynamicColor(
-        dark: Color(red: 0.435, green: 0.827, blue: 0.604),
-        light: Color(red: 0.08, green: 0.44, blue: 0.27)
+        dark: Color(red: 0.494, green: 0.800, blue: 0.592),
+        light: Color(red: 0.086, green: 0.420, blue: 0.267)
     )
+    /// Amber: something needs the user.
     static let appWarning = appDynamicColor(
         dark: Color(red: 0.941, green: 0.714, blue: 0.353),
-        light: Color(red: 0.55, green: 0.34, blue: 0.035)
+        light: Color(red: 0.600, green: 0.369, blue: 0.035)
     )
     static let appAttention = appWarning
-    static let appLive = appDynamicColor(
-        dark: Color(red: 0.20, green: 0.85, blue: 0.55),
-        light: Color(red: 0.08, green: 0.44, blue: 0.27)
-    )
+    static let appLive = appSuccess
 
     static let appScrim = Color.black.opacity(0.5)
-    static let appFillSubtle = appDynamicColor(dark: Color.white.opacity(0.08), light: Color.black.opacity(0.06))
+    static let appFillSubtle = appDynamicColor(dark: Color.white.opacity(0.08), light: Color.black.opacity(0.05))
     static let appFillScrim = appScrim
     static let appObsidian = appBackground
     static let appTitanium = appMuted
 
-    /// The user's own messages use a quiet neutral wash.
-    static let appUserBubble = appDynamicColor(
-        dark: Color.white.opacity(0.13),
-        light: Color(red: 0.07, green: 0.22, blue: 0.16).opacity(0.08)
-    )
+    /// The user's own messages use a quiet wash of the action colour.
+    static let appUserBubble = appAccentSoft
 
-    /// Adam's side of the conversation: message bubbles and cards.
-    /// The same raised surface as every card (Settings, board, Activity), so a thread has one grey, not two.
-    static let appReceivedBubble = appDynamicColor(
-        dark: Color(red: 0.082, green: 0.086, blue: 0.09),
-        light: Color.white
-    )
+    /// Adam's side of the conversation sits on the canvas; its cards use the shared surface.
+    static let appReceivedBubble = appSurface
 
     // MARK: - Roles (thread and cards)
-    /// The strongest surface against the current background: the button to press.
+    /// The button to press.
     static let appAction = appAccent
     /// Text on `appAction`.
     static let appOnAction = appOnAccent
     /// Adam is doing something (progress, live watches).
-    static let appWorking = appAccent
+    static let appWorking = appSuccess
     /// Something is waiting on the user.
     static let appNeedsYou = appWarning
     /// Finished.
     static let appDone = appSuccess
-    /// Thin outline for thread cards.
-    static let appCardOutline = appDynamicColor(
-        dark: Color(red: 0.2, green: 0.21, blue: 0.22),
-        light: Color(red: 0.063, green: 0.090, blue: 0.129).opacity(0.13)
-    )
+    /// Thin outline for cards: the same hairline everywhere.
+    static let appCardOutline = appHairline
 }
 
 // MARK: - Object tiles
@@ -188,24 +175,27 @@ extension Font {
         return .system(role.style, design: .default).weight(weight ?? fallback)
     }
 
-    /// Times, readings and counts: monospaced like an instrument, so they line up and read as measured.
+    /// Times, readings and counts: the system sans with tabular figures, so numbers line up
+    /// without switching to a monospaced face.
     static func reading(_ role: TypeRole, weight: Font.Weight = .regular) -> Font {
-        .system(role.style, design: .monospaced).weight(weight)
+        .system(role.style, design: .default).weight(weight).monospacedDigit()
     }
 
-    static var screenTitle: Font { .appBody(20, weight: .semibold) }
-    /// The Preferences type scale, used by every screen: group label, row title, secondary line, body, control, fine print.
-    static var sectionLabel: Font { .appBody(13, weight: .medium) }
-    static var rowTitle: Font    { .appBody(15, weight: .medium) }
-    static var rowSecondary: Font { .appBody(13, weight: .regular) }
-    static var bodyText: Font { .appBody(15) }
-    static var control: Font { .appBody(15, weight: .medium) }
-    static var fineprint: Font { .appBody(12, weight: .medium) }
+    /// Page and screen headings: one weight and size for every header with a back control.
+    static var screenTitle: Font { .role(.title, weight: .bold) }
+    /// The shared type scale, used by every screen: group label, row title, secondary line, body, control, fine print.
+    static var sectionLabel: Font { .role(.footnote, weight: .semibold) }
+    static var rowTitle: Font    { .role(.body, weight: .medium) }
+    static var rowSecondary: Font { .role(.footnote) }
+    static var bodyText: Font { .role(.body) }
+    static var control: Font { .role(.callout, weight: .semibold) }
+    static var fineprint: Font { .role(.caption, weight: .medium) }
     static func heroDisplay(_ size: CGFloat = 30) -> Font { .appEditorial(size) }
-    /// The serif headline scale: first screens, page headers, and the title of a card or sheet.
-    static var heroTitle: Font { .appRounded(30, weight: .semibold, relativeTo: .title1) }
-    static var pageTitle: Font { .appRounded(34, weight: .bold, relativeTo: .largeTitle) }
-    static var sectionTitle: Font { .appRounded(20, weight: .semibold, relativeTo: .title3) }
+    /// Headline roles, all system sans with Dynamic Type: a first-screen hero, a sheet or page
+    /// title (the same as `screenTitle`), and a heading inside content.
+    static var heroTitle: Font { .role(.display, weight: .bold) }
+    static var pageTitle: Font { .screenTitle }
+    static var sectionTitle: Font { .system(.title3).weight(.semibold) }
     /// Big friendly figures and focal lines.
     static func appRounded(_ size: CGFloat, weight: Font.Weight = .bold, relativeTo style: UIFont.TextStyle = .title1) -> Font {
         let relativeStyle: Font.TextStyle
@@ -226,16 +216,17 @@ extension Font {
 }
 
 // MARK: - Radius
+/// Three radii: 12 for small controls and icon wells, 14 for buttons and fields, 16 for cards.
 enum AppRadius {
-    static let sm: CGFloat = 10
-    static let md: CGFloat = 10
-    static let lg: CGFloat = 18
+    static let sm: CGFloat = 12
+    static let md: CGFloat = 14
+    static let lg: CGFloat = 16
     static let xl: CGFloat = 24
     static let bubble: CGFloat = 18
-    static let card: CGFloat = 18
-    /// The small scale new work uses: controls 12, surfaces 20, and the capsule for pills.
+    static let card: CGFloat = 16
     static let control: CGFloat = 12
-    static let surface: CGFloat = 20
+    static let button: CGFloat = 14
+    static let surface: CGFloat = 16
 }
 
 // MARK: - Motion
@@ -426,13 +417,15 @@ struct AppDivider: View {
     }
 }
 
+/// The one section label: a short sentence-case word in muted semibold footnote, above a group.
 struct AppSectionHeader: View {
     let title: String
     var body: some View {
         Text(title)
-            .font(.appBody(15, weight: .semibold))
-            .foregroundStyle(Color.appInk)
+            .font(.sectionLabel)
+            .foregroundStyle(Color.appMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -481,19 +474,92 @@ extension Color {
     static let appGlow = appAccent.opacity(0.3)
 }
 
+// MARK: - Buttons
+//
+// One button family for the whole app. Primary is the forest-green filled action (one per
+// screen or decision). Secondary is a quiet inset fill for a real alternative. Quiet is text only:
+// Decline, Cancel, Not now. Destructive is red text on a faint red fill, for removal.
+
+enum AppButtonKind {
+    case primary, secondary, quiet, destructive
+}
+
+struct AppButtonStyle: ButtonStyle {
+    var kind: AppButtonKind = .primary
+    var fullWidth = true
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: AppRadius.button, style: .continuous)
+        return configuration.label
+            .font(.role(.callout, weight: .semibold))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, kind == .quiet ? AppSpacing.md : AppSpacing.lg)
+            .padding(.vertical, AppSpacing.sm)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: kind == .quiet ? 44 : 50)
+            .background(fill, in: shape)
+            .contentShape(shape)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.82 : 1) : 0.45)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .appFast, value: configuration.isPressed)
+    }
+
+    private var foreground: Color {
+        switch kind {
+        case .primary: return .appOnAccent
+        case .secondary: return .appInk
+        case .quiet: return .appInk
+        case .destructive: return .appDanger
+        }
+    }
+
+    private var fill: Color {
+        switch kind {
+        case .primary: return .appAccent
+        case .secondary: return .appSurface2
+        case .quiet: return .clear
+        case .destructive: return Color.appDanger.opacity(0.1)
+        }
+    }
+}
+
+extension ButtonStyle where Self == AppButtonStyle {
+    static var appPrimary: AppButtonStyle { AppButtonStyle(kind: .primary) }
+    static var appSecondary: AppButtonStyle { AppButtonStyle(kind: .secondary) }
+    static var appQuiet: AppButtonStyle { AppButtonStyle(kind: .quiet, fullWidth: false) }
+    static var appDestructive: AppButtonStyle { AppButtonStyle(kind: .destructive) }
+    static func app(_ kind: AppButtonKind, fullWidth: Bool = true) -> AppButtonStyle {
+        AppButtonStyle(kind: kind, fullWidth: fullWidth)
+    }
+}
+
+/// A full-width primary button with a light haptic.
 struct AppPrimaryButton: View {
     let title: String
     let action: () -> Void
     var body: some View {
-        Button(action: action) {
+        Button {
+            HapticManager.shared.impact(.light)
+            action()
+        } label: {
             Text(title)
-                .font(.appBody(15, weight: .semibold))
-                .foregroundStyle(Color.appBackground)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Color.appInk, in: RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
         }
-        .buttonStyle(.appScale(0.97))
+        .buttonStyle(.appPrimary)
+    }
+}
+
+// MARK: - Card
+
+extension View {
+    /// The one raised surface: white (or deep green-grey) fill, one hairline, 16pt corners, no shadow.
+    func appCard(padding: CGFloat = AppSpacing.lg) -> some View {
+        self
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.appSurface, in: RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.7))
     }
 }
 
@@ -1025,16 +1091,10 @@ struct SettingsDivider: View {
     }
 }
 
-/// Editorial section header — a Didot title in editorial ink, Title-case, left-aligned,
-/// no background. The settings-family counterpart to `AppSectionTitle`.
+/// The settings-family name for the shared section label.
 struct SettingsSectionHeader: View {
     let title: String
-    var body: some View {
-        Text(title)
-            .font(.appBody(15, weight: .semibold))
-            .foregroundStyle(Color.appInk)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    var body: some View { AppSectionHeader(title: title) }
 }
 
 /// Capsule toggle at the system switch size: blue when on, quiet grey when off.
@@ -1102,13 +1162,8 @@ struct TodayCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
         VStack(alignment: .leading, spacing: 0) { content }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(padding)
-            .background(shape.fill(Color.appAdaptive(dark: Color.appSurface2, light: .white.opacity(0.88))))
-            .overlay(shape.strokeBorder(Color.appHairline, lineWidth: 0.6))
-            .shadow(color: .black.opacity(0.035), radius: 6, y: 2)
+            .appCard(padding: padding)
     }
 }
 
@@ -1128,7 +1183,7 @@ extension View {
     func hidesTabBarOnScroll() -> some View { modifier(HidesTabBarOnScroll()) }
 }
 
-/// The quiet counterpart: border-only, muted titanium text, no fill.
+/// The quiet counterpart to `AppPrimaryButton`: text only, full width.
 struct AppOutlineButton: View {
     let title: String
     var action: () -> Void
@@ -1136,12 +1191,8 @@ struct AppOutlineButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.appBody(15, weight: .medium))
-                .foregroundStyle(Color.appMuted)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
         }
-        .buttonStyle(.appScale)
+        .buttonStyle(.app(.quiet))
     }
 }
 
@@ -1153,12 +1204,7 @@ struct AppSectionTitle: View {
     // size retained for source compat; all section headers now share one canonical scale.
     var size: CGFloat = 22
     init(_ text: String, size: CGFloat = 22) { self.text = text; self.size = size }
-    var body: some View {
-        Text(text)
-            .font(.appBody(15, weight: .semibold))
-            .foregroundStyle(Color.appInk)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    var body: some View { AppSectionHeader(title: text) }
 }
 
 /// The one row primitive for list-style screens (Memory/Settings/Connections/Pendant/Account/More).
@@ -1221,10 +1267,10 @@ enum ThreadBackground: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Adam's own look is dark, like the device and its site; Warm and Sea are the light choices.
+    /// Adam's own look follows the phone: the warm canvas in light, green-black in dark.
     var scheme: ColorScheme? {
         switch self {
-        case .automatic: return .dark
+        case .automatic: return nil
         case .warm, .sea: return .light
         case .night: return .dark
         }

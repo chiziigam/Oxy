@@ -153,60 +153,66 @@ struct MessageBubble: View {
                     .frame(width: 220, height: 220 * min(max(uiImage.size.height / max(uiImage.size.width, 1), 0.6), 1.4))
                     .clipShape(bubbleShape)
                     .accessibilityLabel("Photo you sent")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             // Message content
             if !message.content.isEmpty && uberAction == nil {
                 if isUser {
-                    VStack(alignment: .leading, spacing: 9) {
+                    // The user's turn: a quiet right-aligned bubble in the action colour's wash,
+                    // body text at reading size, with the time and any queue state above it.
+                    VStack(alignment: .trailing, spacing: 6) {
                         HStack(spacing: 6) {
-                            Text("You")
-                                .font(.appBody(12, weight: .semibold))
+                            if message.queuedForActiveTask {
+                                Text("Queued")
+                                    .font(.role(.caption, weight: .medium))
+                            }
                             Text(message.timestamp.formatted(
                                 date: Calendar.current.isDateInToday(message.timestamp) ? .omitted : .abbreviated,
                                 time: .shortened))
-                                .font(.appBody(12))
-                                .monospacedDigit()
-                            if message.queuedForActiveTask {
-                                Text("Queued")
-                                    .font(.appBody(12, weight: .medium))
-                            }
+                                .font(.reading(.caption))
                         }
                         .foregroundStyle(Color.appMuted)
-                        if let quote = ReplyQuote.split(userContent.text) {
-                            Text("Replying to \(quote.who) · \(quote.snippet)")
-                                .font(.appBody(13))
-                                .foregroundStyle(Color.appMuted)
-                                .lineLimit(2)
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let quote = ReplyQuote.split(userContent.text) {
+                                Text("Replying to \(quote.who) · \(quote.snippet)")
+                                    .font(.role(.footnote))
+                                    .foregroundStyle(Color.appMuted)
+                                    .lineLimit(2)
+                            }
+                            Text(AttributedString(ReplyQuote.split(userContent.text)?.body ?? userContent.text))
+                                .font(.role(.body))
+                                .foregroundStyle(Color.appInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let name = userContent.name {
+                                HStack(spacing: 12) {
+                                    AppIcon("doc", size: 20)
+                                        .foregroundStyle(Color.appAccent)
+                                        .frame(width: 28, height: 36)
+                                    Text(name)
+                                        .font(.role(.callout, weight: .medium))
+                                        .foregroundStyle(Color.appInk)
+                                        .lineLimit(3)
+                                        .truncationMode(.middle)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(10)
+                                .background(Color.appSurface, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Attachment, \(name)")
+                            }
                         }
-                        Text(AttributedString(ReplyQuote.split(userContent.text)?.body ?? userContent.text))
-                            .font(.appBody(isCompact || message.content.count < 48 ? 18 : 22, weight: .semibold))
-                            .foregroundStyle(Color.appInk)
-                            .lineSpacing(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .overlay(alignment: .topTrailing) {
-                                if let reaction { ReactionBadge(emoji: reaction).offset(x: 10, y: -14) }
-                            }
-                        if let name = userContent.name {
-                            HStack(spacing: 12) {
-                                AppIcon("doc", size: 22)
-                                    .foregroundStyle(Color.appAccent)
-                                    .frame(width: 32, height: 40)
-                                Text(name)
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.appInk)
-                                    .lineLimit(3)
-                                    .truncationMode(.middle)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .padding(12)
-                            .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: 12))
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Attachment, \(name)")
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.appUserBubble, in: bubbleShape)
+                        .overlay(alignment: .topLeading) {
+                            if let reaction { ReactionBadge(emoji: reaction).offset(x: -10, y: -14) }
                         }
                     }
-                    .padding(.top, 18)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.leading, 48)
+                    .padding(.top, 14)
                     .padding(.bottom, 4)
+                    .accessibilityElement(children: .combine)
                 } else {
                     HStack(spacing: 0) {
                         VStack(alignment: .leading, spacing: 0) {
@@ -402,12 +408,7 @@ struct MessageBubble: View {
                         resolveOffer(offer)
                         onActionCommand?(offer.prompt)
                     }
-                    .font(.appBody(14, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(Color.appAction))
-                    .buttonStyle(.appScale)
+                    .buttonStyle(.app(.primary, fullWidth: false))
 
                     Button("Not now") { resolveOffer(offer) }
                         .font(.appBody(14, weight: .medium))
@@ -474,7 +475,7 @@ struct DisplayRenderSheet: View {
                     .font(.appBody(21, weight: .semibold))
                     .foregroundStyle(Color.appInk)
 
-                Text("This sends the reply as a short readable update.")
+                Text("Shows a short version of the reply on the display.")
                     .font(.appBody(13))
                     .foregroundStyle(Color.appMuted)
 
@@ -493,7 +494,7 @@ struct DisplayRenderSheet: View {
                         .foregroundStyle(Color.appAccent)
                     }
                 } else if displays.isEmpty {
-                    Text("No displays paired. Pair one in Settings.")
+                    Text("No displays yet. Add one in Your home.")
                         .font(.appBody(14))
                         .foregroundStyle(Color.appMuted)
                 } else {
@@ -912,16 +913,9 @@ private struct FailedTurnView: View {
             onRetry?()
         } label: {
             Text("Try again")
-                .font(.appBody(14, weight: .semibold))
-                .foregroundStyle(Color.appOnAction)
                 .fixedSize()
-                .padding(.horizontal, 14)
-                .frame(minHeight: 36)
-                .background(Capsule().fill(Color.appAction))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.appScale(0.95))
+        .buttonStyle(.app(.secondary, fullWidth: false))
     }
 
     var body: some View {

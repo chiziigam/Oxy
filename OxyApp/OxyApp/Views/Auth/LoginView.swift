@@ -69,7 +69,7 @@ struct LoginView: View {
                 } else {
                     await MainActor.run {
                         HapticManager.shared.warning()
-                        withAnimation { errorMessage = response.error ?? "Authentication failed" }
+                        withAnimation { errorMessage = response.error ?? "Couldn't sign you in. Check your details and try again." }
                         isLoading = false
                     }
                 }
@@ -101,7 +101,7 @@ struct LoginView: View {
                     }
                     return
                 }
-                await MainActor.run { failDemoLogin(response.error ?? "Demo login is not available on this backend.") }
+                await MainActor.run { failDemoLogin(response.error ?? "Test sign-in isn't available on this server.") }
             } catch {
                 await MainActor.run { failDemoLogin(error.localizedDescription) }
             }
@@ -172,20 +172,14 @@ private struct LoginFormPage: View {
                     HStack(spacing: 8) {
                         if isLoading {
                             ProgressView()
-                                .tint(Color.appBackground)
+                                .tint(Color.appOnAccent)
                                 .scaleEffect(0.8)
                         }
-                        Text(isRegistering ? "Create Account" : "Sign In")
-                            .font(.appBody(15, weight: .semibold))
+                        Text(isRegistering ? "Create account" : "Sign in")
                     }
-                    .foregroundStyle(Color.appBackground)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.appInk, in: RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.appPrimary)
                 .disabled(isLoading || userId.isEmpty || password.isEmpty)
-                .opacity(userId.isEmpty || password.isEmpty ? 0.4 : 1)
                 .animation(.appFast, value: userId.isEmpty || password.isEmpty)
                 .padding(.top, 36)
 
@@ -193,20 +187,10 @@ private struct LoginFormPage: View {
                     Button(action: onDemoLogin) {
                         HStack(spacing: 8) {
                             AppIcon("person-check", size: 16)
-                            Text("Continue as Test User")
-                                .font(.appBody(14, weight: .semibold))
+                            Text("Continue as test user")
                         }
-                        .foregroundStyle(Color.appInk)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.appFillSubtle)
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                                .stroke(Color.appHairline, lineWidth: 0.5)
-                        )
                     }
-                    .buttonStyle(.appScale)
+                    .buttonStyle(.appSecondary)
                     .disabled(isLoading)
                     .opacity(isLoading ? 0.55 : 1)
                     .padding(.top, 14)

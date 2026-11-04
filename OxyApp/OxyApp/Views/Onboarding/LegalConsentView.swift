@@ -25,7 +25,7 @@ struct LegalConsentView: View {
                     .foregroundStyle(Color.appInk)
                     .padding(.top, 18)
 
-                Text("Review how your data is handled before continuing.")
+                Text("Read how Adam handles your data, then agree to continue.")
                     .font(.appBody(15))
                     .foregroundStyle(Color.appMuted)
                     .lineSpacing(4)
@@ -36,7 +36,7 @@ struct LegalConsentView: View {
                     consentRow(
                         isOn: $agreedTerms,
                         lead: "I agree to the",
-                        emphasis: "Terms of Service"
+                        emphasis: "Terms of Use"
                     )
                     AppDivider()
                     consentRow(

@@ -46,7 +46,7 @@ struct WorkflowTimelineView: View {
                                 OxySkeletonCard(height: 180)
                             }
                             .frame(width: max(0, geometry.size.width - AppSpacing.margin * 2))
-                            .accessibilityLabel("Loading work")
+                            .accessibilityLabel("Loading task")
                         }
                     }
                     .frame(width: max(0, geometry.size.width - AppSpacing.margin * 2), alignment: .leading)
@@ -143,8 +143,11 @@ struct WorkflowTimelineView: View {
 
     private func checkpointSection(_ checkpoint: WorkflowCheckpoint) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Decision").font(.appBody(14, weight: .semibold)).foregroundStyle(Color.appInk)
-                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: AppSpacing.sm) {
+                Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8).accessibilityHidden(true)
+                Text("Needs you").font(.role(.footnote, weight: .semibold)).foregroundStyle(Color.appNeedsYou)
+            }
+            .accessibilityAddTraits(.isHeader)
             Text(checkpoint.prompt)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.appInk)
@@ -154,12 +157,12 @@ struct WorkflowTimelineView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if expired(checkpoint) {
-                Text("This decision has expired.").font(.body).foregroundStyle(Color.appInk)
+                Text("This expired before you answered.").font(.body).foregroundStyle(Color.appInk)
                 Button("Ask Adam to check again") { AskAdam.draft("Check this again: \(checkpoint.prompt)") }
                     .font(.body.weight(.medium)).foregroundStyle(Color.appAccent)
                     .frame(minHeight: 44)
             } else if submittedIDs.contains(checkpoint.id) {
-                Text("Answer sent. Updating status…").font(.body).foregroundStyle(Color.appInk)
+                Text("Answer sent. Checking it went through…").font(.body).foregroundStyle(Color.appInk)
             } else if resolvingCheckpointID == checkpoint.id {
                 ProgressView("Sending answer").font(.body).tint(Color.appAccent)
             } else if detail?.workflow.isFinished != true {
@@ -185,9 +188,7 @@ struct WorkflowTimelineView: View {
                     .disabled(resolvingCheckpointID != nil || errorMessage != nil)
                     .opacity(resolvingCheckpointID != nil || errorMessage != nil ? 0.45 : 1)
                 } else {
-                    let layout = typeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
-                    layout {
+                    VStack(spacing: AppSpacing.xs) {
                         decisionButton("Approve", primary: true) { resolve(checkpoint, approved: true, choice: nil) }
                         decisionButton("Decline", primary: false) { resolve(checkpoint, approved: false, choice: nil) }
                     }
@@ -197,21 +198,18 @@ struct WorkflowTimelineView: View {
             }
             Color.clear.frame(height: 1).id("decision-end-\(checkpoint.id)")
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.appDecisionSurface, in: RoundedRectangle(cornerRadius: 16))
+        .appCard(padding: 20)
+        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
+            .strokeBorder(Color.appNeedsYou.opacity(0.35), lineWidth: 1))
     }
 
     private func decisionButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        // One filled action; Decline is quiet text, never as loud as the action it declines.
         Button(action: action) {
-            Text(title).font(.body.weight(.semibold))
-                .foregroundStyle(primary ? Color.appBackground : Color.appInk)
+            Text(title)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .padding(.vertical, 8)
-                .background(primary ? Color.appInk : Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(.appScale)
+        .buttonStyle(.app(primary ? AppButtonKind.primary : AppButtonKind.quiet))
     }
 
     private func documentsSection(_ documents: [WorkflowDocument]) -> some View {
@@ -284,7 +282,7 @@ struct WorkflowTimelineView: View {
         } catch is CancellationError {
             return
         } catch {
-            errorMessage = detail == nil ? "Couldn't load this work." : "Couldn't update this work. Showing saved details."
+            errorMessage = detail == nil ? "Couldn't load this task." : "Couldn't refresh. Showing what was saved."
         }
     }
 
@@ -299,7 +297,7 @@ struct WorkflowTimelineView: View {
             do {
                 #if DEBUG
                 if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_WORKFLOW"] == "server-expired" {
-                    throw APIError.server(500, "That decision expired — ask me again and I'll re-check.")
+                    throw APIError.server(500, "This expired. Ask Adam to check again.")
                 }
                 #endif
                 try await HomeBoardService.resolveCheckpoint(workflowId: workflowId, checkpointId: checkpoint.id,
@@ -368,7 +366,7 @@ private struct TimelineRow: View {
                 Text(event.summary ?? "Update").font(.body.weight(isFirst ? .medium : .regular))
                     .foregroundStyle(Color.appInk)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(event.date.map { $0.formatted(date: Calendar.current.isDateInToday($0) ? .omitted : .abbreviated, time: .shortened) } ?? "Time unavailable")
+                Text(event.date.map { $0.formatted(date: Calendar.current.isDateInToday($0) ? .omitted : .abbreviated, time: .shortened) } ?? "Time unknown")
                     .font(.caption).foregroundStyle(Color.appMuted)
                 if event.isUser { Text("You").font(.caption).foregroundStyle(Color.appMuted) }
             }

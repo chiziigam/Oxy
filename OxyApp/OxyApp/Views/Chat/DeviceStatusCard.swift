@@ -30,9 +30,8 @@ struct DeviceStatusCard: View {
             Circle()
                 .fill(telemetry.isStreaming ? Color.appLive : Color.appMuted.opacity(0.5))
                 .frame(width: 6, height: 6)
-            Text(telemetry.isStreaming ? "BLE STREAMING" : "BLE IDLE")
-                .font(.appMono(10, weight: .medium))
-                .tracking(0.6)
+            Text(telemetry.isStreaming ? "Connected" : "Idle")
+                .font(.role(.footnote, weight: .medium))
                 .foregroundStyle(telemetry.isStreaming ? Color.appInk : Color.appMuted)
                 .fixedSize()
         }
@@ -40,16 +39,15 @@ struct DeviceStatusCard: View {
 
     private var metrics: some View {
         HStack(spacing: 12) {
-            metric(String(format: "%.1fMS", telemetry.routingLatencyMillis))
-            metric("BATTERY \(telemetry.coreBatteryPercent)%")
+            metric(String(format: "%.0f ms", telemetry.routingLatencyMillis))
+            metric("Battery \(telemetry.coreBatteryPercent)%")
         }
     }
 
     private func metric(_ text: String) -> some View {
         Text(text)
-            .font(.appMono(10, weight: .medium))
-            .tracking(0.4)
-            .foregroundStyle(Color.appTitanium)
+            .font(.reading(.footnote))
+            .foregroundStyle(Color.appMuted)
             .fixedSize()
             // Live telemetry rolls its digits instead of popping.
             .contentTransition(.numericText())

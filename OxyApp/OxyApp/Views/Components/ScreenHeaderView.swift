@@ -25,15 +25,14 @@ struct ScreenHeaderView: View {
             }
         }
         .padding(.horizontal, AppSpacing.margin)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .padding(.vertical, AppSpacing.sm)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .background(Color.appBackground.ignoresSafeArea(edges: .top))
     }
 
     private var heading: some View {
         Text(title)
-            .font(typeSize.isAccessibilitySize ? .title2.bold() : .appRounded(30, weight: .bold, relativeTo: .largeTitle))
-            .tracking(-0.7)
+            .font(.screenTitle)
             .foregroundStyle(Color.appInk)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
@@ -42,9 +41,12 @@ struct ScreenHeaderView: View {
     @ViewBuilder
     private var backButton: some View {
         if let onBack {
-            Button(action: onBack) {
-                AppIcon("chevron-left", size: 19)
-                    .foregroundStyle(Color.appAccent)
+            Button {
+                HapticManager.shared.impact(.light)
+                onBack()
+            } label: {
+                AppIcon("chevron-left", size: 17)
+                    .foregroundStyle(Color.appInk)
                     .frame(width: 44, height: 44)
                     .background(Color.appSurface2, in: Circle())
             }
@@ -57,7 +59,7 @@ struct ScreenHeaderView: View {
     private var sampleLabel: some View {
         if appState.isDemoSession {
             Text("Sample")
-                .font(.caption.weight(.medium))
+                .font(.role(.caption, weight: .medium))
                 .foregroundStyle(Color.appMuted)
         }
     }

@@ -9,7 +9,7 @@ struct SetupPendantView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                Text("Connecting device")
+                Text("Connecting your home device")
                     .font(.appBody(13, weight: .medium))
                     .foregroundStyle(Color.appMuted)
 

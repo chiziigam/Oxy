@@ -62,7 +62,7 @@ struct MemoryView: View {
                             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                             : AnyLayout(HStackLayout())
                         summaryLayout {
-                            Text(isLoading ? "Loading memories" : (errorMessage != nil ? (items.isEmpty ? "Memories unavailable" : "Last loaded memories") : "\(items.count) saved memories"))
+                            Text(isLoading ? "Loading memories" : (errorMessage != nil ? (items.isEmpty ? "Couldn't load memories" : "Showing what was saved") : "\(items.count) saved memories"))
                                 .font(.appBody(14)).foregroundStyle(Color.appMuted)
                             if !typeSize.isAccessibilitySize { Spacer() }
                             Button {
@@ -334,14 +334,14 @@ struct MemoryView: View {
                 path: "/memory/\(appState.userId)/items/\(item.id)", method: "PUT", body: ["content": trimmed]
             )
             let result = try JSONDecoder().decode(MemoryChangeResponse.self, from: data)
-            guard result.success else { return "Couldn't save the change. Try again." }
+            guard result.success else { return "Couldn't save that change. Try again." }
             if let index = items.firstIndex(where: { $0.id == item.id }) {
                 items[index] = MemoryItem(id: item.id, content: trimmed, source: item.source, createdAt: item.createdAt)
             }
             HapticManager.shared.success()
             return nil
         } catch {
-            return "Couldn't save the change. Try again."
+            return "Couldn't save that change. Try again."
         }
     }
 
@@ -433,8 +433,7 @@ private struct MemorySearchField: View {
         .frame(minHeight: 44)
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .background(Color.settingsRaised)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+        .settingsSurface()
     }
 }
 
@@ -555,19 +554,13 @@ private struct MemoryDropBox: View {
                     HStack(spacing: 8) {
                         if isSaving {
                             ProgressView()
-                                .scaleEffect(0.6)
-                                .tint(Color.appMuted)
+                                .scaleEffect(0.7)
+                                .tint(Color.appOnAccent)
                         }
                         Text(isSaving ? "Saving" : "Save")
-                            .font(.appBody(12, weight: .semibold))
                     }
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
-                    .background(Color.appAction, in: Capsule())
-                    .opacity(canSave ? 1 : 0.45)
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.app(.primary, fullWidth: false))
                 .disabled(!canSave)
             }
         }

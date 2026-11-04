@@ -11,7 +11,7 @@ struct BackendURLEditorSheet: View {
             ZStack {
                 GlebChrome.pastelBlob.ignoresSafeArea()
                 VStack(alignment: .leading, spacing: 16) {
-                    SettingsSectionHeader(title: "Custom Backend URL")
+                    SettingsSectionHeader(title: "Server address")
 
                     AppLineField(
                         placeholder: "https://your-backend.run.app",
@@ -21,7 +21,7 @@ struct BackendURLEditorSheet: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
 
-                    Text("Leave blank for the default backend.")
+                    Text("Leave blank to use Adam’s own server.")
                         .font(.appBody(12))
                         .foregroundStyle(Color.appMuted)
 
@@ -40,7 +40,7 @@ struct BackendURLEditorSheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("Backend URL")
+            .navigationTitle("Server address")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -88,7 +88,7 @@ struct PairedDisplaysView: View {
             }
 
             if isLoading || hasLoaded || !displays.isEmpty {
-              SettingsGroup(title: "Paired screens") {
+              SettingsGroup(title: "Paired displays") {
                 if isLoading {
                     OxySkeletonCard(height: 88, cornerRadius: 16)
                 } else if hasLoaded && displays.isEmpty {
@@ -120,10 +120,10 @@ struct PairedDisplaysView: View {
               }
             }
 
-            SettingsGroup(title: "Add a screen") {
+            SettingsGroup(title: "Add a display") {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Open this address on the screen")
+                        Text("Open this address on the display")
                             .font(.appBody(16, weight: .medium))
                             .foregroundStyle(Color.appInk)
                         Text(displayAddress)
@@ -139,24 +139,18 @@ struct PairedDisplaysView: View {
                         AppLineField(placeholder: "4 digits", text: $code)
                             .keyboardType(.numberPad)
                             .accessibilityLabel("Pairing code")
-                        AppLineField(placeholder: "Screen name (optional)", text: $pairingName)
-                            .accessibilityLabel("Screen name, optional")
+                        AppLineField(placeholder: "Display name (optional)", text: $pairingName)
+                            .accessibilityLabel("Display name, optional")
                     }
                     .disabled(isWorking)
                     Button { Task { await addScreen(code) } } label: {
                         HStack(spacing: 8) {
                             if isWorking { ProgressView().tint(Color.appOnAction) }
-                            Text(isWorking ? "Pairing…" : "Pair screen")
-                                .font(.appBody(16, weight: .semibold))
+                            Text(isWorking ? "Pairing…" : "Pair display")
                         }
-                        .foregroundStyle(Color.appOnAction)
-                        .padding(.horizontal, 20)
-                        .frame(minHeight: 48)
-                        .background(Color.appAction, in: Capsule())
                     }
-                    .buttonStyle(.appScale)
+                    .buttonStyle(.appPrimary)
                     .disabled(code.count != 4 || isWorking)
-                    .opacity(code.count != 4 || isWorking ? 0.5 : 1)
                 }
                 .padding(.vertical, 8)
             }
@@ -214,7 +208,7 @@ struct PairedDisplaysView: View {
             code = ""
             HapticManager.shared.success()
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn’t add that screen."
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn’t add that display."
             code = ""
             HapticManager.shared.error()
         }

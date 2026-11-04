@@ -305,7 +305,7 @@ struct ChatView: View {
             if viewModel.isLoadingHistory {
                 ProgressView().tint(Color.appMuted)
             } else if viewModel.networkError == nil {
-                Text("No conversation yet.")
+                Text("No messages yet.")
                     .font(.role(.body)).foregroundStyle(Color.appMuted)
             }
         }
@@ -349,6 +349,27 @@ struct ChatView: View {
         } else {
             onMenuChoice?(choice, hubCenter)
         }
+    }
+
+    /// The conversation's heading: the newest request in the user's own words, cut at a word
+    /// boundary so it never ends mid-word or reads as a fragment of a longer sentence.
+    private var conversationTitle: String {
+        guard let latest = exchanges.last(where: { exchange in exchange.messages.contains { $0.role == .user } }) else {
+            return "Conversation"
+        }
+        return Self.cleanTitle(latest.title)
+    }
+
+    static func cleanTitle(_ raw: String, limit: Int = 42) -> String {
+        let text = raw.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        guard !text.isEmpty else { return "Conversation" }
+        guard text.count > limit else { return text }
+        var cut = String(text.prefix(limit))
+        if let space = cut.lastIndex(of: " "), cut.distance(from: cut.startIndex, to: space) > limit / 2 {
+            cut = String(cut[..<space])
+        }
+        while let last = cut.last, ",;:-–—".contains(last) { cut.removeLast() }
+        return cut + "…"
     }
 
     /// What the user has asked here, so work that already answered in the thread isn't repeated as a card.
@@ -403,6 +424,7 @@ struct ChatView: View {
                                 isComposing: isInputFocused,
                                 showsStatus: !showsOverview,
                                 onHome: showsOverview ? nil : { withAnimation(.appStandard) { overviewSelected = true } },
+                                title: isIncognito ? "Private" : (showsOverview ? HomeNowView.greeting() : conversationTitle),
                                 homeStatus: showsOverview ? HomeNowView.status(boardModel) : nil,
                                 wheelOpen: $wheelOpen,
                                 hubCenter: $hubCenter
@@ -436,7 +458,7 @@ struct ChatView: View {
                                 }
                             }
                             Spacer()
-                            Button("Current Chat") {
+                            Button("Back to latest") {
                                 Task {
                                     await viewModel.returnToCurrentChat(userId: appState.userId)
                                 }
@@ -487,7 +509,7 @@ struct ChatView: View {
                                 if showsOverview {
                                     overview
                                 } else {
-                                if viewModel.messages.isEmpty && boardModel.isEmpty {
+                                if viewModel.messages.isEmpty {
                                     quietConversation
                                 }
                                 if viewModel.hasOlderHistory, !viewModel.messages.isEmpty, didSettleAtBottom {
@@ -498,10 +520,6 @@ struct ChatView: View {
                                 ForEach(exchanges) { exchange in
                                     exchangeSection(exchange)
                                 }
-
-                                HomeMomentCards(model: boardModel)
-                                    .padding(.horizontal, AppSpacing.chatMargin)
-                                    .padding(.top, boardModel.isEmpty ? 0 : 14)
 
                                 }
                                 Color.clear
@@ -729,7 +747,7 @@ struct ChatView: View {
                     voiceInput.isTranscribing = true
                 }
                 if ProcessInfo.processInfo.environment["OXY_DEBUG_VOICE_ERROR"] == "1" {
-                    voiceErrorMessage = "Microphone access is off. Enable it in Settings to use voice."
+                    voiceErrorMessage = "The microphone is off for Adam. Turn it on in Settings to talk."
                 }
             }
             #endif
@@ -766,6 +784,9 @@ struct ChatView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await boardModel.refresh() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: HomeService.changedNotification)) { _ in
+                Task { await boardModel.refresh() }
             }
             .onReceive(NotificationCenter.default.publisher(for: AskAdam.sendNotification)) { note in
                 guard let text = note.object as? String else { return }
@@ -826,7 +847,7 @@ struct ChatView: View {
                     handleMessageComposeResult(result)
                 }
             }
-            .alert("Messages unavailable", isPresented: Binding(
+            .alert("Couldn't load messages", isPresented: Binding(
                 get: { messageComposerAlert != nil },
                 set: { if !$0 { messageComposerAlert = nil } }
             )) {
@@ -1352,7 +1373,7 @@ struct ChatView: View {
 
     private func presentMessageDraft(_ draft: MessageDraft) {
         guard MFMessageComposeViewController.canSendText() else {
-            messageComposerAlert = "This device cannot send text messages from an in-app composer."
+            messageComposerAlert = "This iPhone can't send texts from here."
             return
         }
         messageDraft = draft
@@ -1557,7 +1578,7 @@ private struct ActionReviewSheet: View {
             case "send_message", "send_telegram": return "Message ready to send"
             case "make_call": return "Call ready to make"
             case "create_calendar_event": return "Calendar event ready"
-            default: return "Review action"
+            default: return "Review"
             }
         }()
     }
@@ -1634,20 +1655,12 @@ private struct ActionReviewSheet: View {
             VStack(spacing: 8) {
                 Button(action: onConfirm) {
                     Text(confirmLabel)
-                        .font(.appBody(17, weight: .semibold))
-                        .foregroundStyle(Color.appOnAction)
-                        .frame(maxWidth: .infinity, minHeight: 54)
-                        .padding(.vertical, 4)
-                        .background(Color.appAction, in: RoundedRectangle(cornerRadius: 18))
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.appPrimary)
                 Button(action: onCancel) {
                     Text("Cancel")
-                        .font(.appBody(17, weight: .medium))
-                        .foregroundStyle(Color.appMuted)
-                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(.appScale)
+                .buttonStyle(.app(.quiet))
             }
             .padding(.horizontal, 26)
             .padding(.top, 14)
@@ -1945,7 +1958,7 @@ private struct ChatInputBar: View {
             .padding(.horizontal, 4)
             .padding(.vertical, 12)
             .accessibilityLabel(incognito ? "Private message" : "Ask Adam")
-            .accessibilityHint(incognito ? "Private chat. This turn is not saved." : "")
+            .accessibilityHint(incognito ? "Private. This message isn't saved." : "")
     }
 
     private var voiceField: some View {
@@ -2072,12 +2085,8 @@ private struct PrivateModeSheet: View {
                 dismiss()
             } label: {
                 Text("Got it")
-                    .font(.appBody(16, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.98))
+            .buttonStyle(.appPrimary)
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)

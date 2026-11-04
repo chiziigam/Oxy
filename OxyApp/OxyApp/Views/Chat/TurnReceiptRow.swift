@@ -247,7 +247,7 @@ private struct ReceiptStep: Identifiable {
         let compact = compactText
         guard !compact.isEmpty else { return nil }
         if action.isFailure, action.action == "find_place" {
-            return "Location access is off. Enable location permissions, then retry."
+            return "Location is off for Adam. Turn it on in Settings, then try again."
         }
         if isSoftMiss { return nil }
         // Counted reads are fully described by the fragment; a repeat is noise.

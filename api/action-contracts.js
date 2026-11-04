@@ -1227,7 +1227,11 @@ const ACTION_CONTRACTS = {
     confirmation: 'none'
   },
   log_health: { adapter: { kind: 'inline' },risk: 'low', required: ['metric'], optional: ['value'], inputExample: { metric: 'steps|heart_rate', value: 'number or note' }, paramHints: { metric: 'steps|heart_rate' }, successSummary: 'Health unavailable', failureSummary: 'Health unavailable', confirmation: 'none', modelVisible: false, availability: 'unavailable' },
-  control_smart_home: { adapter: { kind: 'connector', id: 'home_assistant' }, risk: 'medium', required: ['device', 'command'], inputExample: { device: 'light.living_room', command: 'on|off|toggle|set 22' }, paramHints: { device: 'Home Assistant entity id or configured alias', command: 'on|off|toggle|set 22' }, successSummary: 'Smart home updated', failureSummary: 'Smart home update failed', confirmation: 'review_required', executionMode: 'review' },
+  // directControlAuthorizes: a tap on that device's own Home control is the person's explicit,
+  // deterministic request for exactly this command, so it executes without a second review.
+  // Only the /agent/home/controls route sets context.directControl, after checking the command
+  // against the device's reported capabilities; the model can never set it.
+  control_smart_home: { adapter: { kind: 'connector', id: 'home_assistant' }, risk: 'medium', required: ['device', 'command'], inputExample: { device: 'light.living_room', command: 'on|off|toggle|brightness 60|set 22' }, paramHints: { device: 'Home Assistant entity id or configured alias', command: 'on|off|toggle|brightness 60|set 22' }, successSummary: 'Smart home updated', failureSummary: 'Smart home update failed', confirmation: 'review_required', executionMode: 'review', directControlAuthorizes: true },
   save_to_notion: { adapter: { kind: 'connector', id: 'notion' }, risk: 'low', required: ['content'], inputExample: { content: 'note or task' }, successSummary: 'Saved to Notion', failureSummary: 'Save failed', confirmation: 'none' },
   // Google Docs — implemented in connectors/google.js but had no contract at all, so the
   // agent's tool-calling interface could never reach them. Same low-risk/no-confirmation

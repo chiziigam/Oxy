@@ -45,7 +45,7 @@ struct VaultView: View {
                                 }
                                 if hasLoaded {
                                     if errorMessage != nil {
-                                        Text("Last loaded details").font(.appBody(14)).foregroundStyle(Color.appMuted)
+                                        Text("Showing what was saved").font(.appBody(14)).foregroundStyle(Color.appMuted)
                                     }
                                     credentialsSection
                                     grantsSection
@@ -88,7 +88,7 @@ struct VaultView: View {
                 }
                 Button("Cancel", role: .cancel) { pendingRemove = nil }
             } message: {
-                Text("Adam won't be able to use this saved password.")
+                Text("Adam won't be able to use this login.")
             }
             .sheet(isPresented: $showEntrySheet) {
                 VaultCredentialEntrySheet { saved in
@@ -118,13 +118,8 @@ struct VaultView: View {
                 Task { await authenticateAndLoad() }
             } label: {
                 Text("Unlock")
-                    .font(.appBody(15, weight: .medium))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, 22)
-                    .frame(minHeight: 44)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.app(.primary, fullWidth: false))
         }
         .padding(.horizontal, AppSpacing.margin)
         .padding(.top, 96)
@@ -149,9 +144,9 @@ struct VaultView: View {
     }
 
     private var credentialsSection: some View {
-        SettingsGroup(title: "Passwords") {
+        SettingsGroup(title: "Logins") {
             if credentials.isEmpty {
-                emptyLine("No passwords saved")
+                emptyLine("No saved logins")
                     .padding(.horizontal, 4)
             } else {
                 SettingsList {
@@ -169,7 +164,7 @@ struct VaultView: View {
                     }
                 }
             }
-            quietAction("Add a sign-in") { showEntrySheet = true }
+            quietAction("Add a login") { showEntrySheet = true }
                 .padding(.horizontal, 4)
         }
     }
@@ -237,7 +232,7 @@ struct VaultView: View {
         do {
             let success = try await context.evaluatePolicy(
                 .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: "Unlock saved sign-ins"
+                localizedReason: "Unlock saved logins"
             )
             await MainActor.run { isUnlocked = success }
             if success { await loadAll() }
@@ -329,13 +324,13 @@ private struct VaultCredentialEntrySheet: View {
                     SecureField("Password", text: $password, prompt: Text("Password").foregroundStyle(Color.appMuted))
                         .textContentType(.password)
                 } footer: {
-                    Text("Encrypted. Sign-in requires approval or a permission you set.").foregroundStyle(Color.appMuted)
+                    Text("Encrypted. Adam only signs in when you approve it, or with a permission you set.").foregroundStyle(Color.appMuted)
                 }
                 if let errorMessage {
                     Section { Text(errorMessage).foregroundStyle(Color.appDestructive) }
                 }
             }
-            .navigationTitle("Add sign-in")
+            .navigationTitle("Add login")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -378,7 +373,7 @@ private struct VaultCredentialEntrySheet: View {
                 onSaved(saved)
                 dismiss()
             } else {
-                errorMessage = "The credential couldn't be saved."
+                errorMessage = "Couldn't save that login."
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -482,7 +477,7 @@ private struct VaultGrantEntrySheet: View {
                 onGranted(grant)
                 dismiss()
             } else {
-                errorMessage = "The permission couldn't be saved."
+                errorMessage = "Couldn't save that permission."
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -616,7 +611,7 @@ struct VaultCredentialUse: Codable, Equatable, Identifiable {
 
     private static func outcomeText(_ outcome: String, reason: String?) -> String {
         switch outcome {
-        case "used": return reason == "stored_session" ? "Still signed in from before, no password used" : "Signed in with a saved password"
+        case "used": return reason == "stored_session" ? "Still signed in from before, no password used" : "Signed in with a saved login"
         case "failed": return "Sign-in failed"
         case "denied":
             guard let reason, !reason.isEmpty else { return "Refused" }

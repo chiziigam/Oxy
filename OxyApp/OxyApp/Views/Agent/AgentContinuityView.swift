@@ -94,18 +94,9 @@ struct AgentContinuityView: View {
             Button {
                 showingImporter = true
             } label: {
-                HStack {
-                    Text(isWorking ? "Reading…" : "Choose file")
-                    Spacer()
-                    AppIcon("arrow-up-right", size: 13)
-                }
-                .font(.appBody(15, weight: .medium))
-                .foregroundStyle(Color.appOnAction)
-                .padding(.horizontal, 20)
-                .frame(minHeight: 44)
-                .background(Capsule().fill(Color.appAction))
+                Text(isWorking ? "Reading…" : "Choose file")
             }
-            .buttonStyle(.appScale(0.97))
+            .buttonStyle(.appPrimary)
             .disabled(isWorking)
         }
         .padding(.vertical, 8)
@@ -159,7 +150,7 @@ struct AgentContinuityView: View {
                                 Text(workflow.name)
                                     .font(.appBody(13, weight: .medium))
                                     .foregroundStyle(Color.appInk)
-                                Text(workflow.isScheduled ? cadence(workflow.intervalMinutes) : "Event trigger")
+                                Text(workflow.isScheduled ? cadence(workflow.intervalMinutes) : "When something happens")
                                     .font(.appBody(12))
                                     .foregroundStyle(Color.appMuted)
                             }
@@ -188,18 +179,11 @@ struct AgentContinuityView: View {
         return layout {
             Button { Task { await confirmImport() } } label: {
                 Text(isWorking ? "Importing…" : "Import")
-                    .font(.appBody(16, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(Color.appAction, in: Capsule())
             }
-            .buttonStyle(.appScale)
+            .buttonStyle(.appPrimary)
             .disabled(isWorking)
             Button("Cancel") { reset() }
-                .font(.appBody(16, weight: .medium))
-                .foregroundStyle(Color.appAccent)
-                .frame(minWidth: 64, minHeight: 44)
-                .buttonStyle(.appScale)
+                .buttonStyle(.app(.quiet))
                 .disabled(isWorking)
         }
     }
@@ -305,7 +289,7 @@ struct AgentContinuityView: View {
             pendingData = data
             selectedFileName = url.lastPathComponent
         } catch {
-            errorMessage = "Couldn't read that export."
+            errorMessage = "Couldn't read that file. Choose a ChatGPT or Claude export."
         }
         isWorking = false
     }

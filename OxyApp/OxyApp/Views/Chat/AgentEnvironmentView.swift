@@ -40,10 +40,10 @@ final class EnvironmentMonitor {
     var pageTitle: String { snapshot?.title.flatMap { $0.isEmpty ? nil : $0 } ?? "Workspace" }
     var isLive: Bool { snapshot?.state == "live" && image != nil && clock.timeIntervalSince(receivedAt) < 6 }
     var previewStatus: String {
-        if image != nil { return isLive ? "Live" : "Last capture" }
+        if image != nil { return isLive ? "Live" : "Not live" }
         if loading { return "Opening…" }
         if error != nil || snapshot?.state == "unavailable" { return "Unavailable" }
-        return "Activity and outputs"
+        return "Steps and results"
     }
 
     func refreshFrame(taskID: String?) async {
@@ -83,7 +83,7 @@ final class EnvironmentMonitor {
         } catch {
             guard !Task.isCancelled else { return }
             image = nil; snapshot = nil
-            self.error = "Workspace unavailable. Try again."
+            self.error = "Couldn't open Adam's screen. Try again."
         }
     }
 
@@ -100,7 +100,7 @@ final class EnvironmentMonitor {
         } catch {
             guard !Task.isCancelled else { return }
             tasks = []; runtime = nil
-            activityError = "Activity unavailable. Try again."
+            activityError = "Couldn't load the steps. Try again."
         }
     }
 }
@@ -201,7 +201,7 @@ struct AgentEnvironmentView: View {
                     AdamDot(solid: monitor.isLive, size: 8)
                     Text(monitor.image != nil ? monitor.pageTitle : "No live screen")
                         .font(.rowSecondary).foregroundStyle(Color.appInk).lineLimit(1)
-                    if monitor.image != nil, !monitor.isLive { Text("Last capture").font(.fineprint).foregroundStyle(Color.appMuted) }
+                    if monitor.image != nil, !monitor.isLive { Text("Not live").font(.fineprint).foregroundStyle(Color.appMuted) }
                     Spacer(minLength: 8)
                     if let at = monitor.snapshot?.capturedAt, let date = Date.oxyParse(at) {
                         Text(date.formatted(date: .omitted, time: .standard))
@@ -218,7 +218,7 @@ struct AgentEnvironmentView: View {
                     VStack(spacing: 16) {
                         if monitor.loading { ProgressView() }
                         else {
-                            Text(monitor.error ?? "No screen is open.").font(.bodyText).foregroundStyle(Color.appMuted)
+                            Text(monitor.error ?? "Adam isn't using a browser right now.").font(.bodyText).foregroundStyle(Color.appMuted)
                             if monitor.error != nil {
                                 Button("Retry") { Task { await monitor.refreshFrame(taskID: taskID) } }
                                     .font(.control).frame(minWidth: 44, minHeight: 44)
@@ -290,10 +290,10 @@ struct AgentEnvironmentView: View {
                     ForEach(monitor.tasks.filter(\.isActive)) { task in
                         Text(task.displayGoal).font(.rowTitle).foregroundStyle(Color.appInk)
                     }
-                    if monitor.tasks.isEmpty { Text("No activity available.").font(.bodyText).foregroundStyle(Color.appMuted) }
+                    if monitor.tasks.isEmpty { Text("No steps yet.").font(.bodyText).foregroundStyle(Color.appMuted) }
                 }
                 if let runtime = monitor.runtime, !runtime.artifacts.isEmpty {
-                    Text("Outputs").font(.sectionTitle).foregroundStyle(Color.appInk)
+                    Text("Results").font(.sectionTitle).foregroundStyle(Color.appInk)
                     ForEach(runtime.artifacts) { artifact in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(artifact.title).font(.rowTitle).foregroundStyle(Color.appInk)

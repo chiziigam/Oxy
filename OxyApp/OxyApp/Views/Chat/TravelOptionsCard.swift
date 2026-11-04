@@ -100,13 +100,8 @@ struct TravelOptionsCard: View {
                         UIApplication.shared.open(url)
                     } label: {
                         Text("View")
-                            .font(.appBody(14, weight: .medium))
-                            .foregroundStyle(Color.appOnAction)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 44)
-                            .background(Capsule().fill(Color.appAction))
                     }
-                    .buttonStyle(.appScale(0.97))
+                    .buttonStyle(.app(.secondary, fullWidth: false))
                 }
             }
         }

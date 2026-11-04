@@ -152,3 +152,16 @@ test('watches are only scheduled checks with something to look for', () => {
   });
   assert.deepEqual(home.watches.map(w => w.title), ['Front door']);
 });
+
+test('home carries smart-home controls with an explicit source state', () => {
+  const none = buildHomeModel({ now: NOW });
+  assert.deepEqual([none.controls, none.controlSource.status], [[], 'not_configured']);
+  const down = buildHomeModel({ now: NOW, controls: { status: 'unavailable', detail: 'Home Assistant did not answer.', controls: [] } });
+  assert.equal(down.controlSource.status, 'unavailable');
+  const home = buildHomeModel({
+    now: NOW,
+    controls: { status: 'ok', controls: [{ id: 'light.desk', name: 'Desk lamp', room: 'Study', kind: 'light', state: 'on', available: true, isOn: true, brightness: 60, capabilities: ['toggle', 'brightness'] }] }
+  });
+  assert.equal(home.controlSource.status, 'ok');
+  assert.deepEqual([home.controls[0].id, home.controls[0].isOn, home.controls[0].brightness, home.controls[0].temperature], ['light.desk', true, 60, null]);
+});

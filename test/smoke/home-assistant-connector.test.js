@@ -3,7 +3,10 @@ const test = require('node:test');
 
 const {
   commandToService,
+  describeEntity,
+  directCommandAllowed,
   executeConfigured,
+  listControls,
   homeAssistantConfig,
   resolveEntityId
 } = require('../../connectors/home-assistant');
@@ -71,4 +74,65 @@ test('Home Assistant is explicitly unavailable without both server settings', ()
   assert.deepEqual(homeAssistantConfig({ HOME_ASSISTANT_URL: 'http://home.local', HOME_ASSISTANT_TOKEN: 'secret' }), {
     baseUrl: 'http://home.local', token: 'secret'
   });
+});
+
+test('Home Assistant maps a light brightness to a percentage, and 0 to off', () => {
+  assert.deepEqual(commandToService('light.kitchen', 'brightness 40'), {
+    domain: 'light', service: 'turn_on', data: { entity_id: 'light.kitchen', brightness_pct: 40 }
+  });
+  assert.deepEqual(commandToService('light.kitchen', 'brightness 0'), {
+    domain: 'light', service: 'turn_off', data: { entity_id: 'light.kitchen' }
+  });
+  assert.match(commandToService('switch.kettle', 'brightness 40').error, /requires a light/i);
+});
+
+test('Home controls describe state and capabilities without inventing either', () => {
+  const lamp = describeEntity(
+    { entity_id: 'light.lamp', state: 'on', attributes: { brightness: 255, friendly_name: 'Lamp' }, last_updated: '2026-11-04T01:00:00Z' },
+    { room: 'Living room' }
+  );
+  assert.deepEqual(
+    [lamp.name, lamp.room, lamp.isOn, lamp.brightness, lamp.capabilities],
+    ['Lamp', 'Living room', true, 100, ['toggle', 'brightness']]
+  );
+  const gone = describeEntity({ entity_id: 'switch.heater', state: 'unavailable', attributes: {} });
+  assert.deepEqual([gone.available, gone.isOn, gone.state, gone.capabilities], [false, false, 'unavailable', []]);
+  const door = describeEntity({ entity_id: 'cover.garage', state: 'open', attributes: {} });
+  assert.deepEqual(door.capabilities, [], 'covers get no one-tap control');
+  const heat = describeEntity({ entity_id: 'climate.hall', state: 'heat', attributes: { current_temperature: 19.5, temperature: 21 } });
+  assert.deepEqual([heat.temperature, heat.targetTemperature, heat.capabilities], [19.5, 21, ['temperature']]);
+});
+
+test('direct Home commands are limited to what the device reports it can do', () => {
+  const lamp = { available: true, capabilities: ['toggle', 'brightness'] };
+  assert.equal(directCommandAllowed(lamp, 'off'), true);
+  assert.equal(directCommandAllowed(lamp, 'brightness 30'), true);
+  assert.equal(directCommandAllowed(lamp, 'set 21'), false);
+  assert.equal(directCommandAllowed({ available: true, capabilities: [] }, 'on'), false);
+  assert.equal(directCommandAllowed({ available: false, capabilities: ['toggle'] }, 'on'), false);
+});
+
+test('Home controls are not_configured without a server, unavailable when it does not answer', async () => {
+  assert.equal((await listControls({ config: null })).status, 'not_configured');
+  const down = await listControls({
+    config: { baseUrl: 'http://home.local', token: 't' },
+    env: {},
+    request: { get: async () => { throw new Error('ECONNREFUSED'); } }
+  });
+  assert.deepEqual([down.status, down.controls], ['unavailable', []]);
+});
+
+test('Home controls list named entities with their aliases and rooms', async () => {
+  const seen = [];
+  const result = await listControls({
+    config: { baseUrl: 'http://home.local', token: 't' },
+    env: {
+      HOME_ASSISTANT_ENTITY_MAP: JSON.stringify({ 'desk lamp': 'light.desk' }),
+      HOME_ASSISTANT_ROOM_MAP: JSON.stringify({ 'light.desk': 'Study' })
+    },
+    request: { get: async url => { seen.push(url); return { data: { entity_id: 'light.desk', state: 'off', attributes: {} } }; } }
+  });
+  assert.deepEqual(seen, ['http://home.local/api/states/light.desk']);
+  assert.equal(result.status, 'ok');
+  assert.deepEqual([result.controls[0].name, result.controls[0].room, result.controls[0].isOn], ['Desk Lamp', 'Study', false]);
 });

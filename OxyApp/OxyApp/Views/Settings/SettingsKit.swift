@@ -70,14 +70,14 @@ final class SettingsContextModel {
 
 extension Color {
     /// A quiet lift above the page, in light and dark alike.
-    static let settingsRaised = Color.appAdaptive(dark: .white.opacity(0.06), light: Color.appSurface)
+    static let settingsRaised = Color.appSurface
 }
 
 extension View {
-    /// The one grouped surface: compact radius, one hairline, no shadow.
-    func settingsSurface(radius: CGFloat = 16) -> some View {
+    /// The one grouped surface, identical to `appCard` without its padding.
+    func settingsSurface(radius: CGFloat = AppRadius.card) -> some View {
         self
-            .background(Color.settingsRaised, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .background(Color.appSurface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.7))
     }
 }
@@ -116,7 +116,7 @@ struct SettingsPage<Content: View>: View {
             VStack(spacing: 0) {
                 ScreenHeaderView(title: title, onBack: isRoot && revealClose != nil ? nil : { dismiss() })
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) { content }
+                    VStack(alignment: .leading, spacing: AppSpacing.xl) { content }
                         .padding(.horizontal, AppSpacing.margin)
                         .padding(.top, 4)
                         .padding(.bottom, 40)
@@ -134,11 +134,8 @@ struct SettingsGroup<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let title {
-                Text(title)
-                    .font(.appBody(14, weight: .semibold))
-                    .foregroundStyle(Color.appInk.opacity(0.62))
+                AppSectionHeader(title: title)
                     .padding(.horizontal, 4)
-                    .accessibilityAddTraits(.isHeader)
             }
             content
         }
@@ -211,11 +208,11 @@ struct SettingsRow<Trailing: View>: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.appBody(18, weight: .medium))
+                        .font(.rowTitle)
                         .foregroundStyle(Color.appInk)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.appBody(14))
+                            .font(.rowSecondary)
                             .foregroundStyle(Color.appMuted)
                     }
                 }
@@ -224,8 +221,8 @@ struct SettingsRow<Trailing: View>: View {
             }
             trailing
         }
-        .padding(.vertical, 8)
-        .frame(minHeight: 52)
+        .padding(.vertical, 10)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 
@@ -282,7 +279,7 @@ struct SettingsStatement: View {
                     .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 4 }
             }
             Text(text)
-                .font(.appBody(16))
+                .font(.role(.body))
                 .foregroundStyle(Color.appInk)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

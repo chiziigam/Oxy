@@ -570,3 +570,35 @@ test('a logging failure is reported via console.warn, not silently dropped with 
   }
   assert.ok(warnings.some(w => w.includes('log failed') && w.includes('db connection lost')));
 });
+
+test('a direct Home control tap authorizes only contracts that opt in, and never money', () => {
+  const { hasDirectControlAuthorization } = require('../../api/services/action-execution');
+  const { getActionContract } = require('../../api/action-contracts');
+  const smartHome = getActionContract('control_smart_home');
+  assert.equal(smartHome.executionMode, 'review');
+  assert.equal(hasDirectControlAuthorization('control_smart_home', smartHome, { directControl: true }), true);
+  assert.equal(hasDirectControlAuthorization('control_smart_home', smartHome, {}), false);
+  assert.equal(hasDirectControlAuthorization('control_smart_home', smartHome, { directControl: 'yes' }), false);
+  assert.equal(hasDirectControlAuthorization('stripe_charge', { directControlAuthorizes: true }, { directControl: true }), false);
+  assert.equal(hasDirectControlAuthorization('send_email', getActionContract('send_email'), { directControl: true }), false);
+});
+
+test('a direct Home control tap still parks for review in guard mode', async () => {
+  const { createActionExecution } = require('../../api/services/action-execution');
+  const parked = [];
+  const invoked = [];
+  const execute = createActionExecution({
+    invokeAdapter: async ({ type }) => { invoked.push(type); return { success: true, text: 'light.desk is now on.' }; },
+    setPendingAction: async (_userId, action) => { parked.push(action.type); return { approvalId: 'a1' }; },
+    validateAction: () => null
+  });
+  const action = { type: 'control_smart_home', input: { device: 'light.desk', command: 'on' } };
+  const direct = await execute('u', [action], { directControl: true });
+  assert.equal(direct[0].result.success, true);
+  assert.deepEqual(invoked, ['control_smart_home']);
+  const model = await execute('u', [action], { userMessage: 'turn the desk lamp on' });
+  assert.equal(model[0].result.pending, true);
+  const guarded = await execute('u', [action], { directControl: true, guardMode: true });
+  assert.equal(guarded[0].result.pending, true);
+  assert.deepEqual(parked, ['control_smart_home', 'control_smart_home']);
+});
