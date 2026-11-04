@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { createSupabaseServiceClient } = require('../runtime');
 const { decryptTokens } = require('../api/services/token-crypto');
-const { guardConciergeSpend } = require('../api/services/concierge-spend-guard');
+const { guardConciergeSpend, recordConciergeSpend } = require('../api/services/concierge-spend-guard');
 const { chargeLinkedCard, setPaymentActionRequired } = require('../api/services/stripe-cards');
 const { resolveCurrencyForLocation } = require('../api/services/currency-from-location');
 
@@ -12,6 +12,14 @@ const supabase = createSupabaseServiceClient();
 // daily cap even post-approval — guardConciergeSpend applies both. Receiving money is exempt.
 // stripe_charge is handled inline in api/index.js ahead of dispatch and never reaches this file.
 const SPEND_ACTIONS = new Set(['spend_from_concierge_via_stripe', 'stripe_payout_to_user']);
+
+function formatMoney(amount, currency) {
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: String(currency || 'usd').toUpperCase() }).format(amount);
+  } catch {
+    return `${Number(amount).toFixed(2)} ${String(currency || '').toUpperCase()}`.trim();
+  }
+}
 
 async function getStripeKey(userId) {
   try {
@@ -51,9 +59,13 @@ async function execute(userId, action, params) {
   // Hard per-transaction + rolling-daily ceiling before any real Stripe call — independent of
   // the model and of whether the review gate was bypassed.
   if (SPEND_ACTIONS.has(action)) {
-    const dollars = Number(params?.amount || 0);
-    // Checked in the currency the charge will be made in, not assumed to be the cap's.
-    const verdict = await guardConciergeSpend(supabase, userId, dollars, resolveCurrencyForLocation(params?.location));
+    const dollars = Number(params?.amount);
+    if (!Number.isFinite(dollars) || dollars <= 0) {
+      return { success: false, error: 'That spend needs a positive amount.' };
+    }
+    // Checked in the currency the charge will be made in, not assumed to be the cap's. The
+    // tally is written only after money actually moves, so a declined attempt costs nothing.
+    const verdict = await guardConciergeSpend(supabase, userId, dollars, resolveCurrencyForLocation(params?.location), { record: false });
     if (!verdict.ok) return { success: false, error: verdict.error };
   }
 
@@ -71,7 +83,10 @@ async function execute(userId, action, params) {
 
   try {
     if (action === 'create_stripe_payment_link') {
-      const amount = Math.round((params.amount || 10) * 100);
+      const amount = Math.round(Number(params.amount) * 100);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { success: false, error: 'A payment link needs a positive amount.' };
+      }
       const product = await stripeRequest(key, 'post', '/products', { name: params.description || 'Concierge Service' });
       const price = await stripeRequest(key, 'post', '/prices', {
         product: product.id,
@@ -82,11 +97,11 @@ async function execute(userId, action, params) {
         line_items: [{ price: price.id, quantity: 1 }],
         after_completion: { type: 'redirect', redirect: { url: 'https://yourapp.com/thanks' } }
       });
-      return { success: true, text: `Real Stripe Payment Link created for $${(amount/100).toFixed(2)}. Share or use to receive into account.`, webLink: link.url };
+      return { success: true, text: `Real Stripe Payment Link created for ${formatMoney(amount / 100, currency)}. Share or use to receive into account.`, webLink: link.url };
     }
 
     if (action === 'spend_from_concierge_via_stripe') {
-      const amountCents = Math.round((params.amount || 10) * 100);
+      const amountCents = Math.round(Number(params.amount) * 100);
       const desc = params.description || 'Concierge spend';
       // A fresh random idempotency key per call: execute() has no per-approval context to build
       // a stable one from, and this only needs to keep two genuinely separate spends from
@@ -108,6 +123,7 @@ async function execute(userId, action, params) {
         await setPaymentActionRequired(supabase, userId, {
           paymentIntentId: outcome.paymentIntentId, clientSecret: outcome.clientSecret, amountCents, description: desc, currency
         });
+        await recordConciergeSpend(supabase, userId, amountCents / 100, currency);
         return {
           success: false,
           outcome: 'awaiting_user',
@@ -119,15 +135,16 @@ async function execute(userId, action, params) {
       }
 
       const amount = amountCents / 100;
+      await recordConciergeSpend(supabase, userId, amount, currency);
       return {
         success: true,
-        text: `Charged $${amount.toFixed(2)} (${desc}) to your linked card.`,
+        text: `Charged ${formatMoney(amount, currency)} (${desc}) to your linked card.`,
         paymentIntentId: outcome.paymentIntentId
       };
     }
 
     if (action === 'stripe_payout_to_user') {
-      const amount = Math.round((params.amount || 50) * 100);
+      const amount = Math.round(Number(params.amount) * 100);
       // Payouts require Stripe Connect or balance. For demo: create a transfer if account set.
       const transfer = await stripeRequest(key, 'post', '/transfers', {
         amount,
@@ -135,7 +152,8 @@ async function execute(userId, action, params) {
         destination: params.destination || 'acct_xxx', // needs connected account
         description: params.description || 'Payout from concierge'
       });
-      return { success: true, text: `Stripe payout of $${(amount/100).toFixed(2)} initiated.`, transfer };
+      await recordConciergeSpend(supabase, userId, amount / 100, currency);
+      return { success: true, text: `Stripe payout of ${formatMoney(amount / 100, currency)} initiated.`, transfer };
     }
 
     return { success: false, error: 'Unknown Stripe action' };

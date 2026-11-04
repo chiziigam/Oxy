@@ -66,7 +66,10 @@ const {
   safeParseJSON
 } = require('./lib/text');
 
-const { guardConciergeSpend: sharedGuardConciergeSpend } = require('./services/concierge-spend-guard');
+const {
+  guardConciergeSpend: sharedGuardConciergeSpend,
+  recordConciergeSpend: sharedRecordConciergeSpend
+} = require('./services/concierge-spend-guard');
 const { detectCurrency } = require('./services/money-guard');
 const {
   isPendingCancelMessage,
@@ -3827,6 +3830,10 @@ async function getPreferenceMap(userId) {
 // before touching balance or a payment API; shared with connectors/stripe.js via concierge-spend-guard.js.
 async function guardConciergeSpend(userId, amount, currency = null, options = {}) {
   return sharedGuardConciergeSpend(supabase, userId, amount, currency, options);
+}
+
+async function recordConciergeSpend(userId, amount, currency = null, context = {}) {
+  return sharedRecordConciergeSpend(supabase, userId, amount, currency, context);
 }
 
 async function setPreferenceValue(userId, key, value) {
@@ -10290,6 +10297,7 @@ const actionDeps = {
   createPresentationArtifact,
   parsePrice,
   guardConciergeSpend,
+  recordConciergeSpend,
   // Built from env at module scope and null when Stripe is unconfigured, so it is handed
   // over rather than rebuilt -- a second client would not see that null.
   stripeClient,

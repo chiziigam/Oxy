@@ -1,11 +1,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { guardConciergeSpend, SPEND_DAY_KEY } = require('../../api/services/concierge-spend-guard');
+const { guardConciergeSpend, recordConciergeSpend, SPEND_DAY_KEY } = require('../../api/services/concierge-spend-guard');
 
 // Minimal fake Supabase client: one preferences row keyed by (user_id, key), enough to drive
 // guardConciergeSpend's read-tally / write-tally round trip without a real database.
-function fakeSupabase(initialRows = []) {
+function fakeSupabase(initialRows = [], { readError = null, writeError = null } = {}) {
   const rows = [...initialRows];
   return {
     _rows: rows,
@@ -18,7 +18,7 @@ function fakeSupabase(initialRows = []) {
               return {
                 eq(_col2, key) {
                   const data = rows.filter(r => r.user_id === userId && r.key === key);
-                  return Promise.resolve({ data });
+                  return Promise.resolve({ data, error: readError });
                 }
               };
             }
@@ -27,7 +27,7 @@ function fakeSupabase(initialRows = []) {
         upsert(row) {
           const i = rows.findIndex(r => r.user_id === row.user_id && r.key === row.key);
           if (i >= 0) rows[i] = row; else rows.push(row);
-          return Promise.resolve({ error: null });
+          return Promise.resolve({ error: writeError });
         }
       };
     }
@@ -94,5 +94,42 @@ test('guardConciergeSpend fails closed on an unconvertible currency', async () =
   const supabase = fakeSupabase();
   const verdict = await guardConciergeSpend(supabase, 'user-x', 10, 'ZZZ');
   assert.equal(verdict.ok, false);
+  assert.equal(supabase._rows.length, 0);
+});
+
+test('guardConciergeSpend fails closed when the tally cannot be read', async () => {
+  const supabase = fakeSupabase([], { readError: { message: 'db down' } });
+  const verdict = await guardConciergeSpend(supabase, 'user-db', 20, null, { record: false });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.error, /could not be read/i);
+  assert.equal(supabase._rows.length, 0);
+});
+
+test('guardConciergeSpend fails closed when the tally cannot be written', async () => {
+  const supabase = fakeSupabase([], { writeError: { message: 'write failed' } });
+  const verdict = await guardConciergeSpend(supabase, 'user-db', 20);
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.error, /could not be recorded/i);
+});
+
+test('a check with record:false does not consume the daily cap', async () => {
+  const supabase = fakeSupabase();
+  const verdict = await guardConciergeSpend(supabase, 'user-nr', 20, null, { record: false });
+  assert.equal(verdict.ok, true);
+  assert.equal(supabase._rows.length, 0);
+});
+
+test('recordConciergeSpend only adds the total once the money moved', async () => {
+  const supabase = fakeSupabase();
+  const recorded = await recordConciergeSpend(supabase, 'user-rec', 20, 'GBP');
+  assert.equal(recorded.ok, true);
+  const row = supabase._rows.find(r => r.user_id === 'user-rec' && r.key === SPEND_DAY_KEY);
+  assert.equal(JSON.parse(row.value).total, 25.4);
+});
+
+test('recordConciergeSpend refuses to invent a total when the read fails', async () => {
+  const supabase = fakeSupabase([], { readError: { message: 'db down' } });
+  const recorded = await recordConciergeSpend(supabase, 'user-rec', 20);
+  assert.equal(recorded.ok, false);
   assert.equal(supabase._rows.length, 0);
 });

@@ -15,7 +15,7 @@ const { buildCleanupQuery } = require('../services/gmail-cleanup');
 
 // No virtual concierge ledger exists. Real money actions use Stripe or remain unavailable.
 async function checkConciergeBalance({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   return { success: false, outcome: 'unavailable', unavailable: true, error: 'No real concierge balance is connected.' };
 }
 
@@ -28,14 +28,14 @@ function formatMoney(amount, currency) {
 }
 
 async function spendFromConciergeAccount({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   const amount = Number(params?.amount || 0);
   const description = params?.description || 'purchase';
   const merchant = params?.merchant || 'unknown';
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
   // The cap is checked in the currency the card will actually be charged in.
   const currency = resolveCurrencyForLocation(context.location);
-  const spendGuard = await guardConciergeSpend(userId, amount, currency);
+  const spendGuard = await guardConciergeSpend(userId, amount, currency, { record: false });
   if (!spendGuard.ok) return { success: false, error: spendGuard.error };
   if (!stripeClient) {
     return { success: false, outcome: 'unavailable', unavailable: true, error: 'Real concierge spending is unavailable until a payment rail is configured. No money moved.' };
@@ -57,6 +57,7 @@ async function spendFromConciergeAccount({ userId, action, params, enrichedParam
       paymentIntentId: outcome.paymentIntentId, clientSecret: outcome.clientSecret,
       amountCents: Math.round(amount * 100), description: `${description} at ${merchant}`, currency
     });
+    await recordConciergeSpend(userId, amount, currency);
     return {
       success: false,
       outcome: 'awaiting_user',
@@ -67,18 +68,19 @@ async function spendFromConciergeAccount({ userId, action, params, enrichedParam
     };
   }
 
+  await recordConciergeSpend(userId, amount, currency);
   return { success: true, text: `Charged ${formatMoney(amount, currency)} on ${description} at ${merchant} to your linked card.`, paymentIntentId: outcome.paymentIntentId };
 }
 
 async function topUpConciergeAccount({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   const amount = Number(params?.amount || 0);
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
   return { success: false, outcome: 'unavailable', unavailable: true, error: 'Concierge top-ups are unavailable until a real payment rail is configured. No balance was changed.', amount };
 }
 
 async function receiveToConciergeAccount({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   const amount = Number(params?.amount || 0);
   const description = params?.description || 'payment';
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
@@ -86,22 +88,25 @@ async function receiveToConciergeAccount({ userId, action, params, enrichedParam
 }
 
 async function fundOpportunity({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   const amount = Number(params?.amount || 0);
   const opportunity = params?.opportunity || 'opportunity';
   if (amount <= 0) return { success: false, error: 'Invalid amount' };
-  const fundGuard = await guardConciergeSpend(userId, amount);
+  const fundGuard = await guardConciergeSpend(userId, amount, null, { record: false });
   if (!fundGuard.ok) return { success: false, error: fundGuard.error };
   return { success: false, outcome: 'unavailable', unavailable: true, error: `Funding "${opportunity}" is unavailable until a real payment rail is configured. No balance was changed.`, amount };
 }
 
 async function stripeCharge({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
-  const amountCents = Math.round(Number(params?.amount || 1000));
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
+  const amountCents = Math.round(Number(params?.amount));
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return { success: false, error: 'stripe_charge needs a positive amount in pence.' };
+  }
   const desc = params?.description || 'Concierge spend';
   const amount = amountCents / 100;
   const currency = resolveCurrencyForLocation(context.location);
-  const chargeGuard = await guardConciergeSpend(userId, amount, currency);
+  const chargeGuard = await guardConciergeSpend(userId, amount, currency, { record: false });
   if (!chargeGuard.ok) return { success: false, error: chargeGuard.error };
   if (!stripeClient) {
     return { success: false, outcome: 'unavailable', unavailable: true, error: `Stripe is not configured, so no charge was attempted for ${desc}.`, amount };
@@ -122,6 +127,7 @@ async function stripeCharge({ userId, action, params, enrichedParams, context, d
     await setPaymentActionRequired(supabase, userId, {
       paymentIntentId: outcome.paymentIntentId, clientSecret: outcome.clientSecret, amountCents, description: desc, currency
     });
+    await recordConciergeSpend(userId, amount, currency);
     return {
       success: false,
       outcome: 'awaiting_user',
@@ -132,6 +138,7 @@ async function stripeCharge({ userId, action, params, enrichedParams, context, d
     };
   }
 
+  await recordConciergeSpend(userId, amount, currency);
   return { success: true, text: `Stripe charged ${formatMoney(amount, currency)} (${desc}) to your linked card.`, amount, paymentIntentId: outcome.paymentIntentId };
 }
 
@@ -139,7 +146,7 @@ async function stripeCharge({ userId, action, params, enrichedParams, context, d
 // orders this system actually placed and saw confirmed. There is no bank feed, and the
 // summary text says so every time rather than implying completeness.
 async function findSpend({ userId, action, params, enrichedParams, context, deps, helpers }) {
-  const { supabase, dispatch, stripeClient, guardConciergeSpend } = deps;
+  const { supabase, dispatch, stripeClient, guardConciergeSpend, recordConciergeSpend } = deps;
   const merchantFilter = String(params?.merchant || '').trim();
   const since = String(params?.since || '').trim();
   const before = String(params?.before || '').trim();
