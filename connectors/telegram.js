@@ -186,13 +186,21 @@ async function execute(userId, action, params) {
         }
 
         const result = await client.invoke(new Api.contacts.GetContacts({ hash: BigInt(0) }));
-        const match = result.users.find(u => {
+        // A substring match sent "Sam" to "Sameer"; tokens must match whole words instead.
+        const matches = result.users.filter(u => {
           const fullName = normalizeContactSearch(`${u.firstName || ''} ${u.lastName || ''}`);
           const username = normalizeContactSearch(u.username || '');
-          return fullName.includes(search) || username === search || username.includes(search);
+          return fullName === search
+            || username === search
+            || fullName.split(/\s+/).filter(Boolean).includes(search);
         });
 
-        if (!match) return { success: false, error: `Contact "${contact}" not found in your Telegram` };
+        if (!matches.length) return { success: false, error: `Contact "${contact}" not found in your Telegram` };
+        if (matches.length > 1) {
+          const names = matches.slice(0, 5).map(u => `${u.firstName || ''} ${u.lastName || ''}`.trim()).filter(Boolean);
+          return { success: false, error: `More than one Telegram contact matches "${contact}" (${names.join(', ')}). Say the exact name or username.` };
+        }
+        const match = matches[0];
 
         await client.sendMessage(match, { message });
         const name = `${match.firstName || ''} ${match.lastName || ''}`.trim();
