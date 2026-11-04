@@ -35,3 +35,19 @@ test('the APNs provider token uses a JOSE ES256 signature, not DER', () => {
     }
   }
 });
+
+test('device GPS never overwrites a place the model named', async () => {
+  const { createDeclaredAdapterInvoker } = require('../../api/services/declared-adapter-invoker');
+  let captured = null;
+  const invoke = createDeclaredAdapterInvoker({
+    executeInline: async ({ input }) => { captured = input; return { success: true }; },
+    dispatchConnector: async () => ({ success: true }),
+  });
+  const gps = { latitude: 52.4, longitude: -1.8 };
+
+  await invoke({ adapter: { kind: 'inline' }, userId: 'u1', type: 'search_hotels', input: { location: 'Bath' }, context: { location: gps } });
+  assert.equal(captured.location, 'Bath');
+
+  await invoke({ adapter: { kind: 'inline' }, userId: 'u1', type: 'find_nearby_places', input: {}, context: { location: gps } });
+  assert.deepEqual(captured.location, gps);
+});

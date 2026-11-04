@@ -2932,10 +2932,11 @@ async function reconcileCommitmentsForSentEmail(userId, sent) {
 }
 
 async function executeActionRaw(userId, action, params, context = {}) {
+  const givenParams = params || {};
   const enrichedParams = {
-    ...(params || {}),
-    ...(context.location ? { location: context.location } : {}),
-    ...(context.homeLocation ? { homeLocation: context.homeLocation } : {})
+    ...givenParams,
+    ...(context.location && givenParams.location == null ? { location: context.location } : {}),
+    ...(context.homeLocation && givenParams.homeLocation == null ? { homeLocation: context.homeLocation } : {})
   };
   const recordProjectArtifact = async (input = {}) => {
     if (!context.runtimeSessionId || !context.persistedTaskId) return null;

@@ -10,10 +10,13 @@ function createDeclaredAdapterInvoker({
   if (typeof dispatchConnector !== 'function') throw new TypeError('createDeclaredAdapterInvoker requires dispatchConnector');
 
   return async function invokeDeclaredAdapter({ adapter, userId, type, input, context = {} }) {
+    // The model's own argument wins: a hotel search asks for "Bath", not the device's
+    // {latitude, longitude}. GPS is only a fallback for actions that did not name a place.
+    const given = input || {};
     const enrichedInput = {
-      ...(input || {}),
-      ...(context.location ? { location: context.location } : {}),
-      ...(context.homeLocation ? { homeLocation: context.homeLocation } : {})
+      ...given,
+      ...(context.location && given.location == null ? { location: context.location } : {}),
+      ...(context.homeLocation && given.homeLocation == null ? { homeLocation: context.homeLocation } : {})
     };
 
     if (adapter?.kind === 'inline') {
