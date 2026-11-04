@@ -2,15 +2,16 @@ import SwiftUI
 
 /// What the wheel can open. The first four, in the saved order, sit on the arc; the rest are a spin away.
 enum ThreadMenuChoice: String, CaseIterable, Identifiable {
-    case activity, memory, today, settings, home, privateChat
+    case now, activity, memory, today, settings, home, privateChat
 
     /// What sits on the wheel. Private mode is still a choice the chat understands, but it is not shown here.
-    static let onWheel: [ThreadMenuChoice] = [.activity, .memory, .today, .settings, .home]
+    static let onWheel: [ThreadMenuChoice] = [.now, .activity, .memory, .today, .settings, .home]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .now: return "Now"
         case .activity: return "Activity"
         case .today: return "Today"
         case .home: return "Your home"
@@ -45,6 +46,7 @@ private struct WheelGlyph: View {
     var body: some View {
         Group {
             switch choice {
+            case .now: AppIcon("list", size: size)
             case .activity: AppIcon("wheel-activity", size: size)
             case .today: AppIcon("wheel-today", size: size)
             case .home: AppIcon("wheel-home", size: size)
@@ -56,11 +58,12 @@ private struct WheelGlyph: View {
     }
 }
 
-/// The closed button: the Adam mark in a circle. It turns into a cross as the wheel opens.
+/// The closed button: a plain menu glyph with no container. It turns into a cross on a quiet
+/// fill as the wheel opens.
 struct WheelHub: View {
     var progress: CGFloat
     var incognito: Bool
-    /// What Adam is doing right now. While set, the Adam mark in the hub shows it; otherwise the plain logo.
+    /// What Adam is doing right now. While set, Adam's activity mark replaces the menu glyph.
     var activity: AdamActivityState? = nil
 
     /// Every item grows out of the centre of the hub.
@@ -69,39 +72,28 @@ struct WheelHub: View {
     var body: some View {
         let open = min(max(progress, 0), 1)
         ZStack {
-            Circle().fill(incognito && open < 0.5 ? Color.appAction : Color.appSurface2)
-            ForEach(0..<24, id: \.self) { tick in
-                Capsule()
-                    .fill(Color.appMuted.opacity(tick.isMultiple(of: 6) ? 0.6 : 0.25))
-                    .frame(width: 1, height: tick.isMultiple(of: 6) ? 3 : 2)
-                    .offset(y: -19)
-                    .rotationEffect(.degrees(Double(tick) * 15))
-                    .opacity(1 - open)
+            Circle().fill(Color.appSurface2).opacity(open)
+            Group {
+                if incognito {
+                    GhostIcon(active: true)
+                        .frame(width: 20, height: 20)
+                        .foregroundColor(Color.appInk)
+                } else if let activity {
+                    AdamActivityMark(state: activity, size: 28)
+                } else {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.appInk)
+                }
             }
-            if incognito {
-                GhostIcon(active: true)
-                    .frame(width: 20, height: 20)
-                    .foregroundColor(Color.appOnAction)
-                    .scaleEffect(1 - 0.4 * open)
-                    .opacity(1 - open)
-            } else if let activity {
-                AdamActivityMark(state: activity, size: 32)
-                    .scaleEffect(1 - 0.4 * open)
-                    .opacity(1 - open)
-            } else {
-                AdamMark()
-                    .frame(width: 20, height: 20)
-                    .scaleEffect(1 - 0.4 * open)
-                    .opacity(1 - open)
-            }
-            ZStack {
-                Capsule().frame(width: 16, height: 2)
-                Capsule().frame(width: 2, height: 16)
-            }
-            .foregroundColor(Color.appInk)
-            .rotationEffect(.degrees(Double(open) * 90 - 45))
-            .scaleEffect(0.6 + 0.4 * open)
-            .opacity(open)
+            .scaleEffect(1 - 0.4 * open)
+            .opacity(1 - open)
+            Image(systemName: "xmark")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.appInk)
+                .rotationEffect(.degrees(Double(open) * 90 - 90))
+                .scaleEffect(0.6 + 0.4 * open)
+                .opacity(open)
         }
         .frame(width: 44, height: 44)
         .contentShape(Circle())
@@ -216,14 +208,12 @@ struct ThreadWheelMenu: View {
                                     Text(choice.title).font(.appBody(20, weight: .medium))
                                         .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
-                                    AppIcon("chevron-right", size: 16)
                                 }
                                 .foregroundStyle(Color.appInk)
                                 .padding(.vertical, 10)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.appScale)
-                            Color.appHairline.frame(height: 0.5)
                         }
                         Button { choose(.privateChat) } label: {
                             HStack(spacing: 16) {

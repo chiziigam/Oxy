@@ -218,9 +218,7 @@ struct MessageBubble: View {
                         VStack(alignment: .leading, spacing: 0) {
                             AssistantAnswerView(text: message.content, compact: isCompact, isStreaming: message.isStreaming)
                             if !memoryActions.isEmpty && !message.isStreaming {
-                                Rectangle().fill(Color.appCardOutline).frame(height: 1)
-                                    .padding(.top, 9)
-                                    .padding(.bottom, 7)
+                                Color.clear.frame(height: AppSpacing.md)
                                 ForEach(memoryActions) { action in
                                     MemoryNote(action: action)
                                 }
@@ -311,12 +309,8 @@ struct MessageBubble: View {
                             .foregroundStyle(Color.appAccent)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.appSurface.opacity(0.84))
+                            .background(Color.appSurface)
                             .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                                    .strokeBorder(Color.appHairline, lineWidth: 0.5)
-                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(recovery.recoveryAction?.label ?? "Keep going")
@@ -338,12 +332,8 @@ struct MessageBubble: View {
                             .foregroundStyle(Color.appAccent)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color.appSurface.opacity(0.84))
+                            .background(Color.appSurface)
                             .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                                    .strokeBorder(Color.appHairline, lineWidth: 0.5)
-                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(reauth.recoveryAction?.label ?? "Sign in")
@@ -365,12 +355,8 @@ struct MessageBubble: View {
                                 .foregroundStyle(Color.appAccent)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(Color.appSurface.opacity(0.84))
+                                .background(Color.appSurface)
                                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                                        .strokeBorder(Color.appHairline, lineWidth: 0.5)
-                                )
                         }
                         .buttonStyle(.plain)
                         .sheet(isPresented: $showMissingInformationSheet) {
@@ -393,7 +379,7 @@ struct MessageBubble: View {
                                 .foregroundStyle(Color.appInk)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 9)
-                                .background(Color.appSurface.opacity(0.84))
+                                .background(Color.appSurface)
                                 .clipShape(Capsule())
                                 .buttonStyle(.appScale)
                         }
@@ -528,9 +514,6 @@ struct DisplayRenderSheet: View {
                             .buttonStyle(.plain)
                             .disabled(sendingDisplayID != nil)
 
-                            if display.id != displays.last?.id {
-                                SettingsDivider()
-                            }
                         }
                     }
                     .padding(.horizontal, 14)
@@ -686,10 +669,9 @@ private struct AssistantAnswerView: View {
                     AssistantListRow(marker: "\(index)", text: text, compact: compact)
 
                 case .divider:
-                    Rectangle()
-                        .fill(Color.appHairline)
-                        .frame(height: 0.5)
-                        .padding(.vertical, compact ? 4 : 6)
+                    // A markdown rule becomes a pause, not a line.
+                    Color.clear
+                        .frame(height: compact ? 8 : 12)
 
                 case .codeBlock(let code):
                     AssistantCodeBlock(code: code, compact: compact)
@@ -858,12 +840,8 @@ private struct AssistantTableView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color.appSurface.opacity(0.72))
+                .background(Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                        .strokeBorder(Color.appHairline, lineWidth: 0.5)
-                )
             }
         }
         .accessibilityElement(children: .contain)
@@ -889,10 +867,6 @@ private struct AssistantCodeBlock: View {
         }
         .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                .strokeBorder(Color.appHairline, lineWidth: 0.5)
-        )
     }
 }
 
@@ -938,7 +912,6 @@ private struct FailedTurnView: View {
         .padding(.trailing, 6)
         .padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.appDanger.opacity(0.14)))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.appDanger.opacity(0.45), lineWidth: 1))
         .padding(.trailing, 32)
         .accessibilityElement(children: .combine)
     }
@@ -967,10 +940,6 @@ private struct SubjectImageRow: View {
                         }
                         .frame(width: 96, height: 96)
                         .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
-                                .strokeBorder(Color.appHairline, lineWidth: 0.5)
-                        )
                     }
                 }
             }
@@ -1114,7 +1083,6 @@ private struct DirectionsResultCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.appSurface.opacity(0.9))
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.5))
     }
 
     private func metric(_ label: String, _ value: String) -> some View {
@@ -1143,10 +1111,6 @@ private struct DirectionsResultCard: View {
             .foregroundStyle(Color.appTitanium)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous)
-                    .strokeBorder(Color.appHairline, lineWidth: 0.5)
-            )
         }
         .buttonStyle(.appScale(0.98))
         .disabled(urlString == nil)
@@ -1236,7 +1200,6 @@ private struct MessageSourceChips: View {
                         .foregroundStyle(Color.appTitanium)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
-                        .overlay(Rectangle().strokeBorder(Color.appHairline, lineWidth: 0.5))
                     }
                     .buttonStyle(.appScale)
                 }
@@ -1420,7 +1383,6 @@ struct TravelResultCard: View {
         // Rounded card silhouette to match every other card in the message stream
         // (UberHandoffCard/ActionCard/pendingCard) — was the lone sharp-edged Rectangle.
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.5))
     }
 }
 
@@ -1510,7 +1472,6 @@ private struct ConnectOfferCard: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(Color.appSurface.opacity(0.84), in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.appHairline, lineWidth: 0.7))
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }

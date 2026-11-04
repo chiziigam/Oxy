@@ -144,7 +144,6 @@ struct CompareSheet: View {
                     VStack(alignment: .leading, spacing: 0) {
                         row(label: "", cells: table.columns.map { CompareCell(text: $0.title) }, isHeader: true)
                         ForEach(Array(table.rows.enumerated()), id: \.offset) { index, label in
-                            SettingsRule()
                             row(label: label, cells: table.columns.map { $0.cells[index] ?? CompareCell(text: "Not stated") }, isHeader: false)
                         }
                     }
@@ -178,7 +177,6 @@ struct CompareSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .combine)
-                SettingsRule()
             }
         }
     }

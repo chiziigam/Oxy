@@ -104,14 +104,12 @@ private struct PendantPairingSection: View {
                 }
 
                 if let name = pendant.peripheralName, pendant.isConnected {
-                    SettingsRule()
                     SettingsRow(title: "Device") {
                         Text(name).font(.appBody(14)).foregroundStyle(Color.appMuted)
                     }
                 }
 
                 if pendant.isConnected {
-                    SettingsRule()
                     SettingsRow(title: "Doorway presence") {
                         if pendant.isCurrentBeaconTrustedForDoorwayPresence {
                             quietAction("Stop using", color: Color.appDestructive) {

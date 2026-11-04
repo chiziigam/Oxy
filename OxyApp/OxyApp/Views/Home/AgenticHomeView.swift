@@ -19,7 +19,6 @@ struct MissionGlassPlate: View {
         let shape = RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
         Color.appSurface
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Color.appHairline, lineWidth: 0.7))
             .shadow(color: Color.appInk.opacity(0.035), radius: 10, y: 4)
     }
 }

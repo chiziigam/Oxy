@@ -185,7 +185,7 @@ struct YourHomeView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: AppSpacing.xl) {
                         if failed {
-                            ErrorBanner(message: loaded && hasDevices ? "Couldn't refresh. Showing what was saved." : "Couldn't load your home.",
+                            ErrorBanner(message: loaded && hasDevices ? "Couldn't refresh. Showing what was saved." : "Couldn't load your home",
                                         onRetry: { Task { await load() } })
                                 .disabled(isRefreshing)
                         }
@@ -453,7 +453,6 @@ struct YourHomeView: View {
                 HStack {
                     tileIcon("display", on: device.online && !failed)
                     Spacer(minLength: AppSpacing.sm)
-                    AppIcon("chevron-right", size: 12).foregroundStyle(Color.appMuted).accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(device.name).font(.rowTitle).foregroundStyle(Color.appInk)
@@ -559,12 +558,12 @@ struct YourHomeView: View {
 
     private var notConnected: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
-            Text("Nothing set up yet.")
-                .font(.role(.title, weight: .bold)).foregroundStyle(Color.appInk)
+            Text("Nothing set up yet")
+                .font(.title2.weight(.bold)).foregroundStyle(Color.appInk)
             Text(controlStatus == "unavailable"
-                 ? "Smart-home devices are unavailable right now. Pair a display, or try again later."
-                 : "Pair a display, or connect a smart-home server, and each room shows here.")
-                .font(.role(.body)).foregroundStyle(Color.appMuted)
+                 ? "Smart-home devices are unavailable right now."
+                 : "Add a display and your rooms show here.")
+                .font(.body).foregroundStyle(Color.appMuted)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Add a display") {
                 HapticManager.shared.impact(.medium)
@@ -610,9 +609,12 @@ struct YourHomeView: View {
 
     @ViewBuilder
     private var setUpSection: some View {
-        if loaded {
+        // With nothing set up, the one primary "Add a display" above is the path; no second entry here.
+        if loaded && (hasDevices || controlStatus == "not_configured" || needsAddress) {
             section("Set up") {
-                row(title: "Add a display", detail: nil, dot: nil, chevron: true) { showsDisplaySetup = true }
+                if hasDevices {
+                    row(title: "Add a display", detail: nil, dot: nil, chevron: true) { showsDisplaySetup = true }
+                }
                 if controlStatus == "not_configured" {
                     row(title: "Smart-home control", detail: "Not configured", dot: nil, chevron: false) {
                         AskAdam.draft("How do I connect my smart-home devices?")
@@ -648,7 +650,6 @@ struct YourHomeView: View {
             .accessibilityElement(children: .combine)
             SettingsList {
                 SettingsRow(title: "Room", subtitle: device.room ?? "Not assigned")
-                SettingsRule()
                 SettingsRow(title: "Urgent alerts", subtitle: "Show alerts on this display") {
                     SettingsToggle(isOn: Binding(
                         get: { urgentChoice[device.id] ?? device.showsUrgent },
@@ -733,12 +734,13 @@ struct YourHomeView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                AppIcon(chevron ? "chevron-right" : "arrow-up-right", size: 12)
-                    .foregroundStyle(Color.appMuted)
+                if !chevron {
+                    AppIcon("arrow-up-right", size: 12)
+                        .foregroundStyle(Color.appMuted)
+                }
             }
             .padding(.vertical, AppSpacing.md)
             .frame(minHeight: 52)
-            .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.appScale(0.99))

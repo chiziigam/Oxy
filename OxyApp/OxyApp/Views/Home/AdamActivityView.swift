@@ -202,7 +202,6 @@ struct AdamActivityView: View {
                     .accessibilityAddTraits(filter == item ? .isSelected : [])
                 }
             }
-            .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -221,7 +220,6 @@ struct AdamActivityView: View {
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    if index > 0 { SettingsRule() }
                     row(item)
                 }
             }

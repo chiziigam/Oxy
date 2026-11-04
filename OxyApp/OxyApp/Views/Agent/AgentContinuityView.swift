@@ -134,7 +134,6 @@ struct AgentContinuityView: View {
             }
 
             if !preview.workflows.isEmpty {
-                SettingsDivider()
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Automations")
                         .font(.rowTitle)

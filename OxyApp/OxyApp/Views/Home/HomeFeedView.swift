@@ -78,7 +78,6 @@ struct TodaySuggestionsContent: View {
                             Text("All suggestions")
                             Spacer()
                             Text("\(visible.count)").monospacedDigit()
-                            AppIcon("chevron-right", size: 13)
                         }
                         .font(.appBody(15, weight: .medium))
                         .foregroundStyle(Color.appAccent)
@@ -206,7 +205,6 @@ struct TodaySuggestionsContent: View {
             .accessibilityLabel("Dismiss suggestion")
         }
         .padding(.vertical, 22)
-        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
     }
 
     @ViewBuilder

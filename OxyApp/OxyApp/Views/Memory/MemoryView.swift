@@ -122,8 +122,6 @@ struct MemoryView: View {
 
                         ForEach(group.items) { item in
                             memoryListRow(item)
-
-                            SettingsDivider()
                                 .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
@@ -383,10 +381,6 @@ private struct MemoryRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 8)
-                AppIcon("chevron-right", size: 13)
-                    .foregroundStyle(Color.appMuted)
-                    .padding(.top, 2)
-                    .padding(.trailing, 24)
             }
             .padding(.vertical, 16)
             .contentShape(Rectangle())

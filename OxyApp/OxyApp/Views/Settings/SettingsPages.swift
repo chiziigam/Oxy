@@ -59,7 +59,6 @@ struct YouPage: View {
                         }
                 }
                 .padding(.vertical, 16)
-                SettingsRule()
                 SettingsNavRow(title: "Home address", subtitle: settings.homeAddress.isEmpty ? "Not set" : settings.homeAddress) {
                     destination = .home
                 }
@@ -184,7 +183,6 @@ struct HomeAddressPage: View {
                             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                     }
                     .buttonStyle(.plain)
-                    SettingsDivider()
                 }
             }
         }

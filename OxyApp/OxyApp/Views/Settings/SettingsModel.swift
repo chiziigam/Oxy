@@ -99,7 +99,6 @@ struct PairedDisplaysView: View {
                 } else if !displays.isEmpty {
                     SettingsList {
                         ForEach(Array(displays.enumerated()), id: \.element.id) { index, display in
-                            if index > 0 { SettingsRule() }
                             SettingsRow(title: display.name, subtitle: displayPresenceLabel(display)) {
                                 Button {
                                     pendingRevoke = display

@@ -54,17 +54,17 @@ struct ConnectorsView: View {
 
     private static let directory: [Section] = [
         Section(title: "Mail and calendar", entries: [
-            own("google", "Gmail and Calendar", "Mail and calendar"),
-            own("microsoft", "Outlook and Calendar", "Mail and calendar")
+            own("google", "Gmail and Calendar", ""),
+            own("microsoft", "Outlook and Calendar", "")
         ]),
         Section(title: "Messages", entries: [
-            own("telegram", "Telegram", "Message people"),
-            app("whatsapp", "WhatsApp", "Messages")
+            own("telegram", "Telegram", ""),
+            app("whatsapp", "WhatsApp", "")
         ]),
         Section(title: "Photos and files", entries: [
-            app("googlephotos", "Google Photos", "Find your photos"),
-            app("googledrive", "Google Drive", "Find your files"),
-            app("dropbox", "Dropbox", "Find your files")
+            app("googlephotos", "Google Photos", ""),
+            app("googledrive", "Google Drive", ""),
+            app("dropbox", "Dropbox", "")
         ]),
         Section(title: "Plans and lists", entries: [
             app("todoist", "Todoist", "Your to-do list"),
@@ -137,15 +137,8 @@ struct ConnectorsView: View {
                     OxySkeletonCard(height: 148)
                 }
             } else {
-                if ownLoaded && catalogueLoaded {
-                    if connectedCount == 0 {
-                        Text("No apps connected")
-                            .font(.appBody(16))
-                            .foregroundStyle(Color.appInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    ErrorBanner(message: "Couldn't load all your apps.", onRetry: { Task { await load() } })
+                if !(ownLoaded && catalogueLoaded) {
+                    ErrorBanner(message: "Couldn't load all your apps", onRetry: { Task { await load() } })
                         .disabled(isRefreshing)
                 }
 
@@ -155,25 +148,9 @@ struct ConnectorsView: View {
 
                 let connected = sections.flatMap(\.entries).filter(isConnected)
                 if !connected.isEmpty {
-                    Text(ownLoaded && catalogueLoaded ? "\(connectedCount) connected" : "Connected")
-                        .font(.appBody(15, weight: .semibold))
-                        .foregroundStyle(Color.appInk)
-                    if typeSize.isAccessibilitySize {
-                        VStack(spacing: 12) {
-                            ForEach(connected) { entry in tile(entry) }
-                        }
-                    } else {
-                        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-                            ForEach(Array(stride(from: 0, to: connected.count, by: 2)), id: \.self) { index in
-                                GridRow {
-                                    tile(connected[index])
-                                    if index + 1 < connected.count {
-                                        tile(connected[index + 1])
-                                    } else {
-                                        Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                                    }
-                                }
-                            }
+                    SettingsGroup(title: "Connected") {
+                        VStack(spacing: 0) {
+                            ForEach(connected) { entry in row(entry) }
                         }
                     }
                 }
@@ -182,11 +159,8 @@ struct ConnectorsView: View {
                     let open = section.entries.filter { !isConnected($0) }
                     if !open.isEmpty {
                         SettingsGroup(title: section.title) {
-                            SettingsList {
-                                ForEach(Array(open.enumerated()), id: \.element.id) { index, entry in
-                                    row(entry)
-                                    if index < open.count - 1 { SettingsRule(inset: 48) }
-                                }
+                            VStack(spacing: 0) {
+                                ForEach(open) { entry in row(entry) }
                             }
                         }
                     }
@@ -195,9 +169,7 @@ struct ConnectorsView: View {
                 SettingsGroup(title: "Devices and payments") {
                     SettingsList {
                         SettingsNavRow(title: "Displays") { place = .displays }
-                        SettingsRule()
                         SettingsNavRow(title: "Payment methods") { place = .payments }
-                        SettingsRule()
                         SettingsNavRow(title: "Saved logins") { place = .logins }
                     }
                 }
@@ -243,49 +215,36 @@ struct ConnectorsView: View {
         }
     }
 
-    /// A connected app as an object: its logo, its name and a quiet status, one tap to manage.
-    private func tile(_ entry: Entry) -> some View {
-        Button { manage = entry } label: {
-            let layout = typeSize.isAccessibilitySize
-                ? AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
-            layout {
-                AppIconView(candidates: iconCandidates(entry))
-                    .frame(width: 38, height: 38)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.name).font(.rowTitle).foregroundStyle(Color.appInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.appSuccess).frame(width: 6, height: 6)
-                        Text(pending == entry.key ? "Working" : "Connected").font(.appBody(12, weight: .medium)).foregroundStyle(Color.appMuted)
-                    }
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .settingsSurface()
-            .contentShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-        }
-        .buttonStyle(.appScale(0.97))
-        .accessibilityLabel("\(entry.name), connected")
-        .accessibilityHint("Opens the option to disconnect")
-    }
-
+    /// One plain row: logo, name, a subtitle only when it adds something, and a quiet trailing control.
+    /// A connected row opens the option to disconnect.
     private func row(_ entry: Entry) -> some View {
-        HStack(spacing: 12) {
+        let content = HStack(spacing: 12) {
             AppIconView(candidates: iconCandidates(entry))
-                .frame(width: 36, height: 36)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name).font(.appBody(15, weight: .medium)).foregroundStyle(Color.appInk)
-                Text(entry.line).font(.appBody(13)).foregroundStyle(Color.appMuted).fixedSize(horizontal: false, vertical: true)
+                Text(entry.name).font(.body).foregroundStyle(Color.appInk)
+                if !entry.line.isEmpty {
+                    Text(entry.line).font(.subheadline).foregroundStyle(Color.appMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 8)
             trailing(entry)
         }
-        .padding(.vertical, 10)
-        .frame(minHeight: 60)
+        .padding(.vertical, 6)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
+        return Group {
+            if isConnected(entry) {
+                Button { manage = entry } label: { content }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(entry.name), connected")
+                    .accessibilityHint("Opens the option to disconnect")
+            } else {
+                content
+            }
+        }
     }
 
     private func iconCandidates(_ entry: Entry) -> [String] {
@@ -299,20 +258,20 @@ struct ConnectorsView: View {
         if pending == entry.key {
             ProgressView().scaleEffect(0.65).tint(Color.appMuted)
         } else if isConnected(entry) {
-            Button { manage = entry } label: {
-                HStack(spacing: 6) {
-                    Circle().fill(Color.appSuccess).frame(width: 6, height: 6)
-                    Text("Connected").font(.appBody(13, weight: .medium)).foregroundStyle(Color.appSuccess)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.appScale(0.97))
+            Image(systemName: "checkmark")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.appSuccess)
+                .accessibilityHidden(true)
         } else {
             Button { Task { await connect(entry) } } label: {
                 Text(connector(entry)?.connectionState == "needs_reconnect" ? "Reconnect" : "Connect")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.app(.secondary, fullWidth: false))
+            .buttonStyle(.borderless)
+            .tint(Color.appAccent)
+            .foregroundStyle(Color.appAccent)
         }
     }
 

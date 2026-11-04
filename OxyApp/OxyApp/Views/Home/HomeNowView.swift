@@ -1,7 +1,7 @@
 import AVFoundation
 import SwiftUI
 
-/// Now: the first screen. One column, in order of what matters: the most important decision,
+/// Now: reached from the menu or the line at the top of the conversation. One column, in order of what matters: the most important decision,
 /// work Adam is doing (each with Stop), a compact entry to Your home, and what happened earlier.
 /// The greeting and one-line status live in the header above (see `ThreadHeader`).
 struct HomeNowView: View {
@@ -18,7 +18,7 @@ struct HomeNowView: View {
             if !model.hasLoaded && home == nil {
                 if model.refreshFailed {
                     VStack(alignment: .leading, spacing: AppSpacing.md) {
-                        Text("Couldn't reach Adam.").font(.role(.body)).foregroundStyle(Color.appInk)
+                        Text("Couldn't reach Adam").font(.body).foregroundStyle(Color.appInk)
                         Button("Try again") { Task { await model.refresh() } }
                             .buttonStyle(.app(.secondary, fullWidth: false))
                     }
@@ -32,10 +32,6 @@ struct HomeNowView: View {
             if let first = model.needsYou.first {
                 HomeDecision(item: first, model: model) { openWorkflow = HomeOpenWorkflow(id: $0) }
                     .id("board-decision-\(first.id)")
-            } else if model.hasLoaded {
-                Text(model.working.isEmpty ? "Nothing needs you right now." : "Nothing needs you. Adam is working.")
-                    .font(.role(.body)).foregroundStyle(Color.appMuted)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if model.needsYou.count > 1 {
@@ -124,10 +120,8 @@ struct HomeNowView: View {
         if running == 1 { return ("Working on one thing", Color.appSuccess) }
         if running > 1 { return ("Working on \(running) things", Color.appSuccess) }
         if stuck > 0 { return (stuck == 1 ? "One thing is stuck" : "\(stuck) things are stuck", Color.appNeedsYou) }
-        guard let home = model.home else { return ("All quiet", Color.appMuted) }
-        let anythingOn = home.devices.contains(where: \.online) || (home.controls ?? []).contains(where: \.isOn)
-        let tint: Color = anythingOn ? Color.appSuccess : Color.appMuted
-        return (homeSummary(home), tint)
+        // Nothing to report: no status line. The home summary lives on the Your home row only.
+        return nil
     }
 
     /// "3 rooms · 2 devices on", built only from what the home model reports.
@@ -262,13 +256,9 @@ struct HomeCompactRow: View {
             if let trailing {
                 Text(trailing).font(.reading(.footnote)).foregroundStyle(Color.appMuted)
             }
-            if chevron {
-                AppIcon("chevron-right", size: 12).foregroundStyle(Color.appMuted).accessibilityHidden(true)
-            }
         }
         .padding(.vertical, AppSpacing.md)
         .frame(minHeight: 56)
-        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityValue(attention ? "Needs attention" : "")
@@ -341,8 +331,6 @@ struct HomeDecision: View {
             }
         }
         .appCard(padding: AppSpacing.lg)
-        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
-            .strokeBorder(Color.appNeedsYou.opacity(0.35), lineWidth: 1))
         .accessibilityElement(children: .contain)
     }
 
@@ -469,7 +457,6 @@ struct HomeWorkRow: View {
             }
         }
         .padding(.vertical, AppSpacing.md)
-        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
     }
 }
 

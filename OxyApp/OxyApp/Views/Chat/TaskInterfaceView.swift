@@ -124,7 +124,7 @@ struct TaskInterfaceView: View {
         }
     }
 
-    /// Options to pick from: plain rows with hairlines, so they read as choices and not as more facts.
+    /// Options to pick from: plain rows separated by space, so they read as choices and not as more facts.
     private func choices(_ block: TaskInterfaceBlock) -> some View {
         let items = block.items ?? []
         return VStack(spacing: 0) {
@@ -136,18 +136,14 @@ struct TaskInterfaceView: View {
                             if let detail = item.detail { Text(detail).font(.rowSecondary).foregroundStyle(Color.appMuted) }
                         }
                         Spacer(minLength: 8)
-                        AppIcon("chevron-right", size: 13).foregroundStyle(Color.appMuted)
                     }
                     .padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                     .contentShape(Rectangle())
-                    .overlay(alignment: .top) { if index > 0 { Color.appHairline.frame(height: 0.5) } }
                 }
                 .buttonStyle(.appScale(0.99))
                 .accessibilityIdentifier("interface-choice-\(block.id)")
             }
         }
-        .overlay(alignment: .top) { Color.appHairline.frame(height: 0.5) }
-        .overlay(alignment: .bottom) { Color.appHairline.frame(height: 0.5) }
     }
 
     /// Options side by side with their facts on shared rows, so a number can be read straight across.
@@ -179,7 +175,6 @@ struct TaskInterfaceView: View {
                         }
                     }
                     .padding(.vertical, 11)
-                    .overlay(alignment: .top) { Color.appHairline.frame(height: 0.5) }
                     .accessibilityElement(children: .combine)
                 }
                 if items.contains(where: { $0.ask != nil }) {
@@ -226,7 +221,6 @@ struct TaskInterfaceView: View {
             VStack(alignment: .leading, spacing: 0) {
                 tableRow(block.columns ?? [], header: true)
                 ForEach(Array((block.rows ?? []).enumerated()), id: \.offset) { _, row in
-                    Divider().overlay(Color.appCardOutline)
                     tableRow(row, header: false)
                 }
             }

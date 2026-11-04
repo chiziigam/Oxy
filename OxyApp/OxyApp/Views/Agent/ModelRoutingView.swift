@@ -70,7 +70,6 @@ struct ModelRoutingView: View {
         SettingsGroup(title: "Available models") {
             SettingsList {
                 ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
-                    if index > 0 { SettingsRule() }
                     SettingsRow(
                         title: provider.name,
                         subtitle: provider.configured ? "Ready" : "Not set up",

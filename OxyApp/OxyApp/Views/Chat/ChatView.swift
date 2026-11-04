@@ -19,8 +19,9 @@ struct ChatView: View {
     @State private var boardModel = ThreadBoardModel()
     @State private var alarmClip: SoundClipStore.Clip?
     @State private var wheelOpen = false
-    /// The app opens on Home; the conversation is a place you go to and come back from.
-    @State private var overviewSelected = true
+    /// The app opens on the conversation, ready to type. Now is one step away, from the menu
+    /// or the line at the top of the thread when something needs the user or is running.
+    @State private var overviewSelected = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -243,10 +244,6 @@ struct ChatView: View {
                 .padding(.bottom, 16)
             }
         }
-        .overlay(alignment: .top) {
-            Rectangle().fill(Color.appHairline).frame(height: 0.5)
-                .padding(.horizontal, AppSpacing.chatMargin)
-        }
         .id("exchange-\(exchange.id)")
     }
 
@@ -304,14 +301,55 @@ struct ChatView: View {
         Group {
             if viewModel.isLoadingHistory {
                 ProgressView().tint(Color.appMuted)
-            } else if viewModel.networkError == nil {
-                Text("No messages yet.")
-                    .font(.role(.body)).foregroundStyle(Color.appMuted)
             }
+            // A new conversation is calm: the greeting in the header and the composer below are enough.
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppSpacing.chatMargin)
         .padding(.vertical, AppSpacing.xl)
+    }
+
+    /// What Now would lead with, folded into the top of the thread as one quiet line.
+    /// Nothing is shown when nothing needs the user and nothing is running.
+    private var nowLineText: String? {
+        guard !isIncognito, boardModel.hasLoaded else { return nil }
+        let needs = boardModel.needsYou.count
+        if needs == 1 { return "One thing needs you" }
+        if needs > 1 { return "\(needs) things need you" }
+        let running = boardModel.working.count
+        if running == 1 { return "Working on one thing" }
+        if running > 1 { return "Working on \(running) things" }
+        return nil
+    }
+
+    @ViewBuilder
+    private var nowLine: some View {
+        if let text = nowLineText {
+            Button {
+                HapticManager.shared.select()
+                withAnimation(.appStandard) { overviewSelected = true }
+            } label: {
+                HStack(spacing: AppSpacing.sm) {
+                    Circle()
+                        .fill(boardModel.needsYou.isEmpty ? Color.appSuccess : Color.appNeedsYou)
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                    Text(text)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.appInk)
+                    Spacer(minLength: AppSpacing.sm)
+                    Text(boardModel.needsYou.isEmpty ? "View" : "Review")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AppSpacing.chatMargin)
+            .padding(.bottom, AppSpacing.sm)
+            .accessibilityHint("Opens Now")
+        }
     }
 
     private func loadOlderMessages(_ proxy: ScrollViewProxy) {
@@ -336,7 +374,9 @@ struct ChatView: View {
     }
 
     private func handleMenuChoice(_ choice: ThreadMenuChoice) {
-        if choice == .privateChat {
+        if choice == .now {
+            withAnimation(.appStandard) { overviewSelected = true }
+        } else if choice == .privateChat {
             withAnimation(.linear(duration: 0.15)) { isIncognito.toggle() }
             let key = "adam_private_explained"
             if isIncognito, !UserDefaults.standard.bool(forKey: key) {
@@ -423,8 +463,10 @@ struct ChatView: View {
                                 isDemo: appState.isDemoSession,
                                 isComposing: isInputFocused,
                                 showsStatus: !showsOverview,
-                                onHome: showsOverview ? nil : { withAnimation(.appStandard) { overviewSelected = true } },
-                                title: isIncognito ? "Private" : (showsOverview ? HomeNowView.greeting() : conversationTitle),
+                                onBack: showsOverview ? { withAnimation(.appStandard) { overviewSelected = false } } : nil,
+                                backLabel: "Back to conversation",
+                                title: isIncognito ? "Private" : (showsOverview || viewModel.messages.isEmpty ? HomeNowView.greeting() : conversationTitle),
+                                largeTitle: showsOverview || viewModel.messages.isEmpty,
                                 homeStatus: showsOverview ? HomeNowView.status(boardModel) : nil,
                                 wheelOpen: $wheelOpen,
                                 hubCenter: $hubCenter
@@ -509,6 +551,7 @@ struct ChatView: View {
                                 if showsOverview {
                                     overview
                                 } else {
+                                nowLine
                                 if viewModel.messages.isEmpty {
                                     quietConversation
                                 }
@@ -617,9 +660,6 @@ struct ChatView: View {
                             selectedPhotoItem = nil
                         }
                     )
-                            }
-                            .background(alignment: .bottom) {
-                                ComposerBackdrop()
                             }
                         }
                         #if DEBUG
@@ -1120,9 +1160,7 @@ struct ChatView: View {
                     }
                     VStack(spacing: 0) {
                         sourceRow("Photos and videos", icon: "photo", source: .photos)
-                        Divider().overlay(Color.appHairline)
                         sourceRow("Camera", icon: "camera", source: .camera)
-                        Divider().overlay(Color.appHairline)
                         sourceRow("Files", icon: "doc", source: .files)
                     }
                     .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 16))
@@ -1154,8 +1192,6 @@ struct ChatView: View {
                         .foregroundStyle(Color.appInk)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
-                    AppIcon("chevron-right", size: 14)
-                        .foregroundStyle(Color.appMuted)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
@@ -1400,18 +1436,6 @@ struct ChatView: View {
     ) -> Bool {
         // Times live in the dividers where the conversation pauses, not under messages.
         false
-    }
-}
-
-/// A solid dock keeps the last reply readable above the input controls.
-private struct ComposerBackdrop: View {
-    var body: some View {
-        Color.appBackground
-            .ignoresSafeArea(edges: .bottom)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Color.appHairline).frame(height: 0.5)
-            }
-            .allowsHitTesting(false)
     }
 }
 
@@ -1823,119 +1847,127 @@ private struct ChatInputBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// One shape for the whole bar: a capsule at one line that keeps its ends as text grows.
+    private var barShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 23, style: .circular)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: AppSpacing.sm) {
             if let attachmentLabel {
-                HStack(spacing: 10) {
-                    if attachmentIsImage, let attachmentData, let uiImage = UIImage(data: attachmentData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 38, height: 38)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-                            )
-                    } else {
-                        AppIcon(sf: attachmentIsImage ? "photo.fill" : "doc.fill", size: 17)
-                            .foregroundStyle(Color.appMuted)
-                            .frame(width: 38, height: 38)
-                            .appGlass(RoundedRectangle(cornerRadius: 8))
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(attachmentLabel)
-                            .font(.appBody(13, weight: .medium))
-                            .foregroundStyle(Color.appInk)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Button(action: onRemoveAttachment) {
-                        AppIcon(sf: "xmark.circle.fill", size: 17)
-                            .foregroundStyle(Color.appMuted)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.appScale)
-                    .accessibilityLabel("Remove attachment")
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.appSurface)
-                .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.5))
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
+                attachmentPreview(label: attachmentLabel)
+                    .padding(.horizontal, 12)
             }
 
             composer
-                .padding(.horizontal, AppSpacing.chatMargin)
-                .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 8)
         }
         .onAppear { pulse = true }
     }
 
-    /// Attachment and voice are distinct controls around the text entry.
+    private func attachmentPreview(label: String) -> some View {
+        HStack(spacing: 10) {
+            if attachmentIsImage, let attachmentData, let uiImage = UIImage(data: attachmentData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 38, height: 38)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            } else {
+                Image(systemName: attachmentIsImage ? "photo" : "doc")
+                    .font(.body)
+                    .foregroundStyle(Color.appMuted)
+                    .frame(width: 38, height: 38)
+                    .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            Text(label)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.appInk)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: onRemoveAttachment) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(Color.appMuted)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove attachment")
+        }
+        .padding(.leading, 10)
+        .padding(.vertical, 4)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+    }
+
+    /// One translucent capsule across the bar: text first, then attach and talk / send at the end.
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        HStack(alignment: .bottom, spacing: 0) {
+            Group {
+                if isVoiceActive { voiceField } else { textField }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             if !isVoiceActive {
                 Button(action: onAttach) {
-                    AppIcon("plus", size: 20)
-                        .foregroundStyle(Color.appInk)
-                        .frame(width: 44, height: 52)
+                    Image(systemName: "plus")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(Color.appMuted)
+                        .frame(width: 40, height: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Add a photo, video or file")
-                .buttonStyle(.appScale)
+                .buttonStyle(.plain)
                 .disabled(isSending || isLoadingAttachment)
             }
 
-            HStack(alignment: .bottom, spacing: 4) {
-                if isVoiceActive { voiceField } else { textField }
-            }
-            .padding(4)
-            .background(Color.appReceivedBubble, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(isFocused.wrappedValue || incognito ? Color.appAccent : Color.appCardOutline, lineWidth: 1)
-            }
-            .animation(.appFast, value: isFocused.wrappedValue)
-
             actionButton
         }
+        .padding(.leading, isVoiceActive ? 0 : 16)
+        .padding(.trailing, 2)
+        .padding(.vertical, 1)
+        .frame(minHeight: 46)
+        .background(.ultraThinMaterial, in: barShape)
+        .contentShape(barShape)
+        .onTapGesture { if !isVoiceActive && !isSending { isFocused.wrappedValue = true } }
     }
 
     private var actionButton: some View {
         Button(action: showsStop ? onStop : (canSend ? onSend : onVoice)) {
             ZStack {
                 if showsStop {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    Circle().fill(Color.appAction)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(Color.appOnAction)
-                        .frame(width: 12, height: 12)
+                        .frame(width: 10, height: 10)
                 } else if isPreparingVoice && !canSend {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(Color.appOnAction)
+                        .tint(Color.appMuted)
+                } else if canSend || isRecording {
+                    if isRecording && !reduceMotion {
+                        Circle()
+                            .strokeBorder(Color.appAction.opacity(pulse ? 0 : 0.4), lineWidth: 2)
+                            .scaleEffect(pulse ? 1.5 : 1)
+                            .animation(.easeOut(duration: 1.3).repeatForever(autoreverses: false), value: pulse)
+                    }
+                    Circle().fill(Color.appAction)
+                    Image(systemName: canSend ? "arrow.up" : "stop.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Color.appOnAction)
                 } else {
-                    AppIcon(canSend ? "arrow-up" : (isRecording ? "stop" : "mic"), size: 18)
+                    Image(systemName: "mic")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(canAct ? Color.appInk : Color.appMuted)
                 }
             }
-            .foregroundStyle(buttonForeground)
-            .frame(width: 48, height: 48)
-            .background {
-                if isRecording && !reduceMotion {
-                    Circle()
-                        .strokeBorder(Color.appAction.opacity(pulse ? 0 : 0.4), lineWidth: 2)
-                        .scaleEffect(pulse ? 1.6 : 1)
-                        .animation(.easeOut(duration: 1.3).repeatForever(autoreverses: false), value: pulse)
-                }
-                Circle().fill(buttonFill)
-            }
-            .frame(width: 52, height: 52)
-            .contentShape(Circle())
+            .frame(width: 32, height: 32)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .disabled(!canAct && !showsStop)
         .accessibilityLabel(showsStop ? "Stop" : (canSend ? "Send" : (isRecording ? "Finish recording" : "Talk to Adam")))
@@ -1946,8 +1978,9 @@ private struct ChatInputBar: View {
     }
 
     private var textField: some View {
+        // `isSending` carries the offline state from the chat screen; while offline the field says so.
         TextField("", text: $text, prompt: Text(isSending ? "You're offline" : (incognito ? "Private message" : (typeSize.isAccessibilitySize ? "Ask" : "Ask Adam"))).foregroundStyle(Color.appMuted), axis: .vertical)
-            .font(.appBody(17, weight: .regular))
+            .font(.body)
             .foregroundStyle(Color.appInk)
             .tint(Color.appAccent)
             .lineLimit(1...(typeSize.isAccessibilitySize ? (attachmentLabel == nil ? 2 : 1) : 6))
@@ -1955,8 +1988,7 @@ private struct ChatInputBar: View {
             .disabled(isSending)
             .opacity(isSending ? 0.72 : 1)
             .onSubmit { if canSend { onSend() } }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 12)
+            .padding(.vertical, 11)
             .accessibilityLabel(incognito ? "Private message" : "Ask Adam")
             .accessibilityHint(incognito ? "Private. This message isn't saved." : "")
     }
@@ -1968,12 +2000,13 @@ private struct ChatInputBar: View {
                 HapticManager.shared.select()
                 onCancelVoice()
             } label: {
-                AppIcon(sf: "xmark", size: 13)
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.appMuted)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
-            .buttonStyle(.appScale)
+            .buttonStyle(.plain)
             .accessibilityLabel("Cancel")
 
             if !isPreparingVoice {
@@ -1982,14 +2015,14 @@ private struct ChatInputBar: View {
 
             Group {
                 if isPreparingVoice {
-                    ShimmerText(text: "Writing it down", font: .appBody(15, weight: .medium))
+                    ShimmerText(text: "Writing it down", font: .body)
                 } else if heard.isEmpty {
                     Text("Listening")
-                        .font(.appBody(15, weight: .medium))
+                        .font(.body)
                         .foregroundStyle(Color.appInk)
                 } else {
                     Text(heard)
-                        .font(.appBody(15))
+                        .font(.body)
                         .foregroundStyle(Color.appInk)
                         .lineLimit(2)
                         .truncationMode(.head)
@@ -1998,7 +2031,7 @@ private struct ChatInputBar: View {
             .animation(.appStandard, value: heard)
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 46)
+        .frame(minHeight: 44)
     }
 
     /// While Adam is writing a reply and nothing is typed, the button becomes Stop.
@@ -2010,16 +2043,6 @@ private struct ChatInputBar: View {
 
     private var isVoiceActive: Bool {
         isRecording || isPreparingVoice
-    }
-
-    private var buttonFill: Color {
-        if canSend || showsStop || isRecording { return Color.appAction }
-        return Color.appAction
-    }
-
-    private var buttonForeground: Color {
-        if canSend || showsStop || isRecording { return Color.appOnAction }
-        return canAct ? Color.appOnAction : Color.appMuted
     }
 
     private var canAct: Bool {

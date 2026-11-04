@@ -78,7 +78,6 @@ extension View {
     func settingsSurface(radius: CGFloat = AppRadius.card) -> some View {
         self
             .background(Color.appSurface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.7))
     }
 }
 
@@ -142,24 +141,16 @@ struct SettingsGroup<Content: View>: View {
     }
 }
 
-/// Rows on one raised surface, separated by inset hairlines.
+/// Rows in one plain group: no card, no border, no separators. Rows are spaced by their own padding.
 struct SettingsList<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(spacing: 0) { content }
-            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
-            .settingsSurface()
     }
 }
 
-struct SettingsRule: View {
-    var inset: CGFloat = 0
-    var body: some View {
-        Rectangle().fill(Color.appHairline).frame(height: 0.5).padding(.leading, inset)
-    }
-}
 
 // MARK: - Rows
 
@@ -241,8 +232,9 @@ struct SettingsNavRow: View {
     let action: () -> Void
 
     var body: some View {
+        // The whole row is the button; no chevron.
         SettingsRow(title: title, subtitle: subtitle, lead: lead, action: action) {
-            AppIcon("chevron-right", size: 12).foregroundStyle(Color.appMuted)
+            EmptyView()
         }
     }
 }

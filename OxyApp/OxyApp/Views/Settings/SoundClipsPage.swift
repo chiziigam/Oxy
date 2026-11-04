@@ -29,7 +29,6 @@ struct SoundClipsPage: View {
                 SettingsGroup(title: "Did Adam hear right?") {
                     SettingsList {
                         ForEach(Array(store.clips.enumerated()), id: \.element.id) { index, clip in
-                            if index > 0 { SettingsRule() }
                             row(clip)
                         }
                     }
@@ -43,7 +42,6 @@ struct SoundClipsPage: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        SettingsRule()
                     }
                     Button {
                         confirmsDeleteAll = true
@@ -84,7 +82,6 @@ struct SoundClipsPage: View {
                     .foregroundStyle(Color.appInk)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Color.settingsRaised))
-                    .overlay(Circle().strokeBorder(Color.appCardOutline, lineWidth: 1))
             }
             .buttonStyle(.appScale)
             .accessibilityLabel(playingId == clip.id ? "Stop" : "Play \(clip.title)")
@@ -114,9 +111,8 @@ struct SoundClipsPage: View {
                 .font(.appBody(13, weight: chosen ? .semibold : .medium))
                 .foregroundStyle(chosen ? Color.appOnAccent : Color.appMuted)
                 .padding(.horizontal, 10)
-                .frame(minHeight: 32)
+                .frame(minHeight: 44)
                 .background(Capsule().fill(chosen ? Color.appAccent : Color.clear))
-                .overlay(Capsule().strokeBorder(chosen ? Color.clear : Color.appCardOutline, lineWidth: 1))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

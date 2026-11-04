@@ -38,7 +38,6 @@ struct LegalConsentView: View {
                         lead: "I agree to the",
                         emphasis: "Terms of Use"
                     )
-                    AppDivider()
                     consentRow(
                         isOn: $agreedPrivacy,
                         lead: "I have read the",

@@ -48,12 +48,10 @@ struct SceneCard: View {
                         .frame(width: 16, height: 16)
                         .foregroundStyle(Color.appInk)
                         .frame(width: 34, height: 34)
-                        .overlay(Circle().strokeBorder(Color.appCardOutline, lineWidth: 1))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.appCardOutline, lineWidth: 1))
                 .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.appScale(0.98))
@@ -98,7 +96,6 @@ private struct SceneSheet: View {
                     .foregroundStyle(Color.appInk)
                     .frame(width: 40, height: 40)
                     .background(Circle().fill(Color(uiColor: sceneCanvas)))
-                    .overlay(Circle().strokeBorder(Color.appCardOutline, lineWidth: 1))
             }
             .buttonStyle(.appScale)
             .padding(.top, 8)

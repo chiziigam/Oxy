@@ -306,8 +306,6 @@ struct ReactionPicker: View {
                     }
                     .padding(6)
                     .background(Capsule().fill(Color.appBackground))
-                    .overlay(Capsule().strokeBorder(Color.appCardOutline, lineWidth: 1))
-
                     if showsMore {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 6), spacing: 2) {
                             ForEach(ReactionStore.more, id: \.self) { emoji in
@@ -324,7 +322,6 @@ struct ReactionPicker: View {
                         .padding(10)
                         .frame(width: 300)
                         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.appBackground))
-                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.appCardOutline, lineWidth: 1))
                         .transition(.scale(scale: 0.9, anchor: isUser ? .topTrailing : .topLeading).combined(with: .opacity))
                     }
 
@@ -361,7 +358,6 @@ struct ReactionPicker: View {
                 .padding(.horizontal, 18)
                 .frame(minHeight: 44)
                 .background(Capsule().fill(Color.appBackground))
-                .overlay(Capsule().strokeBorder(Color.appCardOutline, lineWidth: 1))
         }
         .buttonStyle(.appScale(0.95))
     }
@@ -473,7 +469,6 @@ struct ReactionBadge: View {
             .font(.appBody(15))
             .frame(width: 28, height: 28)
             .background(Circle().fill(Color.appBackground))
-            .overlay(Circle().strokeBorder(Color.appCardOutline, lineWidth: 1))
             .transition(.scale.combined(with: .opacity))
             .accessibilityLabel("Reacted \(emoji)")
     }

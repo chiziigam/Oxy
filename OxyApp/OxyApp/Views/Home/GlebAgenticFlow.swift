@@ -1,9 +1,11 @@
 import SwiftUI
 
-// MARK: - App icons (SF Symbols are banned — real bundled assets only)
+// MARK: - App icons
 //
-// Every glyph is a template-rendered vector asset under Assets.xcassets/ic-*.
-// Tint with `.foregroundStyle`. Never use Image(systemName:) anywhere.
+// Glyphs render as SF Symbols (Human Interface Guidelines: system symbols over hand-drawn
+// icons), so they match the system's weight, optical sizing and accessibility. A key with no
+// system equivalent falls back to its template asset under Assets.xcassets/ic-*.
+// Tint with `.foregroundStyle`.
 
 struct AppIcon: View {
     let name: String
@@ -23,15 +25,50 @@ struct AppIcon: View {
     }
 
     var body: some View {
-        Image("ic-\(name)")
-            .renderingMode(.template)
-            .resizable()
-            .scaledToFit()
-            .frame(width: size, height: size)
+        if let symbol = AppGlyph.systemSymbol(for: name) {
+            Image(systemName: symbol)
+                .resizable()
+                .scaledToFit()
+                .fontWeight(weight)
+                .frame(width: size, height: size)
+        } else {
+            Image("ic-\(name)")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        }
     }
 }
 
 enum AppGlyph {
+    /// Bundled icon key → SF Symbol. Keys not listed keep their bundled asset.
+    static func systemSymbol(for key: String) -> String? {
+        let map: [String: String] = [
+            "alert-circle": "exclamationmark.circle", "alert": "exclamationmark",
+            "arrow-right": "arrow.right", "arrow-up-right": "arrow.up.right", "arrow-up": "arrow.up",
+            "blinds": "blinds.horizontal.closed", "bolt": "bolt", "box": "shippingbox",
+            "bulb": "lightbulb", "calendar": "calendar", "camera": "camera", "car": "car",
+            "card": "creditcard", "chat": "bubble.left", "check-circle": "checkmark.circle",
+            "check": "checkmark", "chevron-down": "chevron.down", "chevron-left": "chevron.backward",
+            "chevron-right": "chevron.forward", "chevron-up": "chevron.up",
+            "chevron-updown": "chevron.up.chevron.down", "clock": "clock", "cloud-rain": "cloud.rain",
+            "cloud": "cloud", "cube": "cube", "display": "display", "doc": "doc", "dotted": "circle.dotted",
+            "edit": "pencil", "envelope": "envelope", "fan": "fan", "history": "clock.arrow.circlepath",
+            "list": "list.bullet", "location": "location", "map": "map", "menu": "line.3.horizontal",
+            "mic": "mic", "minus": "minus", "moon": "moon", "person-check": "person.crop.circle.badge.checkmark",
+            "person": "person", "phone": "phone", "photo": "photo", "pin": "mappin", "play": "play",
+            "plus": "plus", "power": "power", "refresh": "arrow.clockwise", "search": "magnifyingglass",
+            "shield-check": "checkmark.shield", "sparkles": "sparkles", "stop": "stop.fill", "sun": "sun.max",
+            "thermometer": "thermometer.medium", "ticket": "ticket", "trash": "trash", "waveform": "waveform",
+            "wifi-alert": "wifi.exclamationmark", "wifi-off": "wifi.slash", "xmark-circle": "xmark.circle.fill",
+            "xmark": "xmark", "tab-chat": "bubble.left", "tab-home": "house", "tab-more": "ellipsis",
+            "wheel-activity": "clock.arrow.circlepath", "wheel-home": "house", "wheel-memory": "brain",
+            "wheel-settings": "gearshape", "wheel-today": "sun.max"
+        ]
+        return map[key]
+    }
+
     /// Dynamic WeatherKit condition symbols → bundled weather icons.
     static func weather(_ sfName: String) -> String {
         let n = sfName.lowercased()

@@ -151,7 +151,6 @@ struct VaultView: View {
             } else {
                 SettingsList {
                     ForEach(Array(credentials.enumerated()), id: \.element.id) { index, credential in
-                        if index > 0 { SettingsRule() }
                         SettingsRow(
                             title: credential.label,
                             subtitle: "\(credential.site) · \(credential.username.isEmpty ? "No username" : credential.username)"
@@ -180,7 +179,6 @@ struct VaultView: View {
             } else {
                 SettingsList {
                     ForEach(Array(grants.enumerated()), id: \.element.id) { index, grant in
-                        if index > 0 { SettingsRule() }
                         SettingsRow(title: grant.site, subtitle: grant.detailLine) {
                             if grant.isLive {
                                 quietAction("Revoke", role: .appDestructive) {
@@ -208,7 +206,6 @@ struct VaultView: View {
             } else {
                 SettingsList {
                     ForEach(Array(VaultCredentialUse.grouped(uses).enumerated()), id: \.element.id) { index, group in
-                        if index > 0 { SettingsRule() }
                         SettingsRow(title: group.site, subtitle: group.detailLine)
                     }
                 }

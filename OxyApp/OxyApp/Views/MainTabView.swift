@@ -41,7 +41,7 @@ struct MainTabView: View {
                 if !didOpenDebugDestination {
                     didOpenDebugDestination = true
                     if let raw = ProcessInfo.processInfo.environment["OXY_DEBUG_OPEN"],
-                       let choice = ThreadMenuChoice(rawValue: raw) {
+                       let choice = ThreadMenuChoice(rawValue: raw), choice != .now {
                         opened = choice
                     }
                 }
@@ -57,6 +57,8 @@ struct MainTabView: View {
         case .home: YourHomeView()
         case .memory: MemoryView()
         case .settings, .privateChat: AdamYouView()
+        // Now lives inside the conversation screen, which handles this choice itself.
+        case .now: EmptyView()
         }
     }
 
@@ -164,9 +166,7 @@ private struct AdamYouView: View {
             SettingsPage(title: "Settings", isRoot: true) {
                 VStack(spacing: 0) {
                     youRow(title: "You", subtitle: youStatus, icon: "person") { destination = .you }
-                    SettingsRule(inset: 44)
                     youRow(title: "Apps", subtitle: appsStatus, icon: "cube") { destination = .apps }
-                    SettingsRule(inset: 44)
                     youRow(title: "Account", subtitle: appState.isDemoSession ? "Sample account" : "Your account and data", icon: "envelope") { destination = .account }
                 }
                 .padding(.vertical, 4)

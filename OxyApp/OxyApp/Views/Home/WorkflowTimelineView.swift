@@ -199,8 +199,6 @@ struct WorkflowTimelineView: View {
             Color.clear.frame(height: 1).id("decision-end-\(checkpoint.id)")
         }
         .appCard(padding: 20)
-        .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
-            .strokeBorder(Color.appNeedsYou.opacity(0.35), lineWidth: 1))
     }
 
     private func decisionButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {

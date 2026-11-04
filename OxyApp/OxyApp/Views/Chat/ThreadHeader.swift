@@ -9,11 +9,14 @@ struct ThreadHeader: View {
     var isDemo = false
     var isComposing = false
     var showsStatus = true
-    /// Set while in the conversation: the way back to Home.
-    var onHome: (() -> Void)? = nil
-    /// On Now, the greeting; in the conversation, the request it is about.
-    var title: String = "Home"
-    /// On Home: the line under the title, with its colour.
+    /// A standard back chevron, shown when this screen sits above another one.
+    var onBack: (() -> Void)? = nil
+    var backLabel: String = "Back"
+    /// The greeting on Now and on an empty conversation; otherwise the request it is about.
+    var title: String = "Adam"
+    /// A large title for the greeting; an inline (headline) title for a conversation.
+    var largeTitle: Bool = false
+    /// The line under a large title, with its colour.
     var homeStatus: (text: String, color: Color)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var wheelOpen: Bool
@@ -21,41 +24,42 @@ struct ThreadHeader: View {
 
     var body: some View {
         HStack(spacing: AppSpacing.md) {
-            if let onHome {
+            if let onBack {
                 Button {
                     HapticManager.shared.impact(.light)
-                    onHome()
+                    onBack()
                 } label: {
-                    AppIcon("chevron-left", size: 17)
-                        .foregroundStyle(Color.appInk)
+                    Image(systemName: "chevron.backward")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.appAccent)
                         .frame(width: 44, height: 44)
-                        .background(Color.appSurface2, in: Circle())
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.appScale)
-                .accessibilityLabel("Back to Now")
+                .buttonStyle(.plain)
+                .accessibilityLabel(backLabel)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: AppSpacing.sm) {
                     Text(title)
-                        .font(onHome == nil ? Font.role(.title, weight: .bold) : Font.role(.body, weight: .semibold))
+                        .font(largeTitle ? .title2.weight(.bold) : .headline)
                         .foregroundStyle(Color.appInk)
-                        .lineLimit(onHome == nil && typeSize.isAccessibilitySize ? 3 : 1)
+                        .lineLimit(largeTitle && typeSize.isAccessibilitySize ? 3 : 1)
                         .truncationMode(.tail)
                         .accessibilityAddTraits(.isHeader)
                     if isDemo {
-                        Text("Sample").font(.role(.caption, weight: .medium)).foregroundStyle(Color.appMuted)
+                        Text("Sample").font(.caption).foregroundStyle(Color.appMuted)
                     }
                 }
-                if let homeStatus, !isIncognito, onHome == nil {
+                if let homeStatus, !isIncognito, largeTitle {
                     HStack(spacing: 7) {
                         Circle().fill(homeStatus.color).frame(width: 7, height: 7)
                             .accessibilityHidden(true)
-                        Text(homeStatus.text).font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appMuted)
+                        Text(homeStatus.text).font(.footnote).foregroundStyle(Color.appMuted)
                             .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                     }
                     .accessibilityElement(children: .combine)
                 } else if isIncognito {
-                    Text("Not saved").font(.role(.footnote, weight: .medium)).foregroundStyle(Color.appMuted)
+                    Text("Not saved").font(.footnote).foregroundStyle(Color.appMuted)
                 }
             }
             Spacer(minLength: AppSpacing.sm)
@@ -75,13 +79,14 @@ struct ThreadHeader: View {
             .buttonStyle(.appScale)
             .opacity(wheelOpen ? 0 : 1)
             .accessibilityLabel("Menu")
-            .accessibilityHint("Opens Today, Activity, Memory, Your home and Settings")
+            .accessibilityHint("Opens Now, Today, Activity, Memory, Your home and Settings")
             .accessibilityValue(isIncognito ? "Private mode on" : (visibleStatus ?? ""))
         }
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .padding(.horizontal, AppSpacing.chatMargin)
-        .padding(.vertical, AppSpacing.sm)
-        .frame(minHeight: 60)
+        .padding(.leading, onBack == nil ? AppSpacing.chatMargin : AppSpacing.sm)
+        .padding(.trailing, AppSpacing.md)
+        .padding(.vertical, AppSpacing.xs)
+        .frame(minHeight: 52)
         .background(Color.appBackground.ignoresSafeArea(edges: .top))
         .animation(.appStandard, value: activity)
         .animation(.appStandard, value: deviceOnline)
@@ -91,8 +96,8 @@ struct ThreadHeader: View {
     private var statusDot: some View {
         if activity != nil || deviceOnline {
             Circle().fill(activity == .waiting ? Color.appNeedsYou : (activity != nil ? Color.appWorking : Color.appDone))
-                .frame(width: 9, height: 9)
-                .overlay(Circle().strokeBorder(Color.appBackground, lineWidth: 2))
+                .frame(width: 7, height: 7)
+                .offset(x: -6, y: 8)
         }
     }
 

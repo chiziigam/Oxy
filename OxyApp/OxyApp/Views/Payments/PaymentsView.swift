@@ -144,7 +144,6 @@ struct PaymentsView: View {
                 if card != nil {
                     SettingsRow(title: cardTitle, subtitle: "Checkout card")
                 }
-                if card != nil, balance != nil { SettingsRule() }
                 if balance != nil {
                     SettingsRow(title: formattedBalance, subtitle: "Balance")
                 }

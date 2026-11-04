@@ -75,7 +75,6 @@ struct TurnReceiptRow: View {
                 HStack(spacing: 3) {
                     Text("Open")
                         .font(.appBody(13, weight: .medium))
-                    AppIcon("chevron-right", size: 11)
                 }
                 .foregroundStyle(Color.appTitanium)
             } else if isExpandable {
@@ -86,9 +85,6 @@ struct TurnReceiptRow: View {
         }
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Color.appHairline).frame(height: 0.5)
-        }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(summaryLine)
@@ -141,11 +137,6 @@ struct TurnReceiptRow: View {
                 }
             }
             Spacer(minLength: 8)
-            if step.action.hasReceiptLink {
-                AppIcon("chevron-right", size: 13)
-                    .foregroundStyle(Color.appMuted)
-                    .accessibilityLabel("Open")
-            }
         }
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: step.action.hasReceiptLink ? 44 : 0, alignment: .leading)

@@ -18,10 +18,6 @@ struct DeviceStatusCard: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 11)
-
-            Rectangle()
-                .fill(Color.appHairline)
-                .frame(height: 0.5)
         }
     }
 

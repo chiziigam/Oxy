@@ -295,10 +295,6 @@ extension View {
             shape.fill((tint ?? Color.appSurface2).opacity(0.35))
         }
         .background(.ultraThinMaterial, in: shape)
-        .overlay(shape.strokeBorder(
-            Color.appAdaptive(dark: .white, light: .black).opacity(interactive ? 0.16 : 0.08),
-            lineWidth: 0.5
-        ))
     }
 }
 
@@ -407,15 +403,6 @@ extension Color {
     )
 }
 
-struct AppDivider: View {
-    var inset: CGFloat = 0
-    var body: some View {
-        Rectangle()
-            .fill(Color.appHairline)
-            .frame(height: 0.5)
-            .padding(.leading, inset)
-    }
-}
 
 /// The one section label: a short sentence-case word in muted semibold footnote, above a group.
 struct AppSectionHeader: View {
@@ -553,13 +540,12 @@ struct AppPrimaryButton: View {
 // MARK: - Card
 
 extension View {
-    /// The one raised surface: white (or deep green-grey) fill, one hairline, 16pt corners, no shadow.
+    /// The one raised surface: a quiet fill with 16pt corners. No border, no shadow.
     func appCard(padding: CGFloat = AppSpacing.lg) -> some View {
         self
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.appSurface, in: RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous).strokeBorder(Color.appHairline, lineWidth: 0.7))
     }
 }
 
@@ -1084,12 +1070,6 @@ extension Color {
     static let appDestructive = appDanger
 }
 
-/// Full-bleed dark hairline (#1A1A1A, 0.5pt) — the Adam row separator.
-struct SettingsDivider: View {
-    var body: some View {
-        Rectangle().fill(Color.appHairline).frame(height: 0.5)
-    }
-}
 
 /// The settings-family name for the shared section label.
 struct SettingsSectionHeader: View {

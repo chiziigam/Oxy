@@ -39,23 +39,19 @@ struct ProfileView: View {
                                 )
                                 .disabled(isBusy)
                                 status(for: .export)
-                                SettingsRule()
                                 actionRow(label: "Import from ChatGPT or Claude", action: { showsImport = true })
                                     .disabled(isBusy)
                             }
 
                             section(title: "Help and policies") {
                                 legalLink(label: "Support", path: "/support")
-                                SettingsRule()
                                 legalLink(label: "Privacy Policy", path: "/privacy")
-                                SettingsRule()
                                 legalLink(label: "Terms of Use", path: "/terms")
                             }
 
                             section(title: "Sign out") {
                                 actionRow(label: "Sign out", action: { showSignOutConfirm = true })
                                     .disabled(isBusy)
-                                SettingsRule()
                                 actionRow(
                                     label: isSigningOutAll ? "Signing out…" : "Sign out of all devices",
                                     action: { showSignOutAllConfirm = true }
@@ -180,8 +176,6 @@ struct ProfileView: View {
                     .font(.appBody(15, weight: .medium))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                AppIcon("chevron-right", size: 12)
-                    .foregroundStyle(Color.appMuted)
             }
             .foregroundStyle(destructive ? Color.appDestructive : Color.appInk)
             .frame(minHeight: 50)

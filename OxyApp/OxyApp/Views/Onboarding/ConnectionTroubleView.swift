@@ -30,7 +30,6 @@ struct ConnectionTroubleView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(checks.enumerated()), id: \.offset) { index, check in
-                        if index != 0 { AppDivider() }
                         checkRow(check)
                     }
                 }

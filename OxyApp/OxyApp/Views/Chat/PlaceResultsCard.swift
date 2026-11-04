@@ -104,11 +104,8 @@ struct PlaceResultsCard: View {
         }
         .padding(14)
         .frame(width: 252, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.appBackground.opacity(0.55)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isChosen ? Color.appAccent.opacity(0.7) : Color.appHairline, lineWidth: isChosen ? 1.2 : 0.7)
-        )
+        // Chosen reads as a quiet accent wash, not an outline.
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(isChosen ? Color.appAccentSoft : Color.appSurface2))
         .accessibilityElement(children: .combine)
     }
 }
