@@ -12,6 +12,10 @@ static i2c_master_dev_handle_t radar_device;
 static bool radar_configured;
 static uint8_t imu_id;
 static sensor_handle_t humiture;
+static esp_err_t humiture_loop_result = ESP_ERR_INVALID_STATE;
+static esp_err_t humiture_init_result = ESP_ERR_INVALID_STATE;
+static esp_err_t humiture_start_result = ESP_ERR_INVALID_STATE;
+static uint32_t humiture_events;
 static float temperature, humidity;
 static int64_t temperature_at, humidity_at;
 static portMUX_TYPE readings_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -50,6 +54,7 @@ static void humiture_event(void *arg, sensor_event_base_t base, int32_t event_id
     const sensor_data_t *data = event_data;
     if (!data) return;
     portENTER_CRITICAL(&readings_lock);
+    humiture_events++;
     if (event_id == SENSOR_TEMP_DATA_READY && isfinite(data->temperature)) {
         temperature = data->temperature; temperature_at = esp_timer_get_time();
     } else if (event_id == SENSOR_HUMI_DATA_READY && isfinite(data->humidity)) {
@@ -71,11 +76,13 @@ void adam_sensors_init(void) {
             icm42670_delete(imu); imu = NULL;
         }
     }
-    if (sensors_event_loop_create() == ESP_OK) {
+    humiture_loop_result = sensors_event_loop_create();
+    if (humiture_loop_result == ESP_OK) {
         bsp_sensor_config_t config = {.type = HUMITURE_ID, .mode = MODE_POLLING, .period = 2000};
-        if (bsp_sensor_init(&config, &humiture) == ESP_OK) {
+        humiture_init_result = bsp_sensor_init(&config, &humiture);
+        if (humiture_init_result == ESP_OK) {
             iot_sensor_handler_register(humiture, humiture_event, NULL);
-            iot_sensor_start(humiture);
+            humiture_start_result = iot_sensor_start(humiture);
         }
     }
     gpio_config_t radar_pin = {.pin_bit_mask = 1ULL << GPIO_NUM_21, .mode = GPIO_MODE_INPUT,
@@ -113,6 +120,10 @@ char *adam_sensors_snapshot(void) {
     bool environment_ok = temp_at && rh_at && now - temp_at < 10000000 && now - rh_at < 10000000;
     cJSON *environment = cJSON_AddObjectToObject(root, "environment");
     cJSON_AddBoolToObject(environment, "available", environment_ok);
+    cJSON_AddStringToObject(environment, "loopStatus", esp_err_to_name(humiture_loop_result));
+    cJSON_AddStringToObject(environment, "initStatus", esp_err_to_name(humiture_init_result));
+    cJSON_AddStringToObject(environment, "startStatus", esp_err_to_name(humiture_start_result));
+    cJSON_AddNumberToObject(environment, "events", humiture_events);
     if (environment_ok) {
         cJSON_AddNumberToObject(environment, "temperatureC", temp);
         cJSON_AddNumberToObject(environment, "humidityPercent", rh);

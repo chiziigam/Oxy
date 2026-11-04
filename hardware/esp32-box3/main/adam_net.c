@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
@@ -10,6 +11,8 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
+#include "esp_tls.h"
 #include "esp_wifi.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -21,6 +24,10 @@ typedef struct { char ssid[33], pass[65], url[129], id[65], token[97]; } config_
 static config_t config;
 static bool configured;
 static volatile bool online;
+static volatile int disconnect_reason;
+static volatile bool scanning;
+static esp_err_t last_network_error;
+static int last_tls_error;
 
 static bool read_string(nvs_handle_t handle, const char *key, char *out, size_t capacity) {
     size_t size = capacity;
@@ -39,8 +46,12 @@ static bool load_config(void) {
 
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) esp_wifi_connect();
-    else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) { online = false; esp_wifi_connect(); }
-    else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) online = true;
+    else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        disconnect_reason = ((wifi_event_sta_disconnected_t *)data)->reason;
+        online = false;
+        if (!scanning) esp_wifi_connect();
+    }
+    else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) { online = true; disconnect_reason = 0; }
 }
 
 void adam_net_init(void) {
@@ -58,16 +69,49 @@ void adam_net_init(void) {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL));
     wifi_config_t wifi = {0};
-    strlcpy((char *)wifi.sta.ssid, config.ssid, sizeof(wifi.sta.ssid));
-    strlcpy((char *)wifi.sta.password, config.pass, sizeof(wifi.sta.password));
+    memcpy(wifi.sta.ssid, config.ssid, strlen(config.ssid));
+    memcpy(wifi.sta.password, config.pass, strlen(config.pass));
     wifi.sta.threshold.authmode = config.pass[0] ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi));
     ESP_ERROR_CHECK(esp_wifi_start());
+    esp_sntp_config_t clock = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    ESP_ERROR_CHECK(esp_netif_sntp_init(&clock));
 }
 
 bool adam_net_configured(void) { return configured; }
 bool adam_net_online(void) { return configured && online; }
+int adam_net_disconnect_reason(void) { return disconnect_reason; }
+const char *adam_net_last_error(void) { return esp_err_to_name(last_network_error); }
+int adam_net_tls_error(void) { return last_tls_error; }
+
+char *adam_net_scan(void) {
+    if (!configured) return NULL;
+    scanning = true;
+    esp_wifi_disconnect();
+    wifi_scan_config_t scan = {.show_hidden = true};
+    esp_err_t err = esp_wifi_scan_start(&scan, true);
+    cJSON *networks = cJSON_CreateArray();
+    if (err == ESP_OK && networks) {
+        uint16_t count = 32;
+        wifi_ap_record_t *records = calloc(count, sizeof(*records));
+        if (records && esp_wifi_scan_get_ap_records(&count, records) == ESP_OK) {
+            for (uint16_t i = 0; i < count; i++) {
+                cJSON *network = cJSON_CreateObject();
+                cJSON_AddStringToObject(network, "ssid", (char *)records[i].ssid);
+                cJSON_AddNumberToObject(network, "rssi", records[i].rssi);
+                cJSON_AddNumberToObject(network, "channel", records[i].primary);
+                cJSON_AddItemToArray(networks, network);
+            }
+        }
+        free(records);
+    }
+    scanning = false;
+    esp_wifi_connect();
+    char *json = err == ESP_OK && networks ? cJSON_PrintUnformatted(networks) : NULL;
+    cJSON_Delete(networks);
+    return json;
+}
 
 static bool copy_field(cJSON *root, const char *key, char *out, size_t capacity, bool required) {
     cJSON *item = cJSON_GetObjectItemCaseSensitive(root, key);
@@ -97,7 +141,7 @@ bool adam_net_store_config(const char *json) {
     return ok;
 }
 
-typedef struct { adam_reply_t *reply; size_t capacity; } transfer_t;
+typedef struct { adam_reply_t *reply; size_t capacity; pcm_stream_t *stream; bool audio_response, failed; } transfer_t;
 
 static void url_decode(const char *in, char *out, size_t capacity) {
     size_t n = 0;
@@ -111,16 +155,27 @@ static void url_decode(const char *in, char *out, size_t capacity) {
 }
 
 static esp_err_t on_http(esp_http_client_event_t *event) {
+    if (event->event_id == HTTP_EVENT_DISCONNECTED && event->data) {
+        int error = 0;
+        if (esp_tls_get_and_clear_last_error(event->data, &error, NULL) != ESP_OK && error) last_tls_error = error;
+    }
     transfer_t *transfer = event->user_data;
     if (!transfer) return ESP_OK;
     adam_reply_t *reply = transfer->reply;
     if (event->event_id == HTTP_EVENT_ON_HEADER) {
+        if (!strcasecmp(event->header_key, "Content-Type")) transfer->audio_response = !strncasecmp(event->header_value, "application/octet-stream", 24);
         if (!strcasecmp(event->header_key, "X-Adam-Heard")) url_decode(event->header_value, reply->heard, sizeof(reply->heard));
         else if (!strcasecmp(event->header_key, "X-Adam-Reply")) url_decode(event->header_value, reply->reply, sizeof(reply->reply));
     } else if (event->event_id == HTTP_EVENT_ON_DATA && event->data_len > 0) {
         if (reply->http_status == 0) reply->http_status = esp_http_client_get_status_code(event->client);
         if (reply->http_status != 200) return ESP_OK;  // error bodies are not audio
-        if (reply->audio_bytes + event->data_len > MAX_REPLY_BYTES) return ESP_FAIL;
+        if (transfer->failed) return ESP_FAIL;
+        if (reply->audio_bytes + event->data_len > MAX_REPLY_BYTES) { transfer->failed = true; return ESP_FAIL; }
+        if (transfer->stream) {
+            if (!transfer->audio_response || !pcm_stream_push(transfer->stream, (uint8_t *)event->data, event->data_len)) { transfer->failed = true; return ESP_FAIL; }
+            reply->audio_bytes += event->data_len;
+            return ESP_OK;
+        }
         if (reply->audio_bytes + event->data_len > transfer->capacity) {
             size_t capacity = transfer->capacity ? transfer->capacity * 2 : 65536;
             while (capacity < reply->audio_bytes + event->data_len) capacity *= 2;
@@ -135,6 +190,12 @@ static esp_err_t on_http(esp_http_client_event_t *event) {
 }
 
 static esp_http_client_handle_t open_client(const char *suffix, const char *content_type, transfer_t *transfer, int timeout_ms) {
+    // Bounded: 15s here meant the first request after a boot could sit silent that long.
+    if (!strncmp(config.url, "https://", 8) && time(NULL) < 1700000000 &&
+        esp_netif_sntp_sync_wait(pdMS_TO_TICKS(6000)) != ESP_OK) {
+        last_network_error = ESP_ERR_TIMEOUT;
+        return NULL;
+    }
     char url[256];
     snprintf(url, sizeof(url), "%s/display/%s/%s", config.url, config.id, suffix);
     esp_http_client_config_t http = {.url = url, .method = HTTP_METHOD_POST, .timeout_ms = timeout_ms, .buffer_size = 2048,
@@ -148,19 +209,121 @@ static esp_http_client_handle_t open_client(const char *suffix, const char *cont
     return client;
 }
 
-bool adam_net_voice(const int16_t *pcm, size_t bytes, adam_reply_t *reply) {
+bool adam_net_voice(const int16_t *pcm, size_t bytes, adam_reply_t *reply, pcm_sink_t sink, void *context) {
     memset(reply, 0, sizeof(*reply));
     if (!adam_net_online()) return false;
     transfer_t transfer = {.reply = reply};
+    if (sink) {
+        transfer.stream = heap_caps_calloc(1, sizeof(pcm_stream_t), MALLOC_CAP_SPIRAM);
+        if (!transfer.stream) { last_network_error = ESP_ERR_NO_MEM; return false; }
+        pcm_stream_init(transfer.stream, sink, context);
+    }
     esp_http_client_handle_t client = open_client("voice", "application/octet-stream", &transfer, 90000);
-    if (!client) return false;
+    if (!client) { free(transfer.stream); return false; }
     esp_http_client_set_post_field(client, (const char *)pcm, (int)bytes);
+    last_tls_error = 0;
     esp_err_t err = esp_http_client_perform(client);
+    if (transfer.failed) err = ESP_FAIL;
+    if (err == ESP_OK && reply->http_status == 200 && transfer.stream && !pcm_stream_finish(transfer.stream)) err = ESP_FAIL;
+    last_network_error = err;
     if (err == ESP_OK && reply->http_status == 0) reply->http_status = esp_http_client_get_status_code(client);
     esp_http_client_cleanup(client);
+    free(transfer.stream);
     if (err != ESP_OK) { ESP_LOGW(TAG, "voice request failed: %s", esp_err_to_name(err)); free(reply->audio); reply->audio = NULL; reply->audio_bytes = 0; return false; }
     if (reply->http_status != 200) { free(reply->audio); reply->audio = NULL; reply->audio_bytes = 0; }
     return true;
+}
+
+// ── Streamed voice upload ────────────────────────────────────────────────────────────────
+// The recording is written to the connection as it is captured. A dropped connection or a
+// refused write leaves the caller free to send the whole buffer the old way instead.
+
+struct adam_voice_stream {
+    transfer_t transfer;
+    esp_http_client_handle_t client;
+    bool failed;
+    size_t written;
+};
+
+adam_voice_stream_t *adam_net_voice_begin(adam_reply_t *reply, pcm_sink_t sink, void *context) {
+    if (!adam_net_online()) return NULL;
+    memset(reply, 0, sizeof(*reply));
+    adam_voice_stream_t *stream = heap_caps_calloc(1, sizeof(*stream), MALLOC_CAP_SPIRAM);
+    if (!stream) return NULL;
+    stream->transfer.reply = reply;
+    if (sink) {
+        stream->transfer.stream = heap_caps_calloc(1, sizeof(pcm_stream_t), MALLOC_CAP_SPIRAM);
+        if (!stream->transfer.stream) { free(stream); return NULL; }
+        pcm_stream_init(stream->transfer.stream, sink, context);
+    }
+    esp_http_client_handle_t client = open_client("voice", "application/octet-stream", &stream->transfer, 90000);
+    if (!client) goto fail;
+    last_tls_error = 0;
+    // Length unknown while the person is still talking, so the body is chunked.
+    if (esp_http_client_open(client, -1) != ESP_OK) {
+        last_network_error = ESP_FAIL;
+        esp_http_client_cleanup(client);
+        goto fail;
+    }
+    stream->client = client;
+    return stream;
+fail:
+    free(stream->transfer.stream);
+    free(stream);
+    return NULL;
+}
+
+bool adam_net_voice_send(adam_voice_stream_t *stream, const int16_t *pcm, size_t bytes) {
+    if (!stream || stream->failed || !bytes) return stream && !stream->failed;
+    int written = esp_http_client_write(stream->client, (const char *)pcm, (int)bytes);
+    if (written != (int)bytes) { stream->failed = true; last_network_error = ESP_FAIL; return false; }
+    stream->written += bytes;
+    return true;
+}
+
+void adam_net_voice_abort(adam_voice_stream_t *stream) {
+    if (!stream) return;
+    if (stream->client) {
+        esp_http_client_close(stream->client);
+        esp_http_client_cleanup(stream->client);
+    }
+    free(stream->transfer.stream);
+    free(stream);
+}
+
+static void header_value(esp_http_client_handle_t client, const char *key, char *out, size_t capacity) {
+    char *value = NULL;
+    if (esp_http_client_get_header(client, key, &value) == ESP_OK && value) url_decode(value, out, capacity);
+}
+
+bool adam_net_voice_finish(adam_voice_stream_t *stream, const int16_t *tail, size_t tail_bytes, adam_reply_t *reply) {
+    if (!stream) return false;
+    adam_net_voice_send(stream, tail, tail_bytes);
+    bool ok = !stream->failed;
+    esp_http_client_handle_t client = stream->client;
+    if (ok && esp_http_client_fetch_headers(client) < 0) ok = false;
+    if (ok) {
+        int status = esp_http_client_get_status_code(client);
+        reply->http_status = status;
+        header_value(client, "X-Adam-Heard", reply->heard, sizeof(reply->heard));
+        header_value(client, "X-Adam-Reply", reply->reply, sizeof(reply->reply));
+        char *content_type = NULL;
+        bool audio_response = esp_http_client_get_header(client, "Content-Type", &content_type) == ESP_OK && content_type &&
+                              !strncasecmp(content_type, "application/octet-stream", 24);
+        if (status == 200 && !audio_response) ok = false;
+        uint8_t buffer[2048];
+        while (ok && status == 200) {
+            int read = esp_http_client_read(client, (char *)buffer, sizeof(buffer));
+            if (read <= 0) break;
+            if (!stream->transfer.stream || reply->audio_bytes + read > MAX_REPLY_BYTES) { ok = false; break; }
+            if (!pcm_stream_push(stream->transfer.stream, buffer, (size_t)read)) { ok = false; break; }
+            reply->audio_bytes += (size_t)read;
+        }
+    }
+    last_network_error = ok ? ESP_OK : ESP_FAIL;
+    stream->failed = !ok;
+    adam_net_voice_abort(stream);
+    return ok;
 }
 
 bool adam_net_post_json(const char *path, const char *json) {
@@ -170,7 +333,9 @@ bool adam_net_post_json(const char *path, const char *json) {
     esp_http_client_handle_t client = open_client(path, "application/json", &transfer, 15000);
     if (!client) return false;
     esp_http_client_set_post_field(client, json, (int)strlen(json));
+    last_tls_error = 0;
     esp_err_t err = esp_http_client_perform(client);
+    last_network_error = err;
     int status = err == ESP_OK ? esp_http_client_get_status_code(client) : 0;
     esp_http_client_cleanup(client);
     free(ignored.audio);
