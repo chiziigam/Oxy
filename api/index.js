@@ -685,6 +685,32 @@ async function bridgeToChatPipeline(userId, message, req, buildRequest = buildTe
   return chatRes.json();
 }
 
+// The same bridge, but handing back the chat stream's events as they arrive, with speech
+// switched on. The room node can then talk while the model is still writing.
+async function* bridgeToChatPipelineStream(userId, message, req, buildRequest = buildDisplayChatRequest) {
+  const { data: userRow } = await supabase.from('users').select('token_version').eq('user_id', userId).maybeSingle();
+  const sessionToken = createSessionToken(userId, userRow?.token_version || 1);
+  const baseUrl = `http://127.0.0.1:${process.env.PORT || req.socket.localPort || 3000}`;
+  const chatRes = await fetch(`${baseUrl}/chat?stream=true&tts=true`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', Authorization: `Bearer ${sessionToken}` },
+    body: JSON.stringify(buildRequest(userId, message))
+  });
+  if (!chatRes.ok) throw new Error(`chat bridge returned ${chatRes.status}`);
+  let buffer = '';
+  for await (const chunk of chatRes.body) {
+    buffer += Buffer.from(chunk).toString('utf8');
+    let index;
+    while ((index = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      const line = frame.split('\n').find(l => l.startsWith('data: '));
+      if (!line) continue;
+      try { yield JSON.parse(line.slice(6)); } catch { /* keepalives and partial frames */ }
+    }
+  }
+}
+
 // Telegram's own typing indicator lasts ~5s, so it needs refreshing while a slow agent-loop
 // turn runs — otherwise a 30-60s travel search looks like dead silence instead of a wait.
 async function withTelegramTyping(chatId, work) {
@@ -9102,6 +9128,8 @@ require('./services/box-gateway').registerBoxRoutes(app, {
   displayBearerToken,
   bridgeToChatPipeline,
   buildDisplayChatRequest,
+  // Speech starts as the model writes, rather than after the whole turn.
+  streamChatReply: (userId, message, req) => bridgeToChatPipelineStream(userId, message, req, buildDisplayChatRequest),
   evaluateAndSurfaceHouseholdEvents,
   voice: {
     transcribe: buffer => require('./services/voice-provider').transcribeSpeechOpenAI(buffer),

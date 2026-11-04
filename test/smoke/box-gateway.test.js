@@ -12,7 +12,7 @@ function tone(seconds, amplitude = 8000, rate = 16000) {
 }
 
 async function start(overrides = {}) {
-  const calls = { chat: [], events: [], spoken: [] };
+  const calls = { chat: [], events: [], spoken: [], streamed: [] };
   const app = express();
   app.use(express.json());
   gateway.registerBoxRoutes(app, {
@@ -20,6 +20,9 @@ async function start(overrides = {}) {
     pairedDisplays: { displayForToken: async (_supabase, id, token) => (token === 'good' ? { id, user_id: 'u1' } : null) },
     displayBearerToken: req => String(req.headers.authorization || '').replace(/^Bearer\s+/, ''),
     bridgeToChatPipeline: async (userId, message) => { calls.chat.push({ userId, message }); return overrides.chatResult || { text: 'It is half past four.', actions: [] }; },
+    streamChatReply: overrides.streamChatReply
+      ? async function* (userId, message) { calls.streamed.push({ userId, message }); yield* overrides.streamChatReply(userId, message); }
+      : undefined,
     buildDisplayChatRequest: () => ({}),
     evaluateAndSurfaceHouseholdEvents: async (userId, events) => { calls.events.push({ userId, events }); return { raised: 1, received: events.length }; },
     voice: {
@@ -30,12 +33,16 @@ async function start(overrides = {}) {
     findPendingAction: actions => actions.find(a => a.pending) || null
   });
   const server = await new Promise(resolve => { const s = app.listen(0, () => resolve(s)); });
-  const request = (path, { method = 'POST', token = 'good', body, json } = {}) => new Promise((resolve, reject) => {
+  const request = (path, { method = 'POST', token = 'good', body, json, onFirstChunk } = {}) => new Promise((resolve, reject) => {
     const payload = json !== undefined ? Buffer.from(JSON.stringify(json)) : body;
     const headers = { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': json !== undefined ? 'application/json' : 'application/octet-stream' };
     const req = http.request({ port: server.address().port, path, method, headers }, res => {
       const chunks = [];
-      res.on('data', c => chunks.push(c));
+      let seenFirst = false;
+      res.on('data', c => {
+        if (!seenFirst) { seenFirst = true; if (onFirstChunk) onFirstChunk(res); }
+        chunks.push(c);
+      });
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
     });
     req.on('error', reject);
@@ -121,12 +128,118 @@ test('voice turn: fresh room readings are added to a room question only', async 
   } finally { await other.close(); }
 });
 
-test('long answers are shortened for speaking', async () => {
-  const box = await start({ chatResult: { text: 'word '.repeat(400), actions: [] } });
+const spokenClip = () => gateway.pcmToWav(tone(0.5, 5000, 24000), 24000).toString('base64');
+
+test('speech starts before the model has finished writing', async () => {
+  let releaseAudio;
+  const deviceHasAudio = new Promise(resolve => { releaseAudio = resolve; });
+  let resumedAfterAudio = false;
+  const box = await start({
+    streamChatReply: async function* () {
+      yield { type: 'audio', data: spokenClip() };
+      // Only resolves once the device has received a chunk, so a buffered implementation hangs.
+      await Promise.race([
+        deviceHasAudio,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('no audio reached the device before generation finished')), 3000))
+      ]);
+      resumedAfterAudio = true;
+      yield { type: 'text', chunk: ' It is four.' };
+      yield { type: 'audio', data: spokenClip() };
+      yield { type: 'done' };
+    }
+  });
+  try {
+    const res = await box.request('/display/d1/voice', { body: tone(2), onFirstChunk: () => releaseAudio() });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['x-audio-rate'], '16000');
+    assert.match(decodeURIComponent(res.headers['x-adam-heard']), /what time is it/);
+    assert.ok(resumedAfterAudio, 'the model must keep writing while the device already has audio');
+    assert.equal(res.body.length, 16000 * 2, 'two half-second clips, resampled to 16 kHz');
+    assert.deepEqual(box.calls.streamed, [{ userId: 'u1', message: 'what time is it' }]);
+  } finally { await box.close(); }
+});
+
+test('an approval is named after the answer instead of being spoken as done', async () => {
+  const box = await start({
+    streamChatReply: async function* () {
+      yield { type: 'text', chunk: 'Ready to book.' };
+      yield { type: 'audio', data: spokenClip() };
+      yield { type: 'actions', results: [{ pending: true }] };
+      yield { type: 'done' };
+    }
+  });
   try {
     const res = await box.request('/display/d1/voice', { body: tone(2) });
-    assert.ok(box.calls.spoken[0].length < 560);
-    assert.match(box.calls.spoken[0], /more on your phone/);
+    assert.equal(res.status, 200);
+    assert.ok(box.calls.spoken.some(text => /phone/i.test(text)), 'the phone line must still be spoken');
+  } finally { await box.close(); }
+});
+
+test('a stream with no audio falls back to the ordinary spoken reply', async () => {
+  const box = await start({
+    streamChatReply: async function* () {
+      yield { type: 'text', chunk: 'It is half past four.' };
+      yield { type: 'done' };
+    }
+  });
+  try {
+    const res = await box.request('/display/d1/voice', { body: tone(2) });
+    assert.equal(res.status, 200);
+    assert.equal(decodeURIComponent(res.headers['x-adam-reply']), 'It is half past four.');
+    assert.ok(box.calls.spoken.some(text => /half past four/.test(text)));
+  } finally { await box.close(); }
+});
+
+test('a slow answer is covered by a short spoken acknowledgement', async () => {
+  process.env.OXY_VOICE_ACK_DELAY_MS = '120';
+  const box = await start({
+    streamChatReply: async function* () {
+      await new Promise(resolve => setTimeout(resolve, 700));
+      yield { type: 'text', chunk: 'It is four.' };
+      yield { type: 'audio', data: spokenClip() };
+      yield { type: 'done' };
+    }
+  });
+  try {
+    const started = Date.now();
+    let firstChunkAt = null;
+    const res = await box.request('/display/d1/voice', {
+      body: tone(2),
+      onFirstChunk: () => { firstChunkAt = Date.now() - started; }
+    });
+    assert.equal(res.status, 200);
+    assert.ok(firstChunkAt !== null && firstChunkAt < 500, `first audio took ${firstChunkAt}ms`);
+    assert.ok(box.calls.spoken.includes('One moment.'), 'the acknowledgement must be spoken');
+    assert.equal(res.body.length, 16000 * 2, 'acknowledgement plus answer');
+  } finally {
+    delete process.env.OXY_VOICE_ACK_DELAY_MS;
+    await box.close();
+  }
+});
+
+test('a quick answer is not preceded by an acknowledgement', async () => {
+  process.env.OXY_VOICE_ACK_DELAY_MS = '400';
+  const box = await start({
+    streamChatReply: async function* () {
+      yield { type: 'text', chunk: 'It is four.' };
+      yield { type: 'audio', data: spokenClip() };
+      yield { type: 'done' };
+    }
+  });
+  try {
+    const res = await box.request('/display/d1/voice', { body: tone(2) });
+    assert.equal(res.body.length, 16000, 'only the answer');
+  } finally {
+    delete process.env.OXY_VOICE_ACK_DELAY_MS;
+    await box.close();
+  }
+});
+
+test('long answers are shortened for speaking', async () => {  const box = await start({ chatResult: { text: 'word '.repeat(400), actions: [] } });
+  try {
+    const res = await box.request('/display/d1/voice', { body: tone(2) });
+    const spoken = box.calls.spoken.find(text => /more on your phone/.test(text)) || '';
+    assert.ok(spoken.length > 0 && spoken.length < 560);
     assert.equal(res.status, 200);
   } finally { await box.close(); }
 });

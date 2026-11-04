@@ -11,6 +11,7 @@ const RATE = 16000;
 const MIN_AUDIO_BYTES = RATE * 2 * 0.4;
 const MAX_AUDIO_BYTES = RATE * 2 * 15;
 const MAX_SPOKEN = 500;
+const MAX_REPLY_PCM = RATE * 2 * 35;
 const SENSOR_FRESH_MS = 2 * 60 * 1000;
 const SOUND_BUCKET_MS = 10 * 60 * 1000;
 const PHONE_ONLY = 'Open Adam on your phone to approve that.';
@@ -101,7 +102,7 @@ function soundEvent(displayId, type, now = new Date()) {
 
 function registerBoxRoutes(app, deps) {
   const { supabase, pairedDisplays, displayBearerToken, bridgeToChatPipeline, buildDisplayChatRequest, evaluateAndSurfaceHouseholdEvents,
-    voice, reactions, findPendingAction, log = () => {} } = deps;
+    voice, reactions, findPendingAction, streamChatReply, log = () => {} } = deps;
   const fusion = deps.fusion || sensorFusion.createFusion();
   const sensors = new Map();
   const signalTimes = new Map();
@@ -150,6 +151,89 @@ function registerBoxRoutes(app, deps) {
   }, deps.sweepMs ?? 15000);
   sweepTimer.unref?.();
 
+  // A short spoken acknowledgement covers a slow model. Synthesised once and cached, so it
+  // costs no time on the turn that needs it.
+  const ACK_TEXT = process.env.OXY_VOICE_ACK_TEXT || 'One moment.';
+  const ACK_DELAY_MS = Number(process.env.OXY_VOICE_ACK_DELAY_MS || 900);
+  let ackPcm = null;
+  let ackPending = null;
+  function acknowledgementPcm() {
+    if (ackPcm) return Promise.resolve(ackPcm);
+    if (!ackPending) {
+      ackPending = voice.synthesizeSpeech(ACK_TEXT)
+        .then(base64 => { ackPcm = wavToPcm16k(Buffer.from(base64, 'base64')); return ackPcm; })
+        .catch(e => { log('warn', 'box.voice.ack_failed', { error: e.message }); return null; })
+        .finally(() => { ackPending = null; });
+    }
+    return ackPending;
+  }
+
+  // Speaks the reply while the model is still writing: the chat stream already turns complete
+  // sentences into audio, so each clip can go to the speaker as soon as it exists.
+  async function streamReplyToDevice({ res, display, text, req, heard }) {
+    const startedAt = Date.now();
+    let replyText = '';
+    let actions = [];
+    let headersSent = false;
+    let audioBytes = 0;
+    let firstAudioMs = null;
+    let ackPlayed = false;
+    const writeAudio = pcm => {
+      if (!headersSent) {
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'X-Audio-Rate': String(RATE),
+          'X-Adam-Heard': encodeURIComponent(heard.slice(0, 200)),
+          'X-Adam-Reply': encodeURIComponent(replyText.slice(0, 300))
+        });
+        headersSent = true;
+        firstAudioMs = Date.now() - startedAt;
+      }
+      res.write(pcm);
+      audioBytes += pcm.length;
+    };
+    const ackTimer = ACK_DELAY_MS > 0 ? setTimeout(async () => {
+      if (headersSent) return;
+      const pcm = await acknowledgementPcm();
+      if (!pcm || headersSent || !pcm.length) return;
+      ackPlayed = true;
+      writeAudio(pcm);
+      log('info', 'box.voice.ack_spoken', { at_ms: Date.now() - startedAt });
+    }, ACK_DELAY_MS) : null;
+    try {
+      for await (const event of streamChatReply(display.user_id, text, req)) {
+        if (event.type === 'text' && typeof event.chunk === 'string') {
+          replyText += event.chunk;
+        } else if (event.type === 'replace' && typeof event.text === 'string') {
+          replyText = event.text;
+        } else if (event.type === 'audio' && event.data) {
+          let clip;
+          try { clip = wavToPcm16k(Buffer.from(event.data, 'base64')); }
+          catch (e) { log('warn', 'box.voice.bad_clip', { error: e.message }); continue; }
+          if (!clip.length) continue;
+          // The device holds 40 seconds; stop rather than overrun it.
+          if (audioBytes + clip.length > MAX_REPLY_PCM) break;
+          writeAudio(clip);
+        } else if (event.type === 'actions') {
+          actions = Array.isArray(event.results) ? event.results : [];
+        }
+      }
+    } finally {
+      if (ackTimer) clearTimeout(ackTimer);
+    }
+    if (!headersSent) return { sent: false, reply: replyText, actions };
+    // An approval is never spoken as if it had happened; it is named after the answer.
+    if (findPendingAction(actions)) {
+      try {
+        const extra = wavToPcm16k(Buffer.from(await voice.synthesizeSpeech(PHONE_ONLY), 'base64'));
+        if (audioBytes + extra.length <= MAX_REPLY_PCM) res.write(extra);
+      } catch (e) { log('warn', 'box.voice.phone_notice_failed', { error: e.message }); }
+    }
+    res.end();
+    log('info', 'box.voice.stream', { first_audio_ms: firstAudioMs, ack: ackPlayed, audio_s: Math.round(audioBytes / (RATE * 2)), total_ms: Date.now() - startedAt });
+    return { sent: true, reply: replyText, actions };
+  }
+
   app.post('/display/:id/voice', express.raw({ type: 'application/octet-stream', limit: MAX_AUDIO_BYTES + 1024 }), async (req, res) => {
     try {
       const display = await authorise(req, res);
@@ -158,18 +242,31 @@ function registerBoxRoutes(app, deps) {
       if (pcm.length < MIN_AUDIO_BYTES || pcm.length > MAX_AUDIO_BYTES || pcm.length % 2) return res.status(400).json({ error: 'That recording was the wrong length.', code: 'bad_audio' });
       if (isSilent(pcm)) return res.status(422).json({ error: 'I did not hear anything.', code: 'no_speech' });
       displayAsk.checkAskRate(display.id);
+      const transcribedAt = Date.now();
+      // Warm the acknowledgement while the words are still being transcribed.
+      if (ACK_DELAY_MS > 0) acknowledgementPcm();
       const heard = await voice.transcribe(pcmToWav(pcm));
       if (!heard) return res.status(422).json({ error: 'I did not catch that.', code: 'no_speech' });
+      log('info', 'box.voice.heard', { transcribe_ms: Date.now() - transcribedAt, words: heard.split(/\s+/).length });
 
       let reply;
       try {
         const text = displayAsk.validateDisplayAsk(heard);
         const fresh = sensors.get(display.id);
         const context = fresh && Date.now() - fresh.at < SENSOR_FRESH_MS && ROOM_WORDS.test(text) ? roomLine(fresh.reading, Date.now() - fresh.at) : '';
-        const result = await bridgeToChatPipeline(display.user_id, context ? `${text}\n\n${context}` : text, req, buildDisplayChatRequest);
-        if (findPendingAction(result?.actions || [])) reply = PHONE_ONLY;
-        else reply = reactions.isQuietReply(result?.text) ? 'Done.' : reactions.plainReply(result?.text || 'Done.');
+        const message = context ? `${text}\n\n${context}` : text;
+        if (typeof streamChatReply === 'function') {
+          const outcome = await streamReplyToDevice({ res, display, text: message, req, heard });
+          if (outcome.sent) return;
+          reply = findPendingAction(outcome.actions) ? PHONE_ONLY
+            : reactions.isQuietReply(outcome.reply) ? 'Done.' : reactions.plainReply(outcome.reply || 'Done.');
+        } else {
+          const result = await bridgeToChatPipeline(display.user_id, message, req, buildDisplayChatRequest);
+          if (findPendingAction(result?.actions || [])) reply = PHONE_ONLY;
+          else reply = reactions.isQuietReply(result?.text) ? 'Done.' : reactions.plainReply(result?.text || 'Done.');
+        }
       } catch (e) {
+        if (res.headersSent) { res.end(); return; }
         if (e?.code !== 'needs_phone') throw e;
         reply = PHONE_ONLY;
       }
@@ -177,6 +274,7 @@ function registerBoxRoutes(app, deps) {
       sendAudio(res, await speak(spoken), heard, spoken);
     } catch (e) {
       log('warn', 'box.voice.failed', { error: e.message });
+      if (res.headersSent) { res.end(); return; }
       if (e?.code === 'too_fast') return res.status(429).json({ error: e.message, code: 'too_fast' });
       if (!res.headersSent) res.status(503).json({ error: 'Adam could not answer just now.', code: 'unavailable' });
     }
