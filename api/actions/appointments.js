@@ -75,6 +75,14 @@ async function bookAppointment({ userId, action, params, enrichedParams, context
   const booking = task?.metadata?.appointmentBooking;
   const choice = booking?.choices?.find(item => item.id === params?.choice_id);
   if (!task || !booking || !choice) return { success: false, error: "I couldn't find that appointment choice. Please ask me to look again." };
+  if (booking.phase === 'confirmed' && booking.booking) {
+    return {
+      success: true,
+      text: `That ${choice.service} appointment is already booked for ${choice.label}.`,
+      actionSummary: 'Already booked',
+      taskId: task.id
+    };
+  }
   const service = getAppointmentBookingService();
   if (!service || booking.provider !== 'sandbox') {
     await saveAppointmentTask(userId, task.id, { ...booking, phase: 'needs_connection' }, { lastError: 'Appointment booking is not connected yet.' });

@@ -81,3 +81,16 @@ test('appointment action exposes a bounded selection receipt with provider IDs',
   assert.equal(result.selection.options[0].id, 'slot-real-id');
   assert.equal(result.selection.options[0].input.choice_id, 'slot-real-id');
 });
+
+test('replaying the same approved choice does not book a second slot', async () => {
+  let bookings = 0;
+  const service = createAppointmentBookingService({
+    provider: { id: 'sandbox', findSlots: async () => [], book: async choice => { bookings += 1; return { id: 'b1', reference: 'Sandbox 0001', choice }; } },
+    calendar: { add: async () => ({ id: 'c1' }) }
+  });
+  const choice = { id: 'slot-1', service: 'dentist', start: '2026-08-11T18:00:00.000Z', end: '2026-08-11T18:30:00.000Z' };
+  await service.commitChoice({ choice, approved: true });
+  const again = await service.commitChoice({ choice, approved: true });
+  assert.equal(bookings, 1);
+  assert.equal(again.alreadyBooked, true);
+});

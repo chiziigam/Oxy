@@ -101,12 +101,13 @@ function createSandboxAppointmentProvider() {
     id: 'sandbox',
     async findSlots({ request }) {
       const start = asDate(request?.window?.start) || new Date();
+      const taken = new Set(bookings.map(booking => booking.choice?.start));
       return [0, 1, 2, 3].map(offset => {
         const at = new Date(start);
         at.setUTCDate(at.getUTCDate() + offset + 1);
         at.setUTCHours(17 + (offset % 2), 30, 0, 0);
         return { id: `sandbox-${at.toISOString()}`, start: at.toISOString(), end: new Date(at.getTime() + 30 * 60 * 1000).toISOString() };
-      });
+      }).filter(slot => !taken.has(slot.start));
     },
     async book(choice) {
       const booking = { id: `sandbox-booking-${bookings.length + 1}`, reference: `Sandbox ${String(bookings.length + 1).padStart(4, '0')}`, choice: { ...choice } };
@@ -131,6 +132,8 @@ function createSandboxCalendar() {
 
 function createAppointmentBookingService({ provider, calendar } = {}) {
   if (!provider || typeof provider.findSlots !== 'function' || typeof provider.book !== 'function') throw new TypeError('An appointment provider with findSlots and book is required.');
+  // One choice id is one booking, however many times the action is replayed.
+  const bookedChoices = new Map();
   return {
     async findChoices({ request, calendarEvents = [], now = new Date() } = {}) {
       const parsed = parseAppointmentRequest(request, now);
@@ -145,9 +148,12 @@ function createAppointmentBookingService({ provider, calendar } = {}) {
     async commitChoice({ choice, approved = false } = {}) {
       if (!approved) return { ok: false, kind: 'approval_required', text: 'This needs your OK before I book it.' };
       if (!choice?.id || !choice?.start || !choice?.end || !choice?.service) return { ok: false, kind: 'invalid_choice', text: "I couldn't find that appointment choice. Please pick one again." };
+      if (bookedChoices.has(choice.id)) return { ...bookedChoices.get(choice.id), alreadyBooked: true };
       const booking = await provider.book(choice);
       if (!booking?.reference) return { ok: false, kind: 'provider_failed', text: "I couldn't confirm that appointment. Your task is saved so you can try again." };
-      return this.addBookingToCalendar({ booking: { id: booking.id || null, reference: cleanText(booking.reference, 120), choice: { ...choice } } });
+      const result = await this.addBookingToCalendar({ booking: { id: booking.id || null, reference: cleanText(booking.reference, 120), choice: { ...choice } } });
+      bookedChoices.set(choice.id, result);
+      return result;
     },
     async addBookingToCalendar({ booking } = {}) {
       const choice = booking?.choice;
