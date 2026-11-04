@@ -38,7 +38,7 @@ function hotelScore(hotel, profile, requirements) {
   if (budgetTier && hotel.rating) {
     if (budgetTier === 'luxury' && hotel.rating >= 4) score += 10;
     if (budgetTier === 'budget' && hotel.pricePerNight && hotel.pricePerNight < 80) score += 10;
-    if (budgetTier === 'mid' && hotel.rating === 3 || hotel.rating === 4) score += 5;
+    if (budgetTier === 'mid' && (hotel.rating === 3 || hotel.rating === 4)) score += 5;
   }
 
   // Rating quality
