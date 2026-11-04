@@ -8,7 +8,7 @@ let PRIMARY_CHAT_MODEL = defaultModelForProvider(process.env.OXY_BRAIN_PROVIDER 
 // slow model (retries, checkpointing, resume) is only testable if the brain call can be
 // swapped, and a destructured binding freezes it at import time.
 const brainProvider = require('./brain-provider');
-const { isEchoOfToolText, WRITE_UP_PROMPT } = require('./agent-final-answer');
+const { isEchoOfToolText, WRITE_UP_PROMPT, isToolObservation, sanitizeReply, PLAIN_ANSWER_PROMPT } = require('./agent-final-answer');
 const { buildToolsForGemini, getActionContract } = require('../action-contracts');
 const { modelView, compactStaleObservations } = require('./agent-context-trim');
 
@@ -308,6 +308,21 @@ async function runAgentLoop({
           if (better && !isEchoOfToolText(better, executedActions)) spoken = better;
         } catch (err) {
           logAgentStep(agentTrace, { type: 'write_up_failed', error: err.message });
+        }
+      }
+      // A reply that is (or contains) a browser observation dump is rewritten in plain language;
+      // the observation was only ever meant for the model.
+      if (isToolObservation(spoken)) {
+        logAgentStep(agentTrace, { type: 'observation_in_reply' });
+        try {
+          resumedContents.push({ role: 'model', parts: [{ text: spoken }] });
+          resumedContents.push({ role: 'user', parts: [{ text: PLAIN_ANSWER_PROMPT }] });
+          const rewrite = await callGeminiWithTools(modelName, resumedContents, { ...baseConfig, tools: [{ functionDeclarations: [] }], toolConfig: undefined }, trace, provider);
+          const plain = extractSpokenFromResponseSafe(rewrite);
+          spoken = plain && !isToolObservation(plain) ? plain : sanitizeReply(spoken);
+        } catch (err) {
+          logAgentStep(agentTrace, { type: 'plain_answer_failed', error: err.message });
+          spoken = sanitizeReply(spoken);
         }
       }
       // No more tools — final answer

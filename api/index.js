@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { isToolObservation, isObservationResult, sanitizeReply } = require('./services/agent-final-answer');
 
 // Error monitoring — set SENTRY_DSN environment variable to enable
 if (process.env.SENTRY_DSN) {
@@ -6558,6 +6559,7 @@ function canUseDirectActionSummary(actionResults) {
 
 function summarizeActionResults(actionResults) {
   return actionResults
+    .filter(entry => !isObservationResult(entry.result) && !isToolObservation(entry.result?.text))
     .map(entry => entry.result?.text?.trim())
     .filter(Boolean)
     .join('\n\n');
@@ -6789,7 +6791,7 @@ function summarizeCompletedActionsConcise(actionResults) {
   if (resultText) return resultText;
 
   const normalized = successful
-    .map(entry => toSingleSentence(entry.result?.text || humanizeActionType(entry.action)))
+    .map(entry => toSingleSentence(isToolObservation(entry.result?.text) ? humanizeActionType(entry.action) : (entry.result?.text || humanizeActionType(entry.action))))
     .filter(Boolean);
   if (!normalized.length) return '';
   if (normalized.length === 1) return normalized[0];
@@ -6826,8 +6828,11 @@ async function writeUpResearchAnswer({ message, spoken, actionResults, chatProvi
   }
 }
 
-function reconcileSpokenWithActions(spoken, actionResults) {
-  const confirmation = summarizeFinishedActionsForUser(actionResults);
+function reconcileSpokenWithActions(rawSpoken, actionResults) {
+  // A browser observation never reaches the user, whether the model echoed it or a step's text
+  // would otherwise be used as the answer.
+  const spoken = isToolObservation(rawSpoken) ? sanitizeReply(rawSpoken) : rawSpoken;
+  const confirmation = sanitizeReply(summarizeFinishedActionsForUser(actionResults));
   if (!confirmation) return spoken;
   const results = normalizeActionResultsForClient(actionResults);
   const mustShow = results.some(entry => entry?.result?.outcome === 'awaiting_user' || entry?.result?.pending || entry?.result?.outcome === 'simulated');
@@ -6837,6 +6842,7 @@ function reconcileSpokenWithActions(spoken, actionResults) {
   // worked actually found (a search answer, a forecast), never just the canned hand-off line.
   const found = results
     .filter(entry => entry?.result?.outcome === 'completed' && String(entry.result?.text || '').trim().length >= 40)
+    .filter(entry => !isObservationResult(entry.result) && !isToolObservation(entry.result?.text))
     .map(entry => String(entry.result.text).trim());
   const own = String(spoken || '').trim();
   const text = own.length >= 20 ? own : found.join('\n\n');
