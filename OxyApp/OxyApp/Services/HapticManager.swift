@@ -1,3 +1,4 @@
+import AudioToolbox
 import UIKit
 import Foundation
 
@@ -82,6 +83,35 @@ final class HapticManager {
         guard enabled else { return }
         notifier.notificationOccurred(.error)
         notifier.prepare()
+    }
+
+    // MARK: Sounds
+
+    /// The few moments that get a sound, all quiet system sounds. They follow the ring/silent
+    /// switch (system sounds do not play when the phone is silenced) and the Sounds setting.
+    enum Sound {
+        case sent, received, voiceStart, voiceStop
+
+        fileprivate var systemID: SystemSoundID {
+            switch self {
+            case .sent: return 1004
+            case .received: return 1003
+            case .voiceStart: return 1113
+            case .voiceStop: return 1114
+            }
+        }
+    }
+
+    nonisolated static let soundsKey = "adam_sounds"
+    nonisolated static let hapticsKey = "oxy_haptics"
+
+    private var soundsOn: Bool {
+        UserDefaults.standard.object(forKey: Self.soundsKey) as? Bool ?? true
+    }
+
+    func play(_ sound: Sound) {
+        guard soundsOn else { return }
+        AudioServicesPlaySystemSound(sound.systemID)
     }
 
     /// Light tick for discrete selection changes (tab switches, pickers).

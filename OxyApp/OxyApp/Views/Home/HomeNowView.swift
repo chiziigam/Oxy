@@ -296,7 +296,6 @@ struct HomeDecision: View {
             }
             Text(question)
                 .font(.role(.title, weight: .bold))
-                .tracking(-0.3)
                 .foregroundStyle(Color.appInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -757,12 +756,11 @@ struct HomeAlarmView: View {
 
     var body: some View {
         ZStack {
-            RadialGradient(colors: [Color(red: 0.76, green: 0.2, blue: 0.12), Self.deep, Color(red: 0.2, green: 0.03, blue: 0.02)],
-                           center: UnitPoint(x: 0.5, y: 0.25), startRadius: 10, endRadius: 700)
+            Self.deep
                 .ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
                 Text(clip.title)
-                    .font(.system(.largeTitle).weight(.bold)).tracking(-0.8)
+                    .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)

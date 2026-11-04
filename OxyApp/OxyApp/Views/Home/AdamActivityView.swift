@@ -91,9 +91,7 @@ struct AdamActivityView: View {
             GeometryReader { geometry in
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        filterBar
-                    }
+                    filterBar
 
                     if !loaded && isLoading {
                         VStack(spacing: 16) {
@@ -113,7 +111,9 @@ struct AdamActivityView: View {
                         } else {
                             if !asks.isEmpty { section("Needs you", asks) }
                             if !upcoming.isEmpty { section("Coming up", upcoming) }
-                            if !past.isEmpty { section(filter == .done ? "Done" : "Recently", past) }
+                            ForEach(pastByDay) { day in
+                                section(day.title, day.items)
+                            }
                         }
                     }
                 }
@@ -159,191 +159,124 @@ struct AdamActivityView: View {
 
     // MARK: Pieces
 
-    @ViewBuilder
+    /// The system segmented control: one native picker for All, Done and Coming up.
     private var filterBar: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Menu {
-                ForEach(Filter.allCases) { item in
-                    Button(item.rawValue) { selectFilter(item) }
-                        .accessibilityAddTraits(filter == item ? .isSelected : [])
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Text(filter.rawValue)
-                        .font(.body.weight(.semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    AppIcon("chevron-down", size: 16)
-                }
-                .foregroundStyle(Color.appAccent)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .background(Color.appSurface2, in: RoundedRectangle(cornerRadius: 14))
-                .contentShape(Rectangle())
+        Picker("Show", selection: Binding(get: { filter }, set: { selectFilter($0) })) {
+            ForEach(Filter.allCases) { item in
+                Text(item.rawValue).tag(item)
             }
-            .accessibilityLabel("Filter activity")
-            .accessibilityValue(filter.rawValue)
-        } else {
-            HStack(spacing: 6) {
-                ForEach(Filter.allCases) { item in
-                    Button { selectFilter(item) } label: {
-                        Text(item.rawValue)
-                            .font(.appBody(15, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .foregroundStyle(filter == item ? Color.appInk : Color.appMuted)
-                            .padding(.horizontal, 15)
-                            .frame(minHeight: 44)
-                            .overlay(alignment: .bottom) {
-                                Capsule().fill(filter == item ? Color.appAccent : Color.clear).frame(height: 2)
-                            }
-                    }
-                    .buttonStyle(.appScale)
-                    .accessibilityAddTraits(filter == item ? .isSelected : [])
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pickerStyle(.segmented)
+        .sensoryFeedback(.selection, trigger: filter)
     }
 
     private func selectFilter(_ item: Filter) {
         guard filter != item else { return }
-        HapticManager.shared.select()
         withAnimation(reduceMotion ? nil : .appStandard) { filter = item }
     }
 
-    private func section(_ title: String, _ items: [ActivityEvent]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.sectionLabel)
-                .foregroundStyle(Color.appMuted)
-                .padding(.horizontal, 4)
-            VStack(spacing: 0) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    row(item)
-                }
+    /// Past entries grouped by day under one plain header each: Today, Yesterday, weekday, date.
+    private struct DayGroup: Identifiable {
+        let title: String
+        var items: [ActivityEvent]
+        var id: String { title }
+    }
+
+    private var pastByDay: [DayGroup] {
+        var groups: [DayGroup] = []
+        for item in past {
+            let title = dayTitle(for: item.date)
+            if let last = groups.indices.last, groups[last].title == title {
+                groups[last].items.append(item)
+            } else {
+                groups.append(DayGroup(title: title, items: [item]))
             }
-            .padding(.top, 4)
+        }
+        return groups
+    }
+
+    private func dayTitle(for date: Date?) -> String {
+        guard let date else { return "Earlier" }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        if let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day,
+           days < 7 {
+            return date.formatted(.dateTime.weekday(.wide))
+        }
+        return date.formatted(.dateTime.day().month(.wide))
+    }
+
+    private func section(_ title: String, _ items: [ActivityEvent]) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color.appMuted)
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(items) { item in row(item) }
+            }
         }
     }
 
+    /// One plain row: what happened, one quiet line, the time at the end. Tap shows its actions.
     private func row(_ item: ActivityEvent) -> some View {
         let expanded = expandedID == item.id
-        let rowLayout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-            : AnyLayout(HStackLayout(alignment: .top, spacing: 13))
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Button {
-                HapticManager.shared.impact(.light)
-                withAnimation(reduceMotion ? nil : .appExpand) { expandedID = expanded ? nil : item.id }
+                withAnimation(reduceMotion ? nil : .snappy) { expandedID = expanded ? nil : item.id }
             } label: {
-                rowLayout {
-                    HStack {
-                    Text(timeLabel(for: item))
-                        .font(.appBody(13, weight: .medium))
-                        .foregroundStyle(Color.appMuted)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .minimumScaleFactor(0.75)
-                        .accessibilityLabel(item.date == nil ? "Time unknown" : timeLabel(for: item))
-                        if dynamicTypeSize.isAccessibilitySize {
-                            Spacer()
-                            marker(for: item)
-                            disclosure(expanded: expanded)
-                        }
-                    }
-                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 66, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.isFailure ? "Couldn't finish" : item.type.label)
-                            .font(.appBody(12, weight: .semibold))
-                            .foregroundStyle(item.isFailure ? Color.appWarning : Color.appMuted)
+                HStack(alignment: .firstTextBaseline, spacing: AppSpacing.md) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(item.title)
-                            .font(.appBody(17, weight: .medium))
+                            .font(.body)
                             .foregroundStyle(Color.appInk)
-                            .lineLimit(expanded || dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .lineLimit(expanded ? nil : 1)
                             .multilineTextAlignment(.leading)
                         if let detail = detailLine(for: item) {
                             Text(detail)
-                                .font(.appBody(13))
-                                .foregroundStyle(Color.appMuted)
-                                .lineLimit(expanded || dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                                .font(.subheadline)
+                                .foregroundStyle(item.isFailure || item.type == .asked ? Color.appNeedsYou : Color.appMuted)
+                                .lineLimit(expanded ? nil : 1)
                                 .multilineTextAlignment(.leading)
                         }
                     }
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Spacer(minLength: 4)
-                        marker(for: item)
-                        disclosure(expanded: expanded)
-                    }
+                    Spacer(minLength: AppSpacing.sm)
+                    Text(timeLabel(for: item))
+                        .font(.footnote)
+                        .foregroundStyle(Color.appMuted)
+                        .accessibilityLabel(item.date == nil ? "Time unknown" : timeLabel(for: item))
                 }
-                .padding(.vertical, 16)
-                .frame(minHeight: 44)
+                .padding(.vertical, AppSpacing.sm)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.appScale(0.995))
+            .buttonStyle(.plain)
+            .sensoryFeedback(.selection, trigger: expanded)
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-            .accessibilityHint("Show or hide activity actions")
+            .accessibilityHint("Show or hide actions")
 
             if expanded {
-                let actionLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                    : AnyLayout(HStackLayout(spacing: 8))
-                actionLayout {
+                HStack(spacing: AppSpacing.lg) {
                     if let workflowId = item.workflowId {
-                        actionPill("View task") { openWorkflowID = workflowId }
+                        Button("View task") { openWorkflowID = workflowId }
                     }
-                    actionPill("Ask about this") { AskAdam.draft("Tell me more about: \(item.title)") }
+                    Button("Ask about this") { AskAdam.draft("Tell me more about: \(item.title)") }
                         .accessibilityLabel("Ask about \(item.title)")
                         .accessibilityHint("Opens a draft in the conversation")
                 }
-                .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 79)
-                .padding(.bottom, 14)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            }
-        }
-    }
-
-    private func disclosure(expanded: Bool) -> some View {
-        AppIcon("chevron-down", size: 13)
-            .foregroundStyle(Color.appMuted)
-            .rotationEffect(.degrees(expanded ? 180 : 0))
-            .accessibilityHidden(true)
-    }
-
-    private func actionPill(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.appBody(13, weight: .medium))
-                .foregroundStyle(Color.appAccent)
-                .padding(.horizontal, 14)
+                .buttonStyle(.borderless)
+                .font(.subheadline.weight(.semibold))
+                .tint(Color.appAccent)
                 .frame(minHeight: 44)
-                .background(Capsule().fill(Color.appSurface2))
-                .frame(minHeight: 44)
-        }
-        .buttonStyle(.appScale(0.95))
-    }
-
-    /// A tick only means something was done successfully. Sensed events and checks carry no mark.
-    @ViewBuilder
-    private func marker(for item: ActivityEvent) -> some View {
-        if item.isFailure {
-            AppIcon("alert-circle", size: 16).foregroundStyle(Color.appWarning)
-                .accessibilityLabel("Couldn't finish")
-        } else {
-            switch item.type {
-            case .did:
-                AppIcon("check-circle", size: 16).foregroundStyle(Color.appSuccess)
-                    .accessibilityLabel("Done")
-            case .asked:
-                Circle().fill(Color.appNeedsYou).frame(width: 8, height: 8)
-                    .frame(width: 16, height: 16)
-                    .accessibilityLabel("Needs you")
-            case .noticed, .scheduled, .checked:
-                Color.clear.frame(width: 16, height: 16)
+                .padding(.bottom, AppSpacing.sm)
+                .transition(.opacity)
             }
         }
     }
 
     private func detailLine(for item: ActivityEvent) -> String? {
+        if item.isFailure { return "Couldn't finish" }
         if item.type == .scheduled {
             if item.stale == true { return "Next check unknown" }
             return item.detail
@@ -356,16 +289,15 @@ struct AdamActivityView: View {
     private func timeLabel(for item: ActivityEvent) -> String {
         guard let date = item.date else { return "Unknown" }
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return date.formatted(date: .omitted, time: .shortened) }
-        if calendar.isDateInTomorrow(date) { return "Tomorrow" }
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
-        return date.formatted(.dateTime.day().month(.abbreviated))
+        // Past rows sit under a day header, so the time alone is enough.
+        if calendar.isDateInTomorrow(date) { return "Tomorrow " + date.formatted(date: .omitted, time: .shortened) }
+        return date.formatted(date: .omitted, time: .shortened)
     }
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(filter == .comingUp ? "Nothing scheduled" : (filter == .done ? "Nothing finished yet" : "No activity yet"))
-                .font(.sectionTitle)
+                .font(.headline)
                 .foregroundStyle(Color.appInk)
         }
         .padding(.top, 24)
@@ -400,7 +332,7 @@ struct AdamActivityView: View {
             #endif
             errorMessage = nil
         } catch {
-            errorMessage = feed == .empty ? "Couldn't load your activity." : "Couldn't refresh. Showing what was saved."
+            errorMessage = feed == .empty ? "Couldn't load your activity" : "Couldn't refresh. Showing what was saved."
         }
         loaded = true
     }

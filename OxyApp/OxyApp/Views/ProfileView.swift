@@ -156,7 +156,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(.appBody(14)).foregroundStyle(Color.appMuted)
             Text(value)
-                .font(.caption.monospaced())
+                .font(.body)
                 .foregroundStyle(Color.appInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)

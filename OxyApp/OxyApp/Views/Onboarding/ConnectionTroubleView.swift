@@ -18,15 +18,10 @@ struct ConnectionTroubleView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
 
-                Text("Can't find your home device")
-                    .font(.appBody(13, weight: .medium))
-                    .foregroundStyle(Color.appMuted)
-
-                Text("We couldn't reach your home device.")
-                    .font(.heroTitle)
+                Text("Couldn't reach your home device")
+                    .font(.largeTitle.weight(.bold))
                     .foregroundStyle(Color.appInk)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 18)
 
                 VStack(spacing: 0) {
                     ForEach(Array(checks.enumerated()), id: \.offset) { index, check in
@@ -51,7 +46,7 @@ struct ConnectionTroubleView: View {
     private func checkRow(_ text: String) -> some View {
         HStack(spacing: 14) {
             Text("—")
-                .font(.appMono(13))
+                .font(.body)
                 .foregroundStyle(Color.appMuted)
             Text(text)
                 .font(.appBody(15, weight: .regular))

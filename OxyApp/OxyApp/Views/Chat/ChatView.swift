@@ -655,9 +655,11 @@ struct ChatView: View {
                             guard !voiceInput.isTranscribing else { return }
                             if voiceInput.isRecording {
                                 HapticManager.shared.impact(.rigid)
+                                HapticManager.shared.play(.voiceStop)
                                 voiceInput.stopRecording()
                             } else {
                                 HapticManager.shared.impact(.medium)
+                                HapticManager.shared.play(.voiceStart)
                                 voiceInput.startRecording(userId: appState.userId)
                             }
                         },
@@ -1254,6 +1256,7 @@ struct ChatView: View {
         // Attachment uploads cannot be queued by the text-only turn queue.
         guard pendingImageData == nil || !viewModel.isSending else { return }
         HapticManager.shared.impact(.light)
+        HapticManager.shared.play(.sent)
         if let pendingImageData {
             let defaultName = pendingImageMimeType == "image/png" ? "photo.png" : "photo.jpg"
             viewModel.sendImageMessage(
@@ -1476,7 +1479,10 @@ private struct ChatHaptics: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sensoryFeedback(trigger: replySettled) { _, settled in
-                settled ? .impact(weight: .medium, intensity: 1.0) : nil
+                settled ? .impact(weight: .light, intensity: 0.7) : nil
+            }
+            .onChange(of: replySettled) { _, settled in
+                if settled { HapticManager.shared.play(.received) }
             }
             .sensoryFeedback(trigger: failed) { _, didFail in
                 didFail ? .warning : nil
@@ -1684,7 +1690,6 @@ private struct ActionReviewSheet: View {
                 }
                 Text(title)
                     .font(.appRounded(32, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-0.7)
                     .foregroundStyle(Color.appInk)
                     .fixedSize(horizontal: false, vertical: true)
 

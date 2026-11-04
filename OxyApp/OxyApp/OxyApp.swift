@@ -44,6 +44,15 @@ struct RootView: View {
     }
     @State private var didRestoreSession = false
     @AppStorage(ThreadBackground.storageKey) private var backgroundRaw = ThreadBackground.automatic.rawValue
+    @AppStorage("adam_legal_consent_v1") private var agreedToTerms = false
+
+    private var skipsConsentForPreview: Bool {
+        #if DEBUG
+        return PreviewData.isIsolated
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
         Group {
@@ -51,6 +60,9 @@ struct RootView: View {
                 debugScreen
             } else if !didRestoreSession {
                 Color.appBackground.ignoresSafeArea()
+            } else if appState.isAuthenticated && !agreedToTerms && !skipsConsentForPreview {
+                // First run after signing in: the Terms and Privacy agreement, once.
+                LegalConsentView(onContinue: { withAnimation(.smooth) { agreedToTerms = true } })
             } else if appState.isAuthenticated {
                 MainTabView()
             } else {

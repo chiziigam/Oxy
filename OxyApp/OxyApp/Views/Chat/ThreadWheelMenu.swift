@@ -448,6 +448,28 @@ private struct WheelItem: View, Animatable {
         return windowStart + raw - cycle * (raw / cycle).rounded(.down)
     }
 
+    private func itemFace(active: Bool, labelOpacity: Double) -> some View {
+        let highlight: Double = active ? 1 : 0
+        let label: String = active ? "Private · On" : choice.title
+        let glyphColor: Color = highlight > 0.5 ? Color.appOnAction : Color.appInk
+        return ZStack {
+            Circle().fill(Color.appReceivedBubble)
+            Circle().fill(Color.appAction).opacity(highlight)
+            WheelGlyph(choice: choice, size: 20, active: active)
+                .foregroundColor(glyphColor)
+        }
+        .frame(width: 52, height: 52)
+        .overlay(alignment: .bottom) {
+            Text(label)
+                .font(.caption.weight(active ? .semibold : .medium))
+                .foregroundStyle(Color.appInk)
+                .lineLimit(1)
+                .fixedSize()
+                .alignmentGuide(.bottom) { d in d[.top] - 8 }
+                .opacity(labelOpacity)
+        }
+    }
+
     private func restingPoint(open: Double) -> CGPoint {
         let theta = (slot + swing * (1 - open)) * .pi / 180
         return CGPoint(
@@ -459,35 +481,23 @@ private struct WheelItem: View, Animatable {
     var body: some View {
         let stagger = CGFloat(min(index, ThreadMenuChoice.reachable - 1))
         let raw = (progress - stagger * 0.07) / (1 - 0.07 * CGFloat(ThreadMenuChoice.reachable - 1))
-        let q = max(raw, 0)
+        let q: CGFloat = max(raw, 0)
         let open = Double(min(q, 1))
         let rest = restingPoint(open: open)
-        let held = heldMix
+        let held: Double = heldMix
         let point = CGPoint(x: rest.x + (liftedPoint.x - rest.x) * held, y: rest.y + (liftedPoint.y - rest.y) * held)
-        let edge = min(1, max(0, min(slot - windowStart, windowStart + window - slot) / 10))
+        let edge: Double = min(1, max(0, min(slot - windowStart, windowStart + window - slot) / 10))
         let active = choice == .privateChat && incognito
-        let highlight: Double = active ? 1 : 0
-        return ZStack {
-            ZStack {
-                Circle().fill(Color.appReceivedBubble)
-                Circle().fill(Color.appAction).opacity(highlight)
-                WheelGlyph(choice: choice, size: 20, active: active)
-                    .foregroundColor(highlight > 0.5 ? Color.appOnAction : Color.appInk)
-            }
-            .frame(width: 52, height: 52)
-            .overlay(alignment: .bottom) {
-                Text(active ? "Private · On" : choice.title)
-                    .font(.appBody(12, weight: active ? .semibold : .medium))
-                    .foregroundStyle(Color.appInk.opacity(active ? 1 : 0.8))
-                    .lineLimit(1)
-                    .fixedSize()
-                    .alignmentGuide(.bottom) { d in d[.top] - 8 }
-                    .opacity(Double(min(max((q - 0.5) * 2, 0), 1)))
-            }
-            .scaleEffect((0.4 + 0.6 * min(q, 1)) * (1 + 0.3 * CGFloat(held)))
-            .shadow(color: .black.opacity(0.35 * held), radius: 14, y: 6)
-            .opacity(Double(min(q * 1.8, 1)) * (edge + (1 - edge) * held))
-        }
+        // Precomputed and typed, so the view chain below stays cheap to type-check.
+        let grow: CGFloat = 0.4 + 0.6 * min(q, 1)
+        let lift: CGFloat = 1 + 0.3 * CGFloat(held)
+        let labelOpacity: Double = Double(min(max((q - 0.5) * 2, 0), 1))
+        let itemOpacity: Double = Double(min(q * 1.8, 1)) * (edge + (1 - edge) * held)
+        let shadowOpacity: Double = 0.35 * held
+        return itemFace(active: active, labelOpacity: labelOpacity)
+            .scaleEffect(grow * lift)
+            .shadow(color: Color.black.opacity(shadowOpacity), radius: 14, y: 6)
+            .opacity(itemOpacity)
         .contentShape(Circle().inset(by: -8))
         .allowsHitTesting(edge > 0.6 || held > 0.5)
         .onTapGesture { onChoose(choice) }

@@ -128,7 +128,6 @@ struct TodaySuggestionsContent: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(title(card, question: parts.0))
                         .font(.role(.title, weight: .bold))
-                        .tracking(-0.3)
                         .foregroundStyle(Color.appInk)
                         .fixedSize(horizontal: false, vertical: true)
                     if let context = parts.1 {

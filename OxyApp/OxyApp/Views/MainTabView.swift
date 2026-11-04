@@ -162,6 +162,8 @@ private struct AdamYouView: View {
     @State private var showsSoundsPreview = false
     #endif
     @AppStorage("oxy_custom_backend_url") private var customBackendURL = ""
+    @AppStorage(HapticManager.soundsKey) private var soundsOn = true
+    @AppStorage(HapticManager.hapticsKey) private var hapticsOn = true
 
     private enum Destination: String, Identifiable {
         case you, apps, account, agents
@@ -177,6 +179,13 @@ private struct AdamYouView: View {
                     youRow(title: "Account", subtitle: appState.isDemoSession ? "Sample account" : "Your account and data", icon: "envelope") { destination = .account }
                 }
                 .padding(.vertical, 4)
+
+                SettingsGroup(title: "Feedback") {
+                    SettingsList {
+                        SettingsToggleRow(title: "Sounds", subtitle: "Quiet sounds on send and reply. Off when your phone is on silent", isOn: $soundsOn)
+                        SettingsToggleRow(title: "Haptics", isOn: $hapticsOn)
+                    }
+                }
 
                 if UserDefaults.standard.bool(forKey: HouseholdSoundMonitor.preferenceKey) {
                     SettingsList {
