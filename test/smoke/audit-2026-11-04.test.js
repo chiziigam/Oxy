@@ -51,3 +51,11 @@ test('device GPS never overwrites a place the model named', async () => {
   await invoke({ adapter: { kind: 'inline' }, userId: 'u1', type: 'find_nearby_places', input: {}, context: { location: gps } });
   assert.deepEqual(captured.location, gps);
 });
+
+test('deleting a whole saved person waits for approval', () => {
+  const { getActionContract } = require('../../api/action-contracts');
+  const contract = getActionContract('forget_person_detail');
+  assert.equal(contract.reviewWhen({ delete_person: true }), true);
+  assert.equal(contract.reviewWhen({ delete_person: 'true' }), true);
+  assert.equal(contract.reviewWhen({ person_name: 'Ben', facts: ['met at work'] }), false);
+});

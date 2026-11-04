@@ -753,6 +753,8 @@ const ACTION_CONTRACTS = {
       delete_person: 'true only when the user wants the whole person forgotten'
     },
     guidance: 'Use for "Ben isn\'t my manager anymore" (clear_relationship), "forget that preference" / "she doesn\'t like that anymore" (facts), and "forget about X entirely" (delete_person). Remove the narrowest thing the user asked to remove — never delete a whole person to drop one fact. For a correction that replaces one fact with another ("prefers gold, not silver"), use remember_person with replaces instead, so the new fact and the removal happen together.',
+    // Deleting the whole record is irreversible; dropping one fact is not.
+    reviewWhen: input => input?.delete_person === true || String(input?.delete_person) === 'true',
     successSummary: 'Forgotten',
     failureSummary: 'Could not forget that',
     confirmation: 'none',
