@@ -62,7 +62,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee build.log | grep -E "error:|\*\* BUILD" || true
-          test -d build/Build/Products/Debug-iphonesimulator/OxyApp.app
+          grep -q "BUILD SUCCEEDED" build.log
 
       - name: Upload build log
         if: always()
