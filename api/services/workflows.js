@@ -105,12 +105,11 @@ async function openCheckpoint(supabase, userId, workflowId, { type, prompt, opti
   await recordEvent(supabase, workflowId, {
     kind: 'checkpoint_opened', summary: prompt, actor: 'millie', refType: 'checkpoint', refId: data.id
   });
-  await supabase.from('workflows').update({
+  await updateWorkflow(supabase, userId, workflowId, {
     status: 'waiting_for_user',
     blocked_reason: prompt,
-    next_action: prompt,
-    updated_at: new Date().toISOString()
-  }).eq('id', workflowId);
+    next_action: prompt
+  }, { summary: prompt });
 
   return data;
 }
@@ -134,8 +133,12 @@ async function resolveCheckpoint(supabase, userId, checkpointId, { approved, cho
   const status = approved ? 'approved' : 'rejected';
   const { data, error } = await supabase.from('workflow_checkpoints').update({
     status, resolution_choice: choice, resolution_note: note, resolved_at: new Date().toISOString()
-  }).eq('id', checkpointId).select().single();
-  if (error) throw new Error(`Couldn't record that decision: ${error.message}`);
+  }).eq('id', checkpointId).eq('status', 'pending').select().single();
+  if (error) {
+    // The compare-and-set predicate is what stops two taps recording opposite decisions.
+    if (error.code === 'PGRST116') throw new Error('That decision was already handled.');
+    throw new Error(`Couldn't record that decision: ${error.message}`);
+  }
 
   await recordEvent(supabase, checkpoint.workflow_id, {
     kind: 'checkpoint_resolved',
@@ -148,11 +151,10 @@ async function resolveCheckpoint(supabase, userId, checkpointId, { approved, cho
   // the work is still waiting.
   const stillPending = await getPendingCheckpoints(supabase, userId, checkpoint.workflow_id);
   if (!stillPending.length) {
-    await supabase.from('workflows').update({
+    await updateWorkflow(supabase, userId, checkpoint.workflow_id, {
       status: approved ? 'working' : 'waiting_for_user',
-      blocked_reason: approved ? null : 'you declined — tell me what to do instead',
-      updated_at: new Date().toISOString()
-    }).eq('id', checkpoint.workflow_id);
+      blocked_reason: approved ? null : 'you declined — tell me what to do instead'
+    }, { actor: 'user', summary: approved ? `Approved: ${checkpoint.prompt}` : `Declined: ${checkpoint.prompt}` });
   }
   return data;
 }

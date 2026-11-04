@@ -277,7 +277,8 @@ test('a job application, a claim, a trip and a purchase all run on the same prim
     const kinds = context.timeline.map(e => e.kind);
     assert.deepEqual(
       kinds,
-      ['created', 'status_changed', 'checkpoint_opened', 'checkpoint_resolved', 'evidence_captured', 'status_changed'],
+      // Opening and answering a checkpoint both move the work's state, so both leave a trace.
+      ['created', 'status_changed', 'checkpoint_opened', 'status_changed', 'checkpoint_resolved', 'status_changed', 'evidence_captured', 'status_changed'],
       `${scenario.type} timeline should read the same as every other kind of work`
     );
   }
