@@ -1571,11 +1571,18 @@ function getActionContract(type) {
 function normalizeActionInput(type, input = {}) {
   const contract = getActionContract(type);
   const normalized = { ...(input || {}) };
-  if (!contract?.aliases) return normalized;
-  for (const [canonical, aliases] of Object.entries(contract.aliases)) {
+  for (const [canonical, aliases] of Object.entries(contract?.aliases || {})) {
     if (normalized[canonical]) continue;
     const alias = aliases.find(key => normalized[key]);
     if (alias) normalized[canonical] = normalized[alias];
+  }
+  for (const key of BOOLEAN_PARAMS) {
+    if (!(key in normalized)) continue;
+    const value = normalized[key];
+    if (typeof value !== 'string') continue;
+    const text = value.trim().toLowerCase();
+    if (text === 'true' || text === 'yes') normalized[key] = true;
+    else if (text === 'false' || text === 'no') normalized[key] = false;
   }
   return normalized;
 }
@@ -1730,8 +1737,17 @@ function actionPromptBlock() {
   return `<action>\n${JSON.stringify({ actions: actionPromptList() }, null, 2)}\n</action>`;
 }
 
+// Parameters whose value is a yes/no, not text. Declared as BOOLEAN to the model and coerced
+// from "true"/"false" strings, so a string from an older prompt cannot invert the intent.
+const BOOLEAN_PARAMS = new Set([
+  'direct_only', 'urgent_only', 'overdue_only', 'remind_on_day', 'include_weekends',
+  'different_person', 'delete_person', 'clear_relationship', 'allow_conflict',
+  'notify_attendees', 'allow_cross_workflow', 'unsubscribe_senders', 'submit'
+]);
+
 // Lists and objects must be declared as such: a "string" list reaches the handler as JSON text.
 function parameterSchema(key, example) {
+  if (BOOLEAN_PARAMS.has(key)) return { type: 'BOOLEAN' };
   if (Array.isArray(example)) {
     return { type: 'ARRAY', items: { type: example.some(item => item && typeof item === 'object') ? 'OBJECT' : 'STRING' } };
   }

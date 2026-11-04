@@ -93,3 +93,19 @@ test('an unreadable chat setting keeps approval mode on; a missing row keeps the
   const missing = await getChatSettings(client({ code: 'PGRST116', message: 'no rows' }), 'u1');
   assert.equal(missing.guardMode, false);
 });
+
+test('string "false" on a yes/no parameter is read as false, not as truthy text', () => {
+  const { validateActionWithContract, actionToFunctionDeclaration, getActionContract } = require('../../api/action-contracts');
+
+  const action = { type: 'browser_act', input: { action: 'type', submit: 'false' } };
+  validateActionWithContract(action, 'type my name into the form');
+  assert.equal(action.input.submit, false);
+
+  const clean = { type: 'clean_inbox', input: { unsubscribe_senders: 'false' } };
+  validateActionWithContract(clean, 'clean my inbox but do not unsubscribe me');
+  assert.equal(clean.input.unsubscribe_senders, false);
+
+  const declaration = actionToFunctionDeclaration('browser_act', getActionContract('browser_act'));
+  assert.equal(declaration.parameters.properties.submit.type, 'BOOLEAN');
+  assert.equal(declaration.parameters.properties.action.type, 'STRING');
+});
