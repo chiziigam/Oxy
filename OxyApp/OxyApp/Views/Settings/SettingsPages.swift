@@ -6,6 +6,7 @@ struct YouPage: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var settings = SettingsStore.load()
     @State private var destination: Destination?
+    @State private var nameSaveTask: Task<Void, Never>?
 
     private enum Destination: Identifiable {
         case saved, home
@@ -29,7 +30,14 @@ struct YouPage: View {
                         .frame(minHeight: 44)
                         .accessibilityLabel("Name")
                         .onChange(of: settings.userName) { _, _ in
-                            SettingsStore.save(settings, userId: appState.userId)
+                            // Per-keystroke saves fired two network calls per character and
+                            // rewrote the whole blob from a stale snapshot.
+                            nameSaveTask?.cancel()
+                            nameSaveTask = Task {
+                                try? await Task.sleep(for: .milliseconds(600))
+                                guard !Task.isCancelled else { return }
+                                SettingsStore.save(settings, userId: appState.userId)
+                            }
                         }
                 }
                 .padding(.vertical, 16)
@@ -46,6 +54,10 @@ struct YouPage: View {
                     destination = .saved
                 }
             }
+        }
+        .onDisappear {
+            nameSaveTask?.cancel()
+            SettingsStore.save(settings, userId: appState.userId)
         }
         .fullScreenCover(item: $destination, onDismiss: { settings = SettingsStore.load() }) { dest in
             Group {

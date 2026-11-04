@@ -281,6 +281,7 @@ struct YourHomeView: View {
                 ForEach(Array(home.watches.enumerated()), id: \.element.id) { index, watch in
                                         row(title: watch.title, detail: watch.detail ?? nextCheck(watch), dot: .appWorking) {
                         AskAdam.draft("What's happening with: \(watch.title)?")
+                        dismiss()
                     }
                 }
             }
@@ -291,7 +292,7 @@ struct YourHomeView: View {
     private func deviceDetails(_ device: HomeModel.Device) -> some View {
         SettingsPage(title: device.name) {
             VStack(alignment: .leading, spacing: 18) {
-                AppIcon(device.kind == "browser" ? "display" : "cube", size: 44)
+                AppIcon(device.kind.hasPrefix("browser") ? "display" : "cube", size: 44)
                     .foregroundStyle(Color.appInk).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(failed ? "Status unavailable" : (device.online ? "Online" : "Offline"))
@@ -333,6 +334,7 @@ struct YourHomeView: View {
             Button {
                 selectedDevice = nil
                 AskAdam.draft("How is the \(device.name) doing?")
+                dismiss()
             } label: {
                 Text("Ask about this display")
                     .font(.appBody(16, weight: .semibold))
@@ -388,6 +390,7 @@ struct YourHomeView: View {
                     ForEach(Array(home.observations.enumerated()), id: \.element.id) { index, item in
                                                 row(title: item.summary, detail: observationDetail(item), dot: nil) {
                             AskAdam.draft("Tell me more about: \(item.summary)")
+                            dismiss()
                         }
                     }
                 }

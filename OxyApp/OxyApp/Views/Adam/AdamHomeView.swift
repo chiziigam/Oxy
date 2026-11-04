@@ -75,6 +75,7 @@ struct AdamHomeView: View {
             if let pending = SiriRequestBus.shared.take(), !pending.isEmpty {
                 conversation = ConversationRequest(text: pending)
             }
+            handlePendantCommands()
             #if DEBUG
             if PreviewData.isIsolated, ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION"] != nil {
                 conversation = ConversationRequest(text: "")
@@ -115,6 +116,9 @@ struct AdamHomeView: View {
             guard let text = note.userInfo?["text"] as? String, !text.isEmpty else { return }
             openWorkflow = nil
             conversation = ConversationRequest(text: text)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .oxyPendantCommand)) { _ in
+            handlePendantCommands()
         }
         .animation(reduceMotion ? nil : .appStandard, value: model.needsYou.map(\.id))
     }
@@ -165,7 +169,7 @@ struct AdamHomeView: View {
 
     private var speaker: HomeModel.Device? {
         guard let home = model.home else { return nil }
-        return home.devices.first { $0.kind != "browser" } ?? home.devices.first
+        return home.devices.first { !$0.kind.hasPrefix("browser") } ?? home.devices.first
     }
 
     private var speakerOnline: Bool { speaker?.online ?? false }
@@ -200,6 +204,19 @@ struct AdamHomeView: View {
         } else if nothingToShow {
             emptyState
         } else {
+            if let stopError = model.errorMessage {
+                HStack(spacing: 10) {
+                    Text(stopError)
+                        .font(.adamBody)
+                        .foregroundStyle(Color.adamMuted)
+                    Spacer()
+                    Button("Dismiss") { model.errorMessage = nil }
+                        .font(.adamLabel)
+                        .foregroundStyle(Color.adamInk)
+                        .frame(minHeight: AdamLayout.buttonHeight)
+                }
+                .padding(.horizontal, 4)
+            }
             if model.refreshFailed {
                 HStack(spacing: 10) {
                     Text("Not up to date")
@@ -279,6 +296,35 @@ struct AdamHomeView: View {
         guard let workflowId = item.workflowId else { return }
         model.markFinishedSeen(item)
         openWorkflow = OpenWorkflow(id: workflowId)
+    }
+
+    /// Physical button presses arrive on a bus because BLE can fire before this view exists.
+    private func handlePendantCommands() {
+        let commands = PendantCommandBus.shared.takeAll()
+        guard !commands.isEmpty else { return }
+        for command in commands {
+            switch command {
+            case .openChat:
+                openWorkflow = nil
+                if conversation == nil { conversation = ConversationRequest(text: "") }
+            case .startRecording:
+                if !voice.isRecording { voice.startRecording(userId: appState.userId) }
+            case .stopRecording:
+                if voice.isRecording { voice.stopRecording() }
+            case .toggleRecording:
+                toggleVoice()
+            case .sendMessage:
+                send()
+            case .confirm:
+                if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = "Yes, confirm." }
+                send()
+            case .cancel:
+                if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = "Cancel." }
+                send()
+            default:
+                break
+            }
+        }
     }
 
     private func send() {
