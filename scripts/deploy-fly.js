@@ -27,7 +27,13 @@ function assertDeployable({ branch, status, env = process.env } = {}) {
 function main() {
   const commit = git(['rev-parse', '--verify', 'HEAD']);
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
-  const status = git(['status', '--porcelain']);
+  // Only files that end up in the runtime image matter here; docs and screenshots may stay dirty.
+  const status = git([
+    'status', '--porcelain', '--',
+    'api', 'connectors', 'scripts', 'server.js', 'auth.js', 'runtime.js',
+    'mcp-server.js', 'create-shortcut.js', 'package.json', 'package-lock.json',
+    'Dockerfile', 'fly.toml', '.dockerignore'
+  ]);
   assertDeployable({ branch, status });
 
   // The live database is not part of the image, so a deploy can happily ship code whose
