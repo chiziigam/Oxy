@@ -104,7 +104,7 @@ struct TravelOptionsCard: View {
                             .foregroundStyle(Color.appOnAction)
                             .padding(.horizontal, 16)
                             .frame(minHeight: 44)
-                            .background(Capsule().fill(Color.appAction))
+                            .background(RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous).fill(Color.appAction))
                     }
                     .buttonStyle(.appScale(0.97))
                 }

@@ -190,7 +190,7 @@ struct TaskInterfaceView: View {
                                 Button { send(ask) } label: {
                                     Text("Choose").font(.control).foregroundStyle(Color.appOnAction)
                                         .frame(maxWidth: .infinity, minHeight: 44)
-                                        .background(Capsule().fill(Color.appAction))
+                                        .background(RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous).fill(Color.appAction))
                                 }
                                 .buttonStyle(.appScale(0.97))
                                 .accessibilityLabel("Choose \(item.title ?? "option")")

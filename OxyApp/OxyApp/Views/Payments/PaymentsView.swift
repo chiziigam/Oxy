@@ -138,7 +138,7 @@ struct PaymentsView: View {
                 .foregroundStyle(agentCard == nil ? Color.appOnAction : Color.appDestructive)
                 .padding(.horizontal, agentCard == nil ? 16 : 8)
                 .frame(minHeight: 44)
-                .background { if agentCard == nil { Capsule().fill(Color.appAction) } }
+                .background { if agentCard == nil { RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous).fill(Color.appAction) } }
         }
         .buttonStyle(.appScale(0.96))
         .disabled(!agentCardLoaded || isRefreshing)

@@ -19,7 +19,7 @@ struct MemoryView: View {
     @State private var pendingDeleteItem: MemoryItem?
     @State private var editingItem: MemoryItem?
     @State private var search = ""
-    @State private var photosExpanded = false
+    @State private var photosExpanded = true
     // The composer stays collapsed to a single line so saved memories lead the screen —
     // you read memories far more often than you add one.
     @State private var composerExpanded = false

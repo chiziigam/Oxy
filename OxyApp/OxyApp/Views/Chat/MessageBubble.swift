@@ -401,7 +401,7 @@ struct MessageBubble: View {
                     .foregroundStyle(Color.appOnAction)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(Capsule().fill(Color.appAction))
+                    .background(RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous).fill(Color.appAction))
                     .buttonStyle(.appScale)
 
                     Button("Not now") { resolveOffer(offer) }
@@ -912,7 +912,7 @@ private struct FailedTurnView: View {
                 .fixedSize()
                 .padding(.horizontal, 14)
                 .frame(minHeight: 36)
-                .background(Capsule().fill(Color.appAction))
+                .background(RoundedRectangle(cornerRadius: AdamLayout.buttonRadius, style: .continuous).fill(Color.appAction))
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
