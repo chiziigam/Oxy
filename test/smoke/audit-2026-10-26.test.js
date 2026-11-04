@@ -61,7 +61,9 @@ test('password and email-verification routes', async (t) => {
 
   // A verification link works once, verifies the email, and cannot reset the password.
   const send = await fetch(`${base}/auth/verify-email`, { method: 'POST', headers: auth, body: '{}' });
-  assert.equal(send.status, 200);
+  // No mail provider is configured in tests, so the honest answer is "could not send" rather
+  // than claiming a link is in an inbox. The token row is still created and is what we test.
+  assert.equal(send.status, 503);
   const token = tables.password_reset_tokens[0].token;
   const asReset = await fetch(`${base}/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, newPassword: 'longenough1' }) });
   assert.equal(asReset.status, 400);
