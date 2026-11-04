@@ -5,7 +5,7 @@ import CoreLocation
 import UIKit
 
 /// Reads the user's own photos on this iPhone and sends Adam short written notes about them.
-/// The pictures never leave the phone. Off until the user switches it on in Preferences.
+/// Only a note is kept; a small JPEG may be sent to describe a photo. Off until the user switches it on in Preferences.
 @MainActor
 final class PhotoLearner {
     static let shared = PhotoLearner()
@@ -62,6 +62,8 @@ final class PhotoLearner {
 
     @discardableResult
     func run() async -> Bool {
+        // The switch may be turned off while a 15-minute pass is still going.
+        guard UserDefaults.standard.bool(forKey: Self.enabledKey) else { return false }
         guard !isRunning else { return false }
         var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .notDetermined { _ = await requestAccess(); status = PHPhotoLibrary.authorizationStatus(for: .readWrite) }
