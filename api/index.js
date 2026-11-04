@@ -6779,7 +6779,7 @@ function summarizeCompletedActionsConcise(actionResults) {
   if (!successful.length) return '';
   const dataOnly = successful.every(entry => DATA_ACTIONS.has(entry.action));
   if (dataOnly) {
-    return successful.every(entry => DIRECT_SUMMARY_ACTIONS.has(entry.action))
+    return successful.every(entry => answersDirectly(entry.action))
       ? summarizeActionResults(successful)
       : '';
   }
