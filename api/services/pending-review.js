@@ -26,7 +26,7 @@ function isPendingConfirmMessage(message) {
   }
   return /^(yes|yeah|yep|yup|confirm|confirmed|approve|approved|proceed)$/i.test(text) ||
     /\b(yes please|looks good|go ahead|do it|send it|send now|send the message|send that message|message them|book it|order it|call them|open it|that's fine|that is fine|all good)\b/i.test(text) ||
-    /\b(approve|approved|confirm|confirmed|proceed with|go ahead with)\b.+/i.test(text);
+    /^(?:please\s+)?(?:approve|confirm|proceed with|go ahead with)\b.+/i.test(text);
 }
 
 function isPendingCancelMessage(message) {
@@ -36,7 +36,7 @@ function isPendingCancelMessage(message) {
     .test(text) ||
     /\b(cancel it|stop it|leave it|scrap it|never mind|nevermind|don't send|do not send|don't book|do not book)\b/i.test(text) ||
     /\b(?:don['’]?t|do not|never)\s+(?:call|text|message|email|send|book|order|buy|purchase|open|add|create|schedule|move)\b/i.test(text) ||
-    /\b(cancel|stop)\b.+/i.test(text);
+    /^(?:please\s+)?(?:cancel|stop)\b.+/i.test(text);
 }
 
 function isPendingRevisionMessage(message) {
