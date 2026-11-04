@@ -125,6 +125,13 @@ const PERCEIVE_IN_PAGE = ({ selector, max, textLimit }) => {
       }
       let scope = dialog ? Array.from(dialog.el.querySelectorAll(selector)) : allNodes;
       if (dialog && scope.length === 0) scope = allNodes; // never let scoping blind the model entirely
+      // A mini-basket or promo panel is a dialog too, and it carries a handful of controls while
+      // the page's real ones — "Continue to checkout" — sit behind it. Keep the panel's controls
+      // first, then add the rest rather than hiding the page.
+      if (dialog && scope.length < 8 && allNodes.length > 20) {
+        const scoped = new Set(scope);
+        scope = [...scope, ...allNodes.filter(el => !scoped.has(el))];
+      }
       // Commercial pages front-load 20-40 nav controls in DOM order, which eats the element budget
       // before the first product tile. Order: in-viewport content, then chrome that matters
       // (search, basket, consent), then the rest of the chrome, then anything off-viewport.
@@ -338,6 +345,17 @@ async function settle(page, pauseMs = 600) {
 
 // After an action, wait for the page to stop changing rather than for a fixed time: a scroll
 // needs a beat, a click that loads or re-renders needs as long as it takes, up to a cap.
+
+// Consent managers often inject their banner a beat after load. Do the first pass, give it a
+// moment, then look again — otherwise the first read is all banner and the agent clicks through it.
+async function settleConsentBanner(page) {
+  await settle(page, 150);
+  const early = await dismissConsent(page).catch(() => false);
+  await settle(page, 700);
+  const late = await consentCandidatePresent(page).catch(() => false) && await dismissConsentOnce(page);
+  if (early || late) await settle(page, 300);
+}
+
 async function settleAfterAction(page, kind) {
   await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
   if (kind === 'wait') return page.waitForTimeout(400).catch(() => {});
@@ -546,7 +564,40 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
     error.code = 'ALREADY_ON_RESULTS';
     throw error;
   }
-  if (existing) await closeSession(userId);
+  // Reuse the live browser. A basket, a consent choice and a sign-in all live in that context;
+  // starting a new one is how an agent loses the item it just added and then reports an empty basket.
+  if (existing) {
+    try {
+      await gotoBrowserPage(existing.page, url);
+    } catch (error) {
+      await closeSession(userId);
+      throw error;
+    }
+    existing.site = host;
+    existing.requestedUrl = url;
+    if (objective) existing.goal = objective;
+    existing.searchOpens = openingASearch ? (existing.searchOpens || 0) + 1 : 0;
+    existing.actedSinceSearch = false;
+    await settleConsentBanner(existing.page);
+    let reusedObservation = await observePage(existing.page);
+    let lastCount = -1;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const count = reusedObservation.elements?.length || 0;
+      if (count === lastCount || count > 8) break;
+      lastCount = count;
+      await settle(existing.page, 600);
+      reusedObservation = await observePage(existing.page);
+    }
+    if (/^https?:\/\//i.test(reusedObservation.url)) existing.lastGoodUrl = reusedObservation.url;
+    return {
+      ...reusedObservation,
+      usedStoredSession: existing.usedStoredSession,
+      resolvedVia,
+      reusedSession: true,
+      hints: getSiteKnowledge().hintsFor(host),
+    };
+  }
+  await closeSession(userId);
 
   const { browser, persistentContext, release } = await acquireBrowser(userId);
   const storageState = await loadStorageState(userId, host).catch(() => null);
@@ -582,9 +633,8 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
     if (typeof release === 'function') release();
     throw error;
   }
-  await settle(page, 150);
-  const dismissedEarly = await dismissConsent(page).catch(() => false);
-  await settle(page, 100);
+  await settleConsentBanner(page);
+  const dismissedEarly = true;
 
   const session = createSession(userId, {
     browser, context, page, release, site: host, goal: objective, workflowId, agentTaskId,
@@ -592,13 +642,6 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
     searchOpens: openingASearch ? 1 : 0, actedSinceSearch: false, lastGoodUrl: url,
   });
   let observation = await observePage(page);
-  // A consent banner can land after the first dismissal pass; ASOS shows its banner this way.
-  const dismissedLate = await consentCandidatePresent(page).catch(() => false) && await dismissConsentOnce(page);
-  // Banners fade out after the click, so a read taken straight away still lists them.
-  if (dismissedEarly || dismissedLate) {
-    await settle(page, 400);
-    observation = await observePage(page);
-  }
   // A blank load is often a slow render; one longer wait before calling it blank.
   if (observation.pageProblem === 'blank') {
     await settle(page, 1500);
@@ -665,7 +708,8 @@ function resolveElement(session, elements, elementId) {
 // mechanical (url + element count + a text digest) — the agent decides what the change MEANS.
 async function act(userId, step = {}) {
   const session = requireSession(userId);
-  const page = session.page;
+  let page = session.page;
+  const pagesBefore = session.context ? session.context.pages().length : 0;
   const seen = await perceive(page);
   const before = { url: page.url(), text: String(seen.text || '').slice(0, 2000) };
   const elements = seen.elements;
@@ -743,6 +787,19 @@ async function act(userId, step = {}) {
 
   if (step.settleMs) await settle(page, Number(step.settleMs));
   else await settleAfterAction(page, kind);
+
+  // Retail checkouts commonly open in a new tab. Without following it the click looks like it did
+  // nothing and the agent retries against a basket page that is no longer the one being used.
+  if (session.context && session.context.pages().length > pagesBefore) {
+    const pages = session.context.pages();
+    const newest = pages[pages.length - 1];
+    if (newest && newest !== page) {
+      session.page = newest;
+      page = newest;
+      await settle(page, 500);
+      await dismissConsent(page).catch(() => false);
+    }
+  }
 
   // Remember which request failed, so a dead page can be named rather than described.
   let failedUrl = null;
