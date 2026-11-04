@@ -13,6 +13,18 @@ function heartbeatSettings(env = process.env) {
   return { enabled, intervalMs: intervalMinutes * 60 * 1000 };
 }
 
+const RETENTION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const RETENTION_FIRST_DELAY_MS = 10 * 60 * 1000;
+
+// The retention sweep runs daily wherever the heartbeat runs. It used to be a CLI nobody
+// scheduled, while /privacy published deletion dates that never happened.
+function retentionSettings(env = process.env) {
+  const enabled = String(env.OXY_HEARTBEAT || '').toLowerCase() === 'on';
+  const minutes = Number(env.OXY_RETENTION_MINUTES);
+  const intervalMs = Number.isFinite(minutes) && minutes >= 60 ? minutes * 60 * 1000 : RETENTION_INTERVAL_MS;
+  return { enabled, intervalMs, firstRunDelayMs: RETENTION_FIRST_DELAY_MS };
+}
+
 function startHeartbeat({
   sweep,
   intervalMs = DEFAULT_INTERVAL_MINUTES * 60 * 1000,
@@ -45,4 +57,4 @@ function startHeartbeat({
   return { tick, stop() { timers.clearTimeout(first); timers.clearInterval(repeat); } };
 }
 
-module.exports = { heartbeatSettings, startHeartbeat, DEFAULT_INTERVAL_MINUTES };
+module.exports = { heartbeatSettings, retentionSettings, startHeartbeat, DEFAULT_INTERVAL_MINUTES };

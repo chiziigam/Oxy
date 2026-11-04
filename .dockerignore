@@ -31,3 +31,6 @@ firmware
 launch
 scratchpad
 hardware
+
+# Local device run data (contains Wi-Fi credentials and display tokens)
+data

@@ -119,3 +119,26 @@ test('browser_act refuses a control that would charge', () => {
     assert.doesNotThrow(() => refusePaymentCommit(label), label);
   }
 });
+
+test('deploy refuses a dirty tree or a branch that is not main', () => {
+  const { assertDeployable } = require('../../scripts/deploy-fly');
+  assert.throws(() => assertDeployable({ branch: 'HEAD', status: '' }), /detached HEAD/);
+  assert.throws(() => assertDeployable({ branch: 'feature', status: '' }), /Refusing to deploy from "feature"/);
+  assert.doesNotThrow(() => assertDeployable({ branch: 'feature', status: '', env: { OXY_DEPLOY_BRANCH: '1' } }));
+  assert.throws(() => assertDeployable({ branch: 'main', status: ' M api/index.js' }), /dirty working tree/);
+  assert.doesNotThrow(() => assertDeployable({ branch: 'main', status: ' M api/index.js', env: { OXY_DEPLOY_DIRTY: '1' } }));
+  assert.doesNotThrow(() => assertDeployable({ branch: 'main', status: '' }));
+});
+
+test('retention runs daily wherever the heartbeat is on', () => {
+  const { retentionSettings } = require('../../api/services/heartbeat');
+  const on = retentionSettings({ OXY_HEARTBEAT: 'on' });
+  assert.equal(on.enabled, true);
+  assert.equal(on.intervalMs, 24 * 60 * 60 * 1000);
+  assert.equal(retentionSettings({}).enabled, false);
+});
+
+test('local device data is excluded from the production image', () => {
+  const ignore = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../.dockerignore'), 'utf8');
+  assert.match(ignore, /^data$/m);
+});
