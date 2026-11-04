@@ -62,6 +62,17 @@ function quoted(text) {
   return value ? `“${value}”` : '';
 }
 
+// A short plain topic for the activity feed: the first few words, no quotes, no trailing filler.
+function topic(text, words = 4) {
+  const parts = clean(text, 80).replace(/["“”]/g, '').split(' ').filter(Boolean);
+  return parts.slice(0, words).join(' ').replace(/[,;:–—-]+$/, '');
+}
+
+// "johnlewis.com" → "johnlewis.com"; the site as the user would recognise it in a list.
+function siteName(input) {
+  return site(input?.url) || clean(input?.site, 40);
+}
+
 function whoOf(input) {
   return clean(input.contact || input.to || input.recipient || input.name, 40);
 }
@@ -252,7 +263,7 @@ const ACTION_WORDING = Object.freeze({
     name: 'Nearby place',
     progress: (i) => pick(detail(i.query) && `Finding ${detail(i.query)}`, 'Finding the place'),
     summary: (p) => ({ summary: `Looked for ${field(p, 'query', 'destination', 'place', 'address') || 'a place'}`, kind: 'looked', usedLocation: true }),
-    feed: (i) => `Looked for ${quoted(i.query || i.place) || 'a place'}`,
+    feed: (i) => (topic(i.query || i.place) ? `Looked for ${topic(i.query || i.place)}` : 'Looked for a place'),
     failureLead: "I couldn't find a nearby place."
   },
   get_directions: {
@@ -434,7 +445,7 @@ const ACTION_WORDING = Object.freeze({
     name: 'Search',
     progress: (i) => pick(detail(i.query) && `Looking up ${detail(i.query)}`, 'Looking it up'),
     summary: (p) => ({ summary: `Searched for ${field(p, 'query') || 'something'}`, kind: 'looked' }),
-    feed: (i) => `Looked up ${quoted(i.query) || 'something online'}`,
+    feed: (i) => (topic(i.query) ? `Searched for ${topic(i.query)}` : 'Searched the web'),
     failureLead: "I couldn't search for that."
   },
   calculate: {
@@ -592,31 +603,40 @@ const ACTION_WORDING = Object.freeze({
   },
 
   browser_open: {
-    progress: (i) => pick(site(i.url) && `Opening ${site(i.url)}`, 'Opening the website')
+    progress: (i) => pick(site(i.url) && `Opening ${site(i.url)}`, 'Opening the website'),
+    feed: (i) => (siteName(i) ? `Opened ${siteName(i)}` : 'Opened a website')
   },
   browser_observe: {
-    progress: () => 'Looking at the page'
+    progress: () => 'Looking at the page',
+    feed: () => 'Read a web page'
   },
   browser_act: {
-    progress: () => 'Filling it in'
+    progress: () => 'Filling it in',
+    feed: () => 'Used a website'
   },
   browser_upload: {
-    progress: () => 'Adding the file'
+    progress: () => 'Adding the file',
+    feed: () => 'Uploaded a file'
   },
   browser_download: {
-    progress: () => 'Downloading'
+    progress: () => 'Downloading',
+    feed: () => 'Downloaded a file'
   },
   browser_continue_without_account: {
-    progress: () => 'Continuing as a guest'
+    progress: () => 'Continuing as a guest',
+    feed: () => 'Continued as a guest'
   },
   browser_sign_in: {
-    progress: (i) => pick(detail(i.site) && `Signing in to ${detail(i.site)}`, 'Signing in')
+    progress: (i) => pick(detail(i.site) && `Signing in to ${detail(i.site)}`, 'Signing in'),
+    feed: (i) => (siteName(i) ? `Signed in to ${siteName(i)}` : 'Signed in to a website')
   },
   browser_fill_known_details: {
-    progress: () => 'Filling in your details'
+    progress: () => 'Filling in your details',
+    feed: () => 'Filled in your details'
   },
   browser_close: {
-    progress: () => 'Finishing up'
+    progress: () => 'Finishing up',
+    feed: () => 'Closed the website'
   },
   transaction_prepare: {
     progress: () => 'Getting the total'

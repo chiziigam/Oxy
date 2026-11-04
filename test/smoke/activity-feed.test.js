@@ -26,7 +26,9 @@ test('actions are told apart by what they do to the world', () => {
 
 test('titles are plain past tense, never internal names', () => {
   assert.equal(describeAction('send_message', { contact: 'Arina' }), 'Sent a message to Arina');
-  assert.equal(describeAction('web_search', { query: 'AirPods case under £50' }), 'Looked up “AirPods case under £50”');
+  assert.equal(describeAction('web_search', { query: 'AirPods case under £50' }), 'Searched for AirPods case under £50');
+  assert.equal(describeAction('web_search', { query: 'Mercor bad news controversy layoffs' }), 'Searched for Mercor bad news controversy');
+  assert.equal(describeAction('browser_open', { url: 'https://www.johnlewis.com/search?search-term=mw4' }), 'Opened johnlewis.com');
   assert.equal(describeAction('some_new_thing', {}), 'Some new thing');
 });
 
