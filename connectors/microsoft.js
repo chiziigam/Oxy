@@ -159,12 +159,16 @@ async function execute(userId, action, params) {
         const body = String(params?.body || '').trim();
         if (!to) return { success: false, error: 'send_outlook_email requires a recipient (to)' };
         if (!body) return { success: false, error: 'send_outlook_email requires a body' };
+        const recipients = to.split(',').map(addr => addr.trim()).filter(Boolean);
+        if (!recipients.length || recipients.some(addr => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr))) {
+          return { success: false, error: 'That recipient is not a complete email address.' };
+        }
         const subject = params?.subject ? String(params.subject) : (body.split('\n')[0].slice(0, 78) || 'Message from Adam');
         await axios.post(`${GRAPH}/me/sendMail`, {
           message: {
             subject,
             body: { contentType: 'Text', content: body },
-            toRecipients: to.split(',').map(addr => ({ emailAddress: { address: addr.trim() } }))
+            toRecipients: recipients.map(addr => ({ emailAddress: { address: addr } }))
           },
           saveToSentItems: true
         }, { headers, timeout: 15000 });

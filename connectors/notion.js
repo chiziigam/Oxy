@@ -42,7 +42,7 @@ async function execute(userId, action, params) {
           parent: { database_id: dbId },
           properties: { title: { title: [{ text: { content: title } }] } },
           children: content ? [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ text: { content } }] } }] : []
-        }, { headers });
+        }, { headers, timeout: 15000 });
         return { success: true, text: `Created Notion page: ${title}`, webLink: res.data.url };
       } else {
         // A token alone is not evidence that a page was created. A database target is
@@ -56,7 +56,7 @@ async function execute(userId, action, params) {
       const res = await axios.post('https://api.notion.com/v1/search', {
         query,
         filter: { property: 'object', value: 'page' }
-      }, { headers });
+      }, { headers, timeout: 15000 });
       const results = res.data.results.map(r => r.properties?.title?.title?.[0]?.text?.content || 'Untitled').join(', ');
       return { success: true, text: `Notion results for "${query}": ${results || 'none'}`, webLink: 'https://notion.so' };
     }

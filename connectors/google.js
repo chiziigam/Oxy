@@ -791,7 +791,13 @@ async function execute(userId, action, params) {
 
       case 'get_emails': {
         const { max_results = 5 } = params;
-        const labelIds = normalizeLabelFilter(params);
+        // Gmail's labelIds take ids, not names. A name ("Receipts") used to be uppercased and
+        // sent straight through, which the API rejects.
+        const resolvedLabels = await resolveLabelIds(headers, normalizeLabelFilter(params));
+        if (!resolvedLabels.ids.length && resolvedLabels.unresolved.length) {
+          return { success: false, error: `Gmail has no label called ${resolvedLabels.unresolved.join(', ')}.` };
+        }
+        const labelIds = resolvedLabels.ids.length ? resolvedLabels.ids : ['INBOX'];
         const list = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/messages',
           { headers, ...gmailParams({ maxResults: max_results, labelIds }), timeout: 15000 });
         if (!list.data.messages?.length) return { success: true, emails: [], text: 'No emails found' };

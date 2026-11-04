@@ -34,12 +34,20 @@ async function execute(userId, action, params) {
       return { success: true, text: `Sent to Slack: ${params.message}`, channel: params.channel };
     }
     if (action === 'search_slack') {
-      const res = await axios.get(`https://slack.com/api/search.messages?query=${encodeURIComponent(params.query || '')}`, { headers });
+      const res = await axios.get(`https://slack.com/api/search.messages?query=${encodeURIComponent(params.query || '')}`, { headers, timeout: 15000 });
       if (!res.data.ok) return { success: false, error: `Slack error: ${res.data.error || 'unknown'}` };
-      return { success: true, text: `Slack search results for ${params.query}` };
+      const matches = res.data.messages?.matches || [];
+      if (!matches.length) return { success: true, text: `No Slack messages matched "${params.query}".`, results: [] };
+      const results = matches.slice(0, 10).map(match => ({
+        channel: match.channel?.name || null,
+        user: match.username || match.user || null,
+        text: String(match.text || '').replace(/\s+/g, ' ').slice(0, 300),
+      }));
+      const lines = results.map(r => `${r.channel ? `#${r.channel}: ` : ''}${r.text}`);
+      return { success: true, text: `Slack matches for ${params.query}:\n${lines.join('\n')}`, results };
     }
     if (action === 'get_slack_channels') {
-      const res = await axios.get('https://slack.com/api/conversations.list', { headers });
+      const res = await axios.get('https://slack.com/api/conversations.list', { headers, timeout: 15000 });
       if (!res.data.ok) return { success: false, error: `Slack error: ${res.data.error || 'unknown'}` };
       return { success: true, text: `Slack channels: ${res.data.channels.map(c => c.name).join(', ')}` };
     }

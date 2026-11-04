@@ -44,7 +44,7 @@ async function stripeRequest(key, method, path, data = null) {
     Authorization: `Bearer ${key}`,
     'Content-Type': 'application/x-www-form-urlencoded'
   };
-  const config = { headers };
+  const config = { headers, timeout: 20000 };
   if (data) {
     const params = new URLSearchParams();
     Object.entries(data).forEach(([k, v]) => params.append(k, v));

@@ -50,12 +50,12 @@ async function execute(userId, action, params) {
     if (action === 'create_github_issue' || (action === 'github_action' && params?.action === 'create_issue')) {
       const title = params?.title || params?.content || 'Task from Assistant';
       const body = params?.body || params?.content || '';
-      const res = await axios.post(`https://api.github.com/repos/${repo}/issues`, { title, body }, { headers });
+      const res = await axios.post(`https://api.github.com/repos/${repo}/issues`, { title, body }, { headers, timeout: 15000 });
       return { success: true, text: `Created issue: ${res.data.html_url}`, webLink: res.data.html_url };
     }
 
     if (action === 'get_github_prs') {
-      const res = await axios.get(`https://api.github.com/repos/${repo}/pulls?state=open`, { headers });
+      const res = await axios.get(`https://api.github.com/repos/${repo}/pulls?state=open`, { headers, timeout: 15000 });
       const prs = Array.isArray(res.data) ? res.data.slice(0, 20).map(p => ({
         number: p.number,
         title: String(p.title || '').slice(0, 180),
@@ -70,7 +70,7 @@ async function execute(userId, action, params) {
     }
 
     if (action === 'github_action' && (!params?.action || params.action === 'status')) {
-      const res = await axios.get(`https://api.github.com/repos/${repo}`, { headers });
+      const res = await axios.get(`https://api.github.com/repos/${repo}`, { headers, timeout: 15000 });
       return {
         success: true,
         text: `${repo} is ${res.data.private ? 'private' : 'public'} with ${res.data.open_issues_count || 0} open issues.`,
