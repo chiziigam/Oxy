@@ -155,6 +155,22 @@ async function closeWarmPool() {
 const SESSION_IDLE_MS = 20 * 60 * 1000;
 const liveSessions = new Map();
 
+// Each live session is a whole Chromium (with a screen, now). This box has 2 GB, so the number
+// that fit is small and the ceiling has to be explicit: a third household browsing at the same
+// time must not take the API down for everyone. The oldest idle session gives way.
+const MAX_LIVE_SESSIONS = envInt('OXY_MAX_BROWSER_SESSIONS', 2);
+
+async function makeRoomForSession() {
+  if (liveSessions.size < MAX_LIVE_SESSIONS) return;
+  const idle = [...liveSessions.entries()]
+    .sort((left, right) => (left[1].lastActivityAt || 0) - (right[1].lastActivityAt || 0));
+  while (liveSessions.size >= MAX_LIVE_SESSIONS && idle.length) {
+    const [oldestUserId] = idle.shift();
+    console.warn(`[browser-session] at the ${MAX_LIVE_SESSIONS}-browser ceiling; closing ${oldestUserId}'s idle session`);
+    await closeSession(oldestUserId).catch(() => {});
+  }
+}
+
 function createSession(userId, session) {
   // credentialTaskId is the identity a task-scoped credential grant binds to. It is created
   // once per browsing RUN because the only other id in play is a fresh uuid every turn, and a
@@ -413,6 +429,8 @@ async function hasResumableSession(userId) {
 }
 
 module.exports = {
+  makeRoomForSession,
+  MAX_LIVE_SESSIONS,
   VIEWPORT,
   envInt,
   withTimeout,

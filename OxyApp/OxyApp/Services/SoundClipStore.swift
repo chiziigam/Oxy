@@ -103,31 +103,6 @@ final class SoundClipStore {
         }
     }
 
-    #if DEBUG
-    /// Debug only (OXY_DEBUG_ALARM=1): a smoke alarm's three-beep pattern heard just now.
-    func seedAlarmNow() {
-        UserDefaults.standard.set(true, forKey: Self.preferenceKey)
-        let rate = 16_000.0
-        let samples = (0..<Int(rate * 3)).map { i -> Float in
-            let t = Double(i) / rate
-            let on = t.truncatingRemainder(dividingBy: 1.0) < 0.5 && Int(t * 4) % 2 == 0
-            return on ? Float(0.4 * sin(2 * .pi * 3_100 * t)) : Float(0.02 * sin(2 * .pi * 90 * t))
-        }
-        save(samples: samples, sampleRate: rate, sound: "smoke", title: "Smoke alarm", at: Date().addingTimeInterval(-40))
-    }
-
-    /// Debug only (OXY_DEBUG_YOU=sounds): three short tones standing in for real alerts.
-    func seedPreviewClips() {
-        UserDefaults.standard.set(true, forKey: Self.preferenceKey)
-        guard clips.isEmpty else { return }
-        let rate = 16_000.0
-        for (offset, (sound, title, pitch)) in [("knock", "Knocking", 220.0), ("smoke_alarm", "Smoke alarm", 3_100.0), ("door_bell", "Doorbell", 660.0)].enumerated() {
-            let samples = (0..<Int(rate)).map { Float(0.3 * sin(2 * .pi * pitch * Double($0) / rate)) }
-            save(samples: samples, sampleRate: rate, sound: sound, title: title, at: Date().addingTimeInterval(Double(-offset) * 3_000))
-        }
-        if let first = clips.first { mark(first, .wrong) }
-    }
-    #endif
 
     private var indexURL: URL { folder.appendingPathComponent("clips.json") }
 

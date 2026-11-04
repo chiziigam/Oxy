@@ -6,7 +6,7 @@
 const {
   VIEWPORT, envInt, withTimeout, acquireBrowser, createSession, getSession, touchSession,
   closeSession, checkpointBrowserState, loadStorageState, persistStorage, siteKeyFromUrl,
-  gotoBrowserPage,
+  gotoBrowserPage, makeRoomForSession,
 } = require('./browser-session');
 
 const SCREENSHOT_QUALITY = envInt('OXY_BROWSER_SCREENSHOT_QUALITY', 30);
@@ -620,6 +620,9 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
     };
   }
   await closeSession(userId);
+  // A headed browser with a screen is the expensive part of this service; make room for it
+  // before starting another one rather than overcommitting the box.
+  await makeRoomForSession();
 
   const { browser, persistentContext, release } = await acquireBrowser(userId);
   const storageState = await loadStorageState(userId, host).catch(() => null);
