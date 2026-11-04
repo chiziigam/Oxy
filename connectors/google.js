@@ -133,6 +133,7 @@ async function bulkModifyMessages(headers, ids, { addLabelIds = [], removeLabelI
 
 async function getTokens(userId) {
   let disconnectedOnPurpose = false;
+  let row = null;
   try {
     const { data, error } = await supabase
       .from('connectors')
@@ -141,14 +142,25 @@ async function getTokens(userId) {
       .eq('connector_id', 'google')
       .limit(1);
 
-    const row = !error && data?.length ? data[0] : null;
-    if (row?.enabled && row.tokens) return decryptTokens(row.tokens);
-    // A row that exists but is disabled is a deliberate disconnect (or a refresh that Google
-    // told us was revoked). Falling back to env here would silently re-connect the user to an
-    // account they just detached from.
-    if (row && !row.enabled) disconnectedOnPurpose = true;
+    row = !error && data?.length ? data[0] : null;
   } catch (err) {
     console.error('[getTokens] DB error:', err.message);
+  }
+
+  // A row that exists but is disabled is a deliberate disconnect (or a refresh that Google
+  // told us was revoked). Falling back to env here would silently re-connect the user to an
+  // account they just detached from.
+  if (row && !row.enabled) disconnectedOnPurpose = true;
+
+  if (row?.enabled && row.tokens) {
+    try {
+      return decryptTokens(row.tokens);
+    } catch (err) {
+      // A key problem must not read as "never connected": that sends the person to connect an
+      // account they already connected, and would fall through to the env mailbox below.
+      console.error('[getTokens] decrypt failed:', err.message);
+      throw new Error('Google is connected, but its saved sign-in could not be read. Reconnect Google from Settings.');
+    }
   }
 
   // Env-var fallback for the single-user setup, deliberately not written to the connectors row
