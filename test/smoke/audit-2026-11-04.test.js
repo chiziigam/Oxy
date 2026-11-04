@@ -59,3 +59,37 @@ test('deleting a whole saved person waits for approval', () => {
   assert.equal(contract.reviewWhen({ delete_person: 'true' }), true);
   assert.equal(contract.reviewWhen({ person_name: 'Ben', facts: ['met at work'] }), false);
 });
+
+test('guard mode gates writes but still lets Adam look at the page', async () => {
+  const { createActionExecution } = require('../../api/services/action-execution');
+  const { getActionContract } = require('../../api/action-contracts');
+  const parked = [];
+  const executed = [];
+  const run = createActionExecution({
+    invokeAdapter: async ({ type }) => { executed.push(type); return { success: true, text: 'ok' }; },
+    setPendingAction: async (userId, action) => { parked.push(action.type); return { approvalId: 'ap1' }; },
+    logAction: async () => {},
+    resolveContract: getActionContract,
+    resolveAdapter: () => ({ kind: 'inline' }),
+  });
+
+  await run('u1', [
+    { type: 'get_emails', input: {} },
+    { type: 'send_email', input: { to: 'a@example.com', body: 'Hello.' } },
+  ], { guardMode: true, userMessage: 'check my mail and email a' });
+
+  assert.deepEqual(executed, ['get_emails']);
+  assert.deepEqual(parked, ['send_email']);
+});
+
+test('an unreadable chat setting keeps approval mode on; a missing row keeps the default', async () => {
+  const { getChatSettings } = require('../../api/services/chat-settings');
+  const client = (error) => ({
+    from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error }) }) }) }),
+  });
+  const failed = await getChatSettings(client({ code: 'XX000', message: 'db down' }), 'u1');
+  assert.equal(failed.guardMode, true);
+  assert.equal(failed.unavailable, true);
+  const missing = await getChatSettings(client({ code: 'PGRST116', message: 'no rows' }), 'u1');
+  assert.equal(missing.guardMode, false);
+});

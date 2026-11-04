@@ -13,7 +13,7 @@ function fakeChatSettingsSupabase(store = []) {
               return {
                 single: async () => {
                   const row = store.find((r) => r[col] === val);
-                  return row ? { data: row, error: null } : { data: null, error: { message: 'not found' } };
+                  return row ? { data: row, error: null } : { data: null, error: { code: 'PGRST116', message: 'not found' } };
                 }
               };
             }
@@ -36,10 +36,12 @@ test('getChatSettings returns defaults when no row exists', async () => {
   assert.deepEqual(settings, { effort: 'medium', guardMode: false });
 });
 
-test('getChatSettings never throws even when the supabase client blows up', async () => {
+test('getChatSettings never throws when the supabase client blows up, and keeps approval mode on', async () => {
   const brokenSupabase = { from() { throw new Error('boom'); } };
   const settings = await getChatSettings(brokenSupabase, 'u1');
-  assert.deepEqual(settings, { effort: 'medium', guardMode: false });
+  assert.equal(settings.effort, 'medium');
+  assert.equal(settings.guardMode, true);
+  assert.equal(settings.unavailable, true);
 });
 
 test('saveChatSettings then getChatSettings returns the saved values', async () => {

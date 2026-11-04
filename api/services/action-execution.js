@@ -43,6 +43,14 @@ function normalizeAuthorizationWords(value) {
 // Words that appear in almost any message, so matching one proves nothing about the recipient.
 const FILLER_WORDS = new Set(['my', 'me', 'the', 'and', 'of', 'to', 'at', 'in', 'on', 'for', 'an', 'or', 'is', 'it', 'we', 'us', 'he', 'she', 'you', 'your', 'our']);
 
+// Guard mode gates writes, not looking. Parking an observation would make the browser loop
+// impossible to advance while "ask before every action" is on.
+const READ_ONLY_ACTION = /^(get_|search_|find_|check_|list_|read_|lookup_)|^(web_search|browser_observe|browser_open|browser_close|transaction_status|workspace_read|workspace_list)$/;
+
+function isReadOnlyAction(type) {
+  return READ_ONLY_ACTION.test(String(type || ''));
+}
+
 function hasExplicitUserAuthorization(action, userMessage) {
   const text = String(userMessage || '').trim();
   if (!text) return false;
@@ -97,7 +105,7 @@ function createActionExecution({
       } else if (context.dryRun || context.simulate) {
         result = simulatedActionResult(action);
       } else if ((
-        context.guardMode ||
+        (context.guardMode && !isReadOnlyAction(type)) ||
         ((contract?.executionMode === 'review' || contract?.reviewWhen?.(action.input || {})) && !(
           contract.explicitRequestAuthorizes && hasExplicitUserAuthorization(action, context.userMessage)
         ))
