@@ -7902,7 +7902,11 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             // The loop must carry the same surface budget as the first turn, or a room question
             // that starts an agent costs the full 127-tool prompt again.
             toolNames: toolsForChannel(channel),
-            maxIterations: isBroadMoneyGoal || autonomyLevel === 'High' || autonomyLevel === 'Bold' ? 10 : 6,
+            // A checkout is twenty small steps — find, add, basket, handover, guest, address,
+            // delivery, payment. The old six guaranteed it stopped before the till.
+            maxIterations: /(?:order|buy|purchase|checkout|basket|cart|shop|book|reserve|apply|renew|website|on [a-z0-9-]+\.(?:com|co\.uk|org))/i.test(message)
+              ? 20
+              : (isBroadMoneyGoal || autonomyLevel === 'High' || autonomyLevel === 'Bold' ? 10 : 6),
             context: {
               userMessage: message,
               location,

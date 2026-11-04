@@ -319,7 +319,20 @@ async function loadCheckoutProfile(supabase, userId) {
   // Consolidated consent OR legacy per-email consent
   const consent = map[PREF_CONSENT] === 'true' || map[PREF_EMAIL_CONSENT] === 'true';
 
-  return { email: email || null, title: title || null, name, phone, address, consent };
+  // The account already knows the person's email address: it is what they signed up with. A guest
+  // checkout that stops to ask for it is asking for something we hold.
+  let accountEmail = null;
+  if (!email) {
+    const { data: account } = await supabase
+      .from('users')
+      .select('email')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const candidate = account?.email ? String(account.email).trim().toLowerCase() : '';
+    if (candidate.includes('@')) accountEmail = candidate;
+  }
+
+  return { email: email || accountEmail || null, title: title || null, name, phone, address, consent };
 }
 
 /**
