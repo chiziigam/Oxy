@@ -127,6 +127,12 @@ function resolveDelivery({ event, prefs = {}, available = [], now = new Date(), 
   if (effective === 'off') {
     return { deliver: false, status: 'suppressed', reason: `${category} notifications are turned off` };
   }
+  // An optional idea never earns an interruption: it waits in the app.
+  if (event?.source_ref?.offer === true) {
+    return available.includes('in_app')
+      ? { deliver: true, channel: 'in_app' }
+      : { deliver: false, status: 'suppressed', reason: 'an optional idea stays in the app' };
+  }
   // "Just show those in the app" — a real preference, and not a failure.
   if (effective === 'in_app') {
     return available.includes('in_app')
