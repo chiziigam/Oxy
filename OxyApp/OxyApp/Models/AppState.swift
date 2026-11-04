@@ -64,6 +64,7 @@ final class AppState {
         Task { @MainActor in
             NativeIntegrationManager.shared.bootstrap(userId: userId)
             await HouseholdSoundMonitor.shared.configure(userId: userId)
+            await SettingsStore.hydrateFromServer(userId: userId)
             await PhotoLearner.shared.runIfEnabled()
         }
     }

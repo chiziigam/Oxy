@@ -4,30 +4,75 @@ import SwiftUI
 
 /// Reads and writes the local settings blob, keeping the server's chat settings in step.
 enum SettingsStore {
-    static func load() -> OxySettings {
+    private static let legacyKey = "oxy_settings"
+
+    private static var currentUserId: String {
+        KeychainHelper.shared.read(key: "user_id") ?? ""
+    }
+
+    private static func key(for userId: String) -> String {
+        userId.isEmpty ? "oxy_settings_anonymous" : "oxy_settings_\(userId)"
+    }
+
+    static func load() -> OxySettings { load(userId: currentUserId) }
+
+    static func load(userId: String) -> OxySettings {
         var settings = OxySettings()
-        if let data = UserDefaults.standard.data(forKey: "oxy_settings"),
+        let scoped = UserDefaults.standard.data(forKey: key(for: userId))
+        let legacy = UserDefaults.standard.data(forKey: legacyKey)
+        if let data = scoped ?? legacy,
            let saved = try? JSONDecoder().decode(OxySettings.self, from: data) {
             settings = saved
+            if scoped == nil {
+                // One-time move off the unscoped blob, so a second account on this phone
+                // cannot inherit the first account's home address and preferences.
+                persist(settings, userId: userId)
+                UserDefaults.standard.removeObject(forKey: legacyKey)
+            }
         }
         normalize(&settings)
         return settings
     }
 
     static func save(_ settings: OxySettings, userId: String) {
+        persist(settings, userId: userId)
+        Task { await NativeIntegrationManager.shared.syncNativeContext(userId: userId) }
+        Task {
+            do {
+                _ = try await APIClient.shared.request(
+                    path: "/chat-settings",
+                    method: "PUT",
+                    body: ["effort": settings.chatEffort, "guardMode": settings.guardMode]
+                )
+                UserDefaults.standard.set(true, forKey: "oxy_chat_settings_synced")
+            } catch {
+                // The local switch keeps the person's intent, but the server still decides
+                // whether an action waits. Hydration on the next launch repairs the mismatch.
+                UserDefaults.standard.set(false, forKey: "oxy_chat_settings_synced")
+            }
+        }
+    }
+
+    /// The server is the authority for guard mode because background runs read it. Without
+    /// this the app only ever wrote it, so a failed write was invisible forever.
+    static func hydrateFromServer(userId: String) async {
+        guard !userId.isEmpty else { return }
+        guard let data = try? await APIClient.shared.request(path: "/chat-settings"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        var settings = load(userId: userId)
+        if let guardMode = json["guardMode"] as? Bool { settings.guardMode = guardMode }
+        if let effort = json["effort"] as? String, ["low", "medium", "high"].contains(effort) {
+            settings.chatEffort = effort
+        }
+        persist(settings, userId: userId)
+    }
+
+    private static func persist(_ settings: OxySettings, userId: String) {
         var settings = settings
         normalize(&settings)
         UserDefaults.standard.set(settings.accentColor, forKey: "oxy_accentColor")
         if let data = try? JSONEncoder().encode(settings) {
-            UserDefaults.standard.set(data, forKey: "oxy_settings")
-        }
-        Task { await NativeIntegrationManager.shared.syncNativeContext(userId: userId) }
-        Task {
-            _ = try? await APIClient.shared.request(
-                path: "/chat-settings",
-                method: "PUT",
-                body: ["effort": settings.chatEffort, "guardMode": settings.guardMode]
-            )
+            UserDefaults.standard.set(data, forKey: key(for: userId))
         }
     }
 
