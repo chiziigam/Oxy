@@ -5,7 +5,7 @@ process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase
 process.env.SUPABASE_KEY = process.env.SUPABASE_KEY || 'test-key';
 
 const { buildToolsForGemini, ACTION_CONTRACTS } = require('../../api/action-contracts');
-const { ROOM_DEVICE_TOOLS, toolsForChannel } = require('../../api/services/chat-channel');
+const { ROOM_DEVICE_TOOLS, toolsForChannel, reasoningEffortForChannel } = require('../../api/services/chat-channel');
 
 const names = tools => tools[0].functionDeclarations.map(d => d.name);
 const moneyAndBrowsing = ['stripe_charge', 'browser_act', 'transaction_authorize', 'workspace_write'];
@@ -44,4 +44,11 @@ test('every other surface keeps the full set', () => {
   assert.equal(toolsForChannel('ios'), null);
   assert.equal(toolsForChannel('telegram_bot'), null);
   assert.equal(names(buildToolsForGemini(false, {})).length, names(buildToolsForGemini(false)).length);
+});
+
+test('the room answers out loud without deep reasoning, and can be tuned', () => {
+  assert.equal(reasoningEffortForChannel('display'), 'low');
+  assert.equal(reasoningEffortForChannel(null), null);
+  assert.equal(reasoningEffortForChannel('ios'), null);
+  assert.equal(reasoningEffortForChannel('display', { OXY_ROOM_REASONING_EFFORT: 'medium' }), 'medium');
 });

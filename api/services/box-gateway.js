@@ -154,7 +154,7 @@ function registerBoxRoutes(app, deps) {
   // A short spoken acknowledgement covers a slow model. Synthesised once and cached, so it
   // costs no time on the turn that needs it.
   const ACK_TEXT = process.env.OXY_VOICE_ACK_TEXT || 'One moment.';
-  const ACK_DELAY_MS = Number(process.env.OXY_VOICE_ACK_DELAY_MS || 900);
+  const ACK_DELAY_MS = Number(process.env.OXY_VOICE_ACK_DELAY_MS || 600);
   let ackPcm = null;
   let ackPending = null;
   function acknowledgementPcm() {
@@ -177,8 +177,9 @@ function registerBoxRoutes(app, deps) {
     let headersSent = false;
     let audioBytes = 0;
     let firstAudioMs = null;
+    let answerAudioMs = null;
     let ackPlayed = false;
-    const writeAudio = pcm => {
+    const writeAudio = (pcm, isAck = false) => {
       if (!headersSent) {
         res.writeHead(200, {
           'Content-Type': 'application/octet-stream',
@@ -189,6 +190,7 @@ function registerBoxRoutes(app, deps) {
         headersSent = true;
         firstAudioMs = Date.now() - startedAt;
       }
+      if (!isAck && answerAudioMs === null) answerAudioMs = Date.now() - startedAt;
       res.write(pcm);
       audioBytes += pcm.length;
     };
@@ -197,7 +199,7 @@ function registerBoxRoutes(app, deps) {
       const pcm = await acknowledgementPcm();
       if (!pcm || headersSent || !pcm.length) return;
       ackPlayed = true;
-      writeAudio(pcm);
+      writeAudio(pcm, true);
       log('info', 'box.voice.ack_spoken', { at_ms: Date.now() - startedAt });
     }, ACK_DELAY_MS) : null;
     try {
@@ -230,7 +232,7 @@ function registerBoxRoutes(app, deps) {
       } catch (e) { log('warn', 'box.voice.phone_notice_failed', { error: e.message }); }
     }
     res.end();
-    log('info', 'box.voice.stream', { first_audio_ms: firstAudioMs, ack: ackPlayed, audio_s: Math.round(audioBytes / (RATE * 2)), total_ms: Date.now() - startedAt });
+    log('info', 'box.voice.stream', { first_audio_ms: firstAudioMs, answer_audio_ms: answerAudioMs, ack: ackPlayed, audio_s: Math.round(audioBytes / (RATE * 2)), total_ms: Date.now() - startedAt });
     return { sent: true, reply: replyText, actions };
   }
 

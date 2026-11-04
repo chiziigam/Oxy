@@ -1260,7 +1260,7 @@ async function refreshBriefingSourceData(userId, todayKey, snapshot) {
 }
 
 const { buildSystemPrompt, CORE_SYSTEM_PROMPT } = require('./prompts');
-const { buildChatChannelContext, buildTelegramChatRequest, buildDisplayChatRequest, normalizeChatChannel, toolsForChannel } = require('./services/chat-channel');
+const { buildChatChannelContext, buildTelegramChatRequest, buildDisplayChatRequest, normalizeChatChannel, toolsForChannel, reasoningEffortForChannel } = require('./services/chat-channel');
 const urgentScreens = require('./services/urgent-screens');
 
 function normalizeGeminiHistory(history) {
@@ -2355,7 +2355,7 @@ async function inferContextualDeterministicTurn(userId, message, settings, trace
   return null;
 }
 
-function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedContentName, baseHistory, userContent, useAgentTools = true, toolNames = null }) {
+function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedContentName, baseHistory, userContent, useAgentTools = true, toolNames = null, reasoningEffort = null }) {
   // Keep control instructions authoritative. Cached prompts force dynamic rules into
   // conversation content, which is too weak for tool use and factuality.
   const canUseCachedPrompt = false;
@@ -2367,6 +2367,7 @@ function buildModernGenerateRequest({ dynamicSystemPrompt, useSearch, cachedCont
     topP: 0.8,
     topK: 20
   };
+  if (reasoningEffort) config.reasoningEffort = reasoningEffort;
 
   // Agentic: prefer native function calling for reliability + loops
   if (useAgentTools) {
@@ -7747,7 +7748,8 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       // model claims actions it never performed, since it emits no <action> text to fall back on.
       useAgentTools: true,
       // A room speaker carries a smaller budget of capabilities than the phone.
-      toolNames: toolsForChannel(channel)
+      toolNames: toolsForChannel(channel),
+      reasoningEffort: reasoningEffortForChannel(channel)
     });
 
     // === AGENTIC UPGRADE: Use ReAct loop for non-deterministic turns (fixes loop, orchestration, planning foundation) ===

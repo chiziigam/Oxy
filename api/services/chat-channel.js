@@ -39,6 +39,13 @@ function toolsForChannel(channel) {
   return normalizeChatChannel(channel) === ROOM_DEVICE_CHANNEL ? ROOM_DEVICE_TOOLS : null;
 }
 
+// A spoken answer is a sentence or two and the phone is one tap away, so the room does not need
+// deep reasoning to answer out loud. Anything it hands to the background keeps the full effort.
+function reasoningEffortForChannel(channel, env = process.env) {
+  if (normalizeChatChannel(channel) !== ROOM_DEVICE_CHANNEL) return null;
+  return env.OXY_ROOM_REASONING_EFFORT || 'low';
+}
+
 
 // "Text" is ordinary conversational language, so on a Telegram conversation it means
 // use the channel the person is already in. Keep explicit native-channel requests on the
@@ -82,6 +89,7 @@ module.exports = {
   ROOM_DEVICE_CHANNEL,
   ROOM_DEVICE_TOOLS,
   toolsForChannel,
+  reasoningEffortForChannel,
   normalizeChatChannel,
   adaptActionForChannel,
   buildTelegramChatRequest,
