@@ -6084,7 +6084,11 @@ async function gatherCalendarContext(userId) {
     const results = await Promise.all(requests);
     return results.flatMap(result => result?.success && Array.isArray(result.events) ? result.events : []).slice(0, 24);
   } catch (e) {
-    return [];
+    // An unreadable calendar is not an empty one; the digest reports the difference.
+    const unavailable = [];
+    unavailable.unavailable = true;
+    unavailable.reason = e.message;
+    return unavailable;
   }
 }
 

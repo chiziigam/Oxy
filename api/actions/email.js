@@ -182,7 +182,9 @@ async function dailyDigestAction({ userId, action, params, enrichedParams, conte
   else coverage.email = { ok: false, reason: replyResult?.error || 'your inbox was unreachable' };
   if (scheduledResult?.success) coverage.reminders = { ok: true };
   else coverage.reminders = { ok: false, reason: scheduledResult?.error || 'reminders were unreachable' };
-  coverage.calendar = calendarEvents?.length ? { ok: true } : { ok: true, empty: true };
+  coverage.calendar = calendarEvents?.unavailable
+    ? { ok: false, reason: calendarEvents.reason || 'your calendar was unreachable' }
+    : calendarEvents?.length ? { ok: true } : { ok: true, empty: true };
   if (watchResult?.error) coverage.watches = { ok: false, reason: watchResult.error.message || 'watch updates were unreachable' };
 
   const scheduledList = scheduledResult?.tasks || [];
