@@ -175,6 +175,27 @@ test('an approval is named after the answer instead of being spoken as done', as
   } finally { await box.close(); }
 });
 
+test('an answer that arrives as text only is still spoken after an acknowledgement', async () => {
+  process.env.OXY_VOICE_ACK_DELAY_MS = '80';
+  const box = await start({
+    streamChatReply: async function* () {
+      // A tool-using turn: it streams words but never any speech.
+      await new Promise(resolve => setTimeout(resolve, 200));
+      yield { type: 'text', chunk: 'The train leaves at six.' };
+      yield { type: 'done' };
+    }
+  });
+  try {
+    const res = await box.request('/display/d1/voice', { body: tone(2) });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.length, 16000 * 2, 'acknowledgement plus the spoken answer');
+    assert.ok(box.calls.spoken.some(text => /train leaves at six/.test(text)), 'the answer must not be dropped');
+  } finally {
+    delete process.env.OXY_VOICE_ACK_DELAY_MS;
+    await box.close();
+  }
+});
+
 test('a stream with no audio falls back to the ordinary spoken reply', async () => {
   const box = await start({
     streamChatReply: async function* () {

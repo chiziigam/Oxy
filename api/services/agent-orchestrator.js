@@ -124,6 +124,7 @@ async function runAgentLoop({
   executeActionsFn,
   trace = null,
   onStep = null,
+  toolNames = null,
   persistTask = false,
   existingTaskId = null,
   resumeNote = null,
@@ -245,7 +246,7 @@ async function runAgentLoop({
     systemInstruction: dynamicSystemPrompt,
     temperature: 0.2,
     topP: 0.8,
-    tools: buildToolsForGemini ? buildToolsForGemini(useSearch) : [{ functionDeclarations: [] }],
+    tools: buildToolsForGemini ? buildToolsForGemini(useSearch, toolNames ? { only: toolNames } : {}) : [{ functionDeclarations: [] }],
     // googleSearch alongside functionDeclarations 400s unless server-side tool
     // invocations are enabled — this is what silently killed grounded turns.
     toolConfig: { functionCallingConfig: { mode: 'AUTO' }, ...(useSearch ? { includeServerSideToolInvocations: true } : {}) }

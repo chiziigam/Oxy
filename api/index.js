@@ -7872,6 +7872,9 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             useSearch: isBroadMoneyGoal || useSearch, // force real-time research for money goals
             provider: chatProvider,
             modelName: chatModel,
+            // The loop must carry the same surface budget as the first turn, or a room question
+            // that starts an agent costs the full 127-tool prompt again.
+            toolNames: toolsForChannel(channel),
             maxIterations: isBroadMoneyGoal || autonomyLevel === 'High' || autonomyLevel === 'Bold' ? 10 : 6,
             context: {
               userMessage: message,

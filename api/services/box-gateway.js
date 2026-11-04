@@ -224,6 +224,17 @@ function registerBoxRoutes(app, deps) {
       if (ackTimer) clearTimeout(ackTimer);
     }
     if (!headersSent) return { sent: false, reply: replyText, actions };
+    // A turn that worked through tools can come back with text but no speech; after an
+    // acknowledgement the headers are already gone, so speak the answer here or lose it.
+    if (answerAudioMs === null) {
+      const spoken = reactions.plainReply(replyText || '').trim() || "I couldn't answer that just now.";
+      try {
+        const pcm = wavToPcm16k(Buffer.from(await voice.synthesizeSpeech(spoken), 'base64'));
+        if (audioBytes + pcm.length <= MAX_REPLY_PCM) res.write(pcm);
+        answerAudioMs = Date.now() - startedAt;
+        log('info', 'box.voice.spoken_after_stream', { at_ms: answerAudioMs });
+      } catch (e) { log('warn', 'box.voice.late_speech_failed', { error: e.message }); }
+    }
     // An approval is never spoken as if it had happened; it is named after the answer.
     if (findPendingAction(actions)) {
       try {
