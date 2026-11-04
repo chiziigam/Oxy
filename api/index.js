@@ -10028,6 +10028,18 @@ app.delete('/vault/credentials/:id', requireSessionAuth, async (req, res) => {
 
 // Fills a just-typed username/password straight into the live page's login form for a
 // `reauth` outcome. Never logged, never in a prompt, never accepted over chat.
+// Abandon any in-progress browser session for this person. The app calls this when a new
+// chat starts so a still-running ordering session cannot keep its input latch.
+app.post('/browser-session/:userId/close', requireSessionAuth, async (req, res) => {
+  if (!requireMatchingUser(req, res, req.params.userId)) return;
+  try {
+    await require('./services/browser-session').closeSession(req.params.userId);
+    res.json({ closed: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/browser-task/reauth-login', requireSessionAuth, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });

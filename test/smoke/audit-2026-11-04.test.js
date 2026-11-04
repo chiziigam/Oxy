@@ -190,3 +190,22 @@ test('the mailer reports its no-provider mode instead of pretending to send', as
     else process.env.RESEND_API_KEY = previous;
   }
 });
+
+test('a new chat can close its browser session, and only its own', async () => {
+  const http = require('node:http');
+  const { createSessionToken } = require('../../auth');
+  const app = require('../../api/index');
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address();
+    const auth = { Authorization: `Bearer ${createSessionToken('u1')}` };
+    const own = await fetch(`http://127.0.0.1:${port}/browser-session/u1/close`, { method: 'POST', headers: auth });
+    assert.equal(own.status, 200);
+    assert.deepEqual(await own.json(), { closed: true });
+    const other = await fetch(`http://127.0.0.1:${port}/browser-session/u2/close`, { method: 'POST', headers: auth });
+    assert.equal(other.status, 403);
+  } finally {
+    server.close();
+  }
+});
