@@ -348,7 +348,7 @@ async function settleAfterAction(page, kind) {
     const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, quietMs); });
     observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
     function done() { observer.disconnect(); clearTimeout(timer); clearTimeout(cap); resolve(); }
-  }), { quietMs: 150, maxMs: 800 }).catch(() => {});
+  }), { quietMs: 300, maxMs: 1500 }).catch(() => {});
 }
 
 // A consent wall covers the real page, so the first screenshot is all banner. Clicks the first
@@ -616,7 +616,13 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
 
 async function observe(userId, { includeScreenshot = false } = {}) {
   const session = requireSession(userId);
-  return observePage(session.page, { includeScreenshot });
+  // What is known about this site stays in front of the model on every read, not just the first
+  // page it opened. The curated labels are cheap; losing them mid-task is what makes the agent
+  // click banner links.
+  return {
+    ...await observePage(session.page, { includeScreenshot }),
+    hints: getSiteKnowledge().hintsFor(session.site),
+  };
 }
 
 
@@ -738,19 +744,10 @@ async function act(userId, step = {}) {
   if (step.settleMs) await settle(page, Number(step.settleMs));
   else await settleAfterAction(page, kind);
 
-  // A click can land on the browser's own error page (a failed redirect, a dropped connection).
-  // Go back to the last page that worked rather than handing the agent an empty page to explore.
-  let recoveredFrom = null;
-  if (/^chrome-error:\/\//i.test(page.url())) {
-    recoveredFrom = page.url();
-    const back = session.lastGoodUrl || before.url;
-    if (/^https?:\/\//i.test(String(back || ''))) {
-      await page.goto(back, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
-      await settle(page, 800);
-    }
-  } else if (/^https?:\/\//i.test(page.url())) {
-    session.lastGoodUrl = page.url();
-  }
+  // Remember which request failed, so a dead page can be named rather than described.
+  let failedUrl = null;
+  const noteFailure = (request) => { if (/^https?:/i.test(request.url())) failedUrl = request.url(); };
+  page.on('requestfailed', noteFailure);
   // A banner that is going to appear does so on a new page, so only look again after one.
   if (page.url() !== before.url) await dismissConsent(page, { retry: false }).catch(() => {});
   session.actedSinceSearch = true;
@@ -767,21 +764,62 @@ async function act(userId, step = {}) {
   };
 
   let observation = await observePage(page);
-  // A step that opens a new page can return before that page has rendered anything; reading it
-  // then shows the model an empty page it may wrongly treat as the answer. Give it a few beats.
-  for (let wait = 0; wait < 4 && page.url() !== before.url && isStillRendering(observation); wait += 1) {
-    await settle(page, 700);
+  // A new page arrives in stages. A shop's basket shows its nav first and its "Continue to
+  // checkout" control a beat later, so a single read hands the model a page with no checkout on
+  // it and it clicks whatever banner is visible instead. Re-read until the controls stop growing.
+  let lastCount = -1;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const count = observation.elements?.length || 0;
+    const navigated = page.url() !== before.url;
+    if (count === lastCount || (!navigated && count > 8)) break;
+    lastCount = count;
+    await settle(page, 600);
     observation = await observePage(page);
   }
+  page.off('requestfailed', noteFailure);
+
+  // A click can land on the browser's own error page. Recover to the last page that worked, and
+  // say which request died, rather than handing the agent an empty page to wander in.
+  let recoveredFrom = null;
+  if (/^chrome-error:\/\//i.test(observation.url)) {
+    recoveredFrom = observation.url;
+    const back = session.lastGoodUrl || before.url;
+    if (/^https?:\/\//i.test(String(back || ''))) {
+      await page.goto(back, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+      await settle(page, 800);
+      observation = await observePage(page);
+    }
+  } else if (/^https?:\/\//i.test(observation.url)) {
+    session.lastGoodUrl = observation.url;
+  }
+
   await checkpointBrowserState(session, { lastObservation: observation.url });
-  return {
-    ...observation,
-    changed: {
+  let changed = {
+    url: before.url !== observation.url,
+    urlBefore: before.url,
+    content: before.text.slice(0, 400) !== observation.text.slice(0, 400),
+  };
+  let noChange = false;
+  if (kind === 'click' && !changed.url && !changed.content) {
+    // A click that moved nothing usually means the control did not do what it looked like: an
+    // option is unset, or the click was swallowed. Look again before the agent believes it worked.
+    await settle(page, 700);
+    const again = await observePage(page);
+    if (before.url !== again.url || before.text.slice(0, 400) !== again.text.slice(0, 400)) observation = again;
+    changed = {
       url: before.url !== observation.url,
       urlBefore: before.url,
       content: before.text.slice(0, 400) !== observation.text.slice(0, 400),
-    },
+    };
+    noChange = !changed.url && !changed.content;
+  }
+  return {
+    ...observation,
+    hints: getSiteKnowledge().hintsFor(session.site),
+    changed,
+    ...(noChange ? { noChange: true } : {}),
     ...(recoveredFrom ? { recoveredFrom } : {}),
+    ...(failedUrl ? { failedUrl } : {}),
   };
 }
 

@@ -28,7 +28,12 @@ function resultSubject({ name = null, amount = null, images = [], options = [] }
 // What the model reads back after any browser step. The element list leads, because that is
 // the actionable part; the page text follows for judgement.
 function observationResult(observation, extra = {}) {
-  const lines = (observation.elementLines || []).slice(0, 60);
+  const allLines = observation.elementLines || [];
+  // A shop's basket puts dozens of nav and footer links ahead of "Continue to checkout".
+  // Cutting at 60 hid the only control that mattered, so the agent clicked banner links instead.
+  const CAP = 140;
+  const lines = allLines.slice(0, CAP);
+  const more = allLines.length > CAP ? ` — showing the first ${CAP} of ${allLines.length}` : '';
   return {
     success: true,
     url: observation.url,
@@ -36,12 +41,16 @@ function observationResult(observation, extra = {}) {
     elements: lines,
     pageText: observation.text,
     ...(observation.blocked ? { blocked: observation.blocked } : {}),
+    ...(Array.isArray(observation.hints) && observation.hints.length ? { hints: observation.hints } : {}),
     ...extra,
     text: [
       `${observation.title || 'Page'} — ${observation.url}`,
       lines.length
-        ? `Controls on this page (use the number as elementId):\n${lines.join('\n')}`
+        ? `Controls on this page (use the number as elementId)${more}:\n${lines.join('\n')}`
         : 'No interactive controls found on this page.',
+      (observation.hints || []).length
+        ? `Known for this site:\n${observation.hints.slice(0, 6).map(hint => `- ${hint}`).join('\n')}`
+        : '',
       observation.text ? `Page text:\n${observation.text.slice(0, 2000)}` : '',
     ].filter(Boolean).join('\n\n'),
   };
