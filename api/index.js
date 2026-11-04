@@ -6442,10 +6442,11 @@ async function runScheduledTasksForUser(userId, logger = console, now = new Date
           }),
           title: claimed.title,
           body: spoken,
-          dedupeKey: notifications.dedupeKeyFor({
-            category: 'watch',
+          dedupeKey: notifications.scheduledTaskDedupeKey({
             scheduledTaskId: claimed.id,
-            state: evaluation?.reason || runStatus
+            hasCondition: Boolean(claimed.condition),
+            state: evaluation?.reason || runStatus,
+            slot: claimed.next_run_at || ''
           }),
           sourceRef: { scheduledTaskId: claimed.id, taskId: persistedTask.id, status: runStatus }
         }).catch(error => logger.warn?.(`[scheduled] notification failed for ${claimed.id}: ${error.message}`));

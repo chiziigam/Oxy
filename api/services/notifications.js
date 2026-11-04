@@ -66,6 +66,17 @@ function gradeUrgency({ category, overdue = false, minutesUntil = null, terminal
 // The key identifies the real-world event, so re-raising it is an update rather than a second
 // alert. A watch keys on its own id plus the state it observed: the same transition seen
 // twice collapses, a genuinely new transition does not.
+// A recurring task runs on a schedule slot; that slot is what makes one run distinct from the
+// next. A condition watch instead keys on the transition it observed, so a site that stays at
+// the same price does not alert every day.
+function scheduledTaskDedupeKey({ scheduledTaskId, hasCondition = false, state = '', slot = '' } = {}) {
+  return dedupeKeyFor({
+    category: 'watch',
+    scheduledTaskId,
+    state: hasCondition ? state : `${state}:${slot}`,
+  });
+}
+
 function dedupeKeyFor({ category, scheduledTaskId, briefingId, threadId, personName, commitmentId, state, dateKey } = {}) {
   const parts = [normalizeCategory(category)];
   if (scheduledTaskId) parts.push(`task:${scheduledTaskId}`);
@@ -267,6 +278,7 @@ module.exports = {
   normalizeUrgency,
   gradeUrgency,
   dedupeKeyFor,
+  scheduledTaskDedupeKey,
   parseQuietHours,
   inQuietHours,
   resolveDelivery,

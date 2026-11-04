@@ -869,3 +869,16 @@ test('a push carries the answer actions stored on its event', async () => {
   assert.equal(result.status, 'delivered');
   assert.deepEqual(sent.push, { apsCategory: 'adam.approve', threadId: 'wf1', collapseId: 'cp1', data: { workflowId: 'wf1', checkpointId: 'cp1' } });
 });
+
+test('a recurring watch notifies on each slot, while a condition watch keys on the transition', () => {
+  const { scheduledTaskDedupeKey } = require('../../api/services/notifications');
+  const day1 = scheduledTaskDedupeKey({ scheduledTaskId: 'w1', state: 'completed', slot: '2026-11-04T07:00:00.000Z' });
+  const day2 = scheduledTaskDedupeKey({ scheduledTaskId: 'w1', state: 'completed', slot: '2026-11-05T07:00:00.000Z' });
+  const again = scheduledTaskDedupeKey({ scheduledTaskId: 'w1', state: 'completed', slot: '2026-11-04T07:00:00.000Z' });
+  assert.notEqual(day1, day2, 'yesterday\'s slot must not suppress today\'s notification');
+  assert.equal(day1, again, 'a retry of the same slot stays one alert');
+
+  const triggered = scheduledTaskDedupeKey({ scheduledTaskId: 'w2', hasCondition: true, state: 'below 90', slot: '2026-11-04T07:00:00.000Z' });
+  const triggeredLater = scheduledTaskDedupeKey({ scheduledTaskId: 'w2', hasCondition: true, state: 'below 90', slot: '2026-11-05T07:00:00.000Z' });
+  assert.equal(triggered, triggeredLater, 'the same condition must not alert twice just because a day passed');
+});
