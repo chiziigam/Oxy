@@ -48,7 +48,9 @@ struct RootView: View {
                 appState.token = "debug-local"
                 appState.isDemoSession = true
                 appState.isAuthenticated = true
-                _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                if ProcessInfo.processInfo.environment["OXY_DEBUG_ASK_NOTIFICATIONS"] == "1" {
+                    _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                }
             } else {
                 appState.restoreSession()
             }

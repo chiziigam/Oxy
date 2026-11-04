@@ -52,7 +52,7 @@ struct ProfileView: View {
                                 legalLink(label: "Terms of Use", path: "/terms")
                             }
 
-                            section(title: "Sign out") {
+                            section(title: nil) {
                                 actionRow(label: "Sign out", action: { showSignOutConfirm = true })
                                     .disabled(isBusy)
                                 SettingsRule()
@@ -76,8 +76,8 @@ struct ProfileView: View {
 
 
                         }
-                        .padding(.horizontal, AppSpacing.margin)
-                        .padding(.top, 12)
+                        .padding(.horizontal, AdamLayout.gutter)
+                        .padding(.top, 8)
                         .padding(.bottom, 40)
                     }
                 }
@@ -128,7 +128,7 @@ struct ProfileView: View {
 
     // MARK: - Rows
 
-    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
         SettingsGroup(title: title) { SettingsList { content() } }
     }
 

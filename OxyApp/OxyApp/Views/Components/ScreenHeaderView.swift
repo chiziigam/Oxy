@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// The bar every screen opens with: one title, one way back, in the same type as the main screen.
 struct ScreenHeaderView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -7,58 +8,34 @@ struct ScreenHeaderView: View {
     var onBack: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if typeSize.isAccessibilitySize {
-                HStack {
-                    backButton
-                    Spacer()
-                    sampleLabel
+        HStack(spacing: 2) {
+            if let onBack {
+                Button(action: onBack) {
+                    AppIcon("chevron-left", size: 18)
+                        .foregroundStyle(Color.adamInk)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                heading
-            } else {
-                HStack(spacing: 10) {
-                    backButton
-                    heading
-                    Spacer(minLength: 0)
-                    sampleLabel
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+                .padding(.leading, -12)
+            }
+            Text(title)
+                .font(typeSize.isAccessibilitySize ? .appBody(20, weight: .semibold) : .adamTitle)
+                .foregroundStyle(Color.adamInk)
+                .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            if appState.isDemoSession {
+                Text("Sample")
+                    .font(.adamLabel)
+                    .foregroundStyle(Color.adamMuted)
             }
         }
-        .padding(.horizontal, AppSpacing.margin)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-        .background(Color.appBackground.ignoresSafeArea(edges: .top))
-    }
-
-    private var heading: some View {
-        Text(title)
-            .font(typeSize.isAccessibilitySize ? .title2.bold() : .appRounded(30, weight: .bold, relativeTo: .largeTitle))
-            .tracking(-0.7)
-            .foregroundStyle(Color.appInk)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    @ViewBuilder
-    private var backButton: some View {
-        if let onBack {
-            Button(action: onBack) {
-                AppIcon("chevron-left", size: 19)
-                    .foregroundStyle(Color.appAccent)
-                    .frame(width: 44, height: 44)
-                    .background(Color.appSurface2, in: Circle())
-            }
-            .buttonStyle(.appScale)
-            .accessibilityLabel("Back")
-        }
-    }
-
-    @ViewBuilder
-    private var sampleLabel: some View {
-        if appState.isDemoSession {
-            Text("Sample")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.appMuted)
-        }
+        .padding(.horizontal, AdamLayout.gutter)
+        .frame(minHeight: 52)
+        .background(Color.adamBackground.ignoresSafeArea(edges: .top))
     }
 }

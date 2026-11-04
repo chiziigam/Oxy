@@ -53,7 +53,7 @@ struct SetupFlowView: View {
 
     private func heading(_ title: String, _ line: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.appBody(30, weight: .semibold)).foregroundStyle(Color.adamInk)
+            Text(title).font(.appBody(22, weight: .semibold)).foregroundStyle(Color.adamInk)
                 .fixedSize(horizontal: false, vertical: true)
             if let line { Text(line).font(.adamBody).foregroundStyle(Color.adamInk.opacity(0.8)) }
         }

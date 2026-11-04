@@ -129,13 +129,13 @@ enum AppSpacing {
 
 /// The type scale: six roles, every one following Dynamic Type.
 enum TypeRole {
-    /// 34: the one sentence that leads a screen.
+    /// 22: the one sentence that leads a screen.
     case display
-    /// 22: the question on a receipt, a page section.
+    /// 17: the question on a receipt, a page section.
     case title
-    /// 17: reading text and device sentences.
+    /// 15: reading text and device sentences.
     case body
-    /// 15: rows, details, controls.
+    /// 13: rows, details, controls.
     case callout
     /// 13: group labels and secondary facts.
     case footnote
@@ -144,10 +144,10 @@ enum TypeRole {
 
     var size: CGFloat {
         switch self {
-        case .display: return 34
-        case .title: return 22
-        case .body: return 17
-        case .callout: return 15
+        case .display: return 22
+        case .title: return 17
+        case .body: return 15
+        case .callout: return 13
         case .footnote: return 13
         case .caption: return 12
         }
@@ -167,13 +167,13 @@ enum TypeRole {
 
 extension Font {
     static func role(_ role: TypeRole, weight: Font.Weight? = nil) -> Font {
-        let fallback: Font.Weight = role == .display ? .bold : (role == .title ? .semibold : .regular)
-        return .system(role.style, design: .default).weight(weight ?? fallback)
+        let fallback: Font.Weight = role == .display ? .bold : (role == .title ? .medium : .regular)
+        return .appBody(role.size, weight: weight ?? fallback)
     }
 
     /// Times, readings and counts: monospaced like an instrument, so they line up and read as measured.
     static func reading(_ role: TypeRole, weight: Font.Weight = .regular) -> Font {
-        .system(role.style, design: .monospaced).weight(weight)
+        .appMono(role.size, weight: weight)
     }
 
     static var screenTitle: Font { .appBody(20, weight: .semibold) }
@@ -186,9 +186,9 @@ extension Font {
     static var fineprint: Font { .appBody(12, weight: .medium) }
     static func heroDisplay(_ size: CGFloat = 30) -> Font { .appEditorial(size) }
     /// The serif headline scale: first screens, page headers, and the title of a card or sheet.
-    static var heroTitle: Font { .appRounded(30, weight: .semibold, relativeTo: .title1) }
-    static var pageTitle: Font { .appRounded(34, weight: .bold, relativeTo: .largeTitle) }
-    static var sectionTitle: Font { .appRounded(20, weight: .semibold, relativeTo: .title3) }
+    static var heroTitle: Font { .appBody(17, weight: .medium) }
+    static var pageTitle: Font { .appBody(17, weight: .medium) }
+    static var sectionTitle: Font { .appBody(17, weight: .medium) }
     /// Big friendly figures and focal lines.
     static func appRounded(_ size: CGFloat, weight: Font.Weight = .bold, relativeTo style: UIFont.TextStyle = .title1) -> Font {
         let relativeStyle: Font.TextStyle

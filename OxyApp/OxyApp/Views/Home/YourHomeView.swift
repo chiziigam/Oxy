@@ -188,18 +188,10 @@ struct YourHomeView: View {
             Text("Pair a display and its status shows here.")
                 .font(.role(.body)).foregroundStyle(Color.appMuted)
                 .fixedSize(horizontal: false, vertical: true)
-            Button {
+            AdamButton(title: "Add a display", prominent: true) {
                 HapticManager.shared.impact(.medium)
                 showsDisplaySetup = true
-            } label: {
-                Text("Add a display")
-                    .font(.role(.callout, weight: .semibold))
-                    .foregroundStyle(Color.appOnAction)
-                    .padding(.horizontal, AppSpacing.xl)
-                    .frame(minHeight: 48)
-                    .background(Capsule().fill(Color.appAction))
             }
-            .buttonStyle(.appScale(0.97))
         }
     }
 

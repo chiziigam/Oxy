@@ -5,37 +5,11 @@ struct YouPage: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @State private var settings = SettingsStore.load()
-    @State private var model = SettingsContextModel()
     @State private var destination: Destination?
 
     private enum Destination: Identifiable {
         case saved, home
         var id: String { "\(self)" }
-    }
-
-    private struct Area: Identifiable {
-        let id: String
-        let title: String
-        let lines: [String]
-    }
-
-    private var areas: [Area] {
-        guard let context = model.context else { return [] }
-        let profile = context.profile
-        let activeGoals = context.goals
-            .filter { ["pending", "running", "paused", "failed"].contains($0.status.lowercased()) }
-            .map(\.goal)
-        let likes = context.preferences.keys.sorted().map { key -> String in
-            let name = key.replacingOccurrences(of: "_", with: " ")
-            return "\(name.prefix(1).uppercased() + name.dropFirst()): \(context.preferences[key] ?? "")"
-        } + profile.context
-        return [
-            Area(id: "people", title: "People", lines: profile.relationships),
-            Area(id: "places", title: "Places", lines: settings.homeAddress.isEmpty ? [] : [settings.homeAddress]),
-            Area(id: "work", title: "Work and study", lines: profile.work),
-            Area(id: "plans", title: "Plans", lines: profile.goals + activeGoals),
-            Area(id: "likes", title: "Preferences", lines: likes)
-        ]
     }
 
     var body: some View {
@@ -59,61 +33,20 @@ struct YouPage: View {
                         }
                 }
                 .padding(.vertical, 16)
+
                 SettingsRule()
+
                 SettingsNavRow(title: "Home address", subtitle: settings.homeAddress.isEmpty ? "Not set" : settings.homeAddress) {
                     destination = .home
                 }
-            }
 
-            if model.isLoading {
-                ProgressView("Loading your details")
-                    .font(.appBody(15))
-                    .frame(maxWidth: .infinity, minHeight: 80)
-            } else if model.failed {
-                ErrorBanner(message: "Couldn't load your details.", onRetry: { Task { await model.load(isDemo: appState.isDemoSession) } })
-            } else {
-                let identity = model.context?.profile.identity ?? []
-                let known = areas.filter { !$0.lines.isEmpty && $0.id != "places" }
-                if !identity.isEmpty || !known.isEmpty {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("Saved context")
-                            .font(.appRounded(22, weight: .semibold, relativeTo: .title2))
-                            .foregroundStyle(Color.appInk)
-                            .accessibilityAddTraits(.isHeader)
-                        ForEach(Array(identity.enumerated()), id: \.offset) { _, line in
-                            Text(line)
-                                .font(.appBody(17))
-                                .foregroundStyle(Color.appInk)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        ForEach(known) { area in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(area.title)
-                                    .font(.appBody(14, weight: .medium))
-                                    .foregroundStyle(Color.appMuted)
-                                    .accessibilityAddTraits(.isHeader)
-                                ForEach(Array(area.lines.prefix(3).enumerated()), id: \.offset) { _, line in
-                                    Text(line)
-                                        .font(.appBody(17))
-                                        .foregroundStyle(Color.appInk)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                if area.lines.count > 3 {
-                                    Button("Show \(area.lines.count - 3) more") { destination = .saved }
-                                        .font(.appBody(15, weight: .medium))
-                                        .foregroundStyle(Color.appAccent)
-                                        .frame(minHeight: 44)
-                                        .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                SettingsRule()
+
+                SettingsNavRow(title: "Memory", subtitle: "What Adam remembers") {
+                    destination = .saved
                 }
             }
         }
-        .task { await model.load(isDemo: appState.isDemoSession) }
         .fullScreenCover(item: $destination, onDismiss: { settings = SettingsStore.load() }) { dest in
             Group {
                 switch dest {

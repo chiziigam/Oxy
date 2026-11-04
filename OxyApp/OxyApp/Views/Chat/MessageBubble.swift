@@ -157,36 +157,29 @@ struct MessageBubble: View {
             // Message content
             if !message.content.isEmpty && uberAction == nil {
                 if isUser {
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack(spacing: 6) {
-                            Text("You")
-                                .font(.appBody(12, weight: .semibold))
-                            Text(message.timestamp.formatted(
-                                date: Calendar.current.isDateInToday(message.timestamp) ? .omitted : .abbreviated,
-                                time: .shortened))
-                                .font(.appBody(12))
-                                .monospacedDigit()
-                            if message.queuedForActiveTask {
-                                Text("Queued")
-                                    .font(.appBody(12, weight: .medium))
-                            }
-                        }
-                        .foregroundStyle(Color.appMuted)
+                    VStack(alignment: .trailing, spacing: 6) {
                         if let quote = ReplyQuote.split(userContent.text) {
                             Text("Replying to \(quote.who) · \(quote.snippet)")
-                                .font(.appBody(13))
+                                .font(.appBody(12))
                                 .foregroundStyle(Color.appMuted)
                                 .lineLimit(2)
                         }
                         Text(AttributedString(ReplyQuote.split(userContent.text)?.body ?? userContent.text))
-                            .font(.appBody(isCompact || message.content.count < 48 ? 18 : 22, weight: .semibold))
+                            .font(.appBody(17))
                             .foregroundStyle(Color.appInk)
                             .lineSpacing(2)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.appUserBubble, in: bubbleShape)
                             .overlay(alignment: .topTrailing) {
                                 if let reaction { ReactionBadge(emoji: reaction).offset(x: 10, y: -14) }
                             }
+                        if message.queuedForActiveTask {
+                            Text("Queued")
+                                .font(.appBody(12))
+                                .foregroundStyle(Color.appMuted)
+                        }
                         if let name = userContent.name {
                             HStack(spacing: 12) {
                                 AppIcon("doc", size: 22)
@@ -205,8 +198,10 @@ struct MessageBubble: View {
                             .accessibilityLabel("Attachment, \(name)")
                         }
                     }
-                    .padding(.top, 18)
-                    .padding(.bottom, 4)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.leading, 64)
+                    .padding(.top, 10)
+                    .padding(.bottom, 2)
                 } else {
                     HStack(spacing: 0) {
                         VStack(alignment: .leading, spacing: 0) {

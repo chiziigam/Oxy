@@ -40,32 +40,6 @@ enum SettingsStore {
     }
 }
 
-/// What Adam currently knows, shared by the menu, You and Connections.
-@MainActor
-@Observable
-final class SettingsContextModel {
-    var context: AgentContextSnapshot?
-    var isLoading = true
-    var failed = false
-
-    func load(isDemo: Bool) async {
-#if DEBUG
-        if isDemo {
-            context = AgentContextDemo.snapshot
-            isLoading = false
-            return
-        }
-#endif
-        do {
-            context = try await AgentContextService.fetch()
-            failed = false
-        } catch {
-            failed = context == nil
-        }
-        isLoading = false
-    }
-}
-
 // MARK: - Surfaces and the dot
 
 extension Color {
@@ -117,8 +91,8 @@ struct SettingsPage<Content: View>: View {
                 ScreenHeaderView(title: title, onBack: isRoot && revealClose != nil ? nil : { dismiss() })
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) { content }
-                        .padding(.horizontal, AppSpacing.margin)
-                        .padding(.top, 4)
+                        .padding(.horizontal, AdamLayout.gutter)
+                        .padding(.top, 8)
                         .padding(.bottom, 40)
                 }
             }
@@ -289,98 +263,6 @@ struct SettingsStatement: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(text)
-    }
-}
-
-// MARK: - Orbit portrait
-
-/// Adam at the centre, the parts of someone's life it understands on a ring around it.
-/// A filled dot with a line to the centre means Adam knows something there; a ring means not yet.
-struct OrbitPortrait: View {
-    struct Satellite: Identifiable {
-        let id: String
-        let label: String
-        let count: Int
-        var known: Bool { count > 0 }
-    }
-
-    let satellites: [Satellite]
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let radius: CGFloat = 74
-
-    var body: some View {
-        GeometryReader { proxy in
-            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            ZStack {
-                Circle().strokeBorder(Color.appHairline, lineWidth: 0.8)
-                    .frame(width: radius * 2, height: radius * 2)
-                    .position(center)
-                Circle().strokeBorder(Color.appHairline.opacity(0.6), lineWidth: 0.8)
-                    .frame(width: radius * 1.1, height: radius * 1.1)
-                    .position(center)
-
-                ForEach(Array(satellites.enumerated()), id: \.element.id) { index, satellite in
-                    let angle = Self.angle(index, of: satellites.count)
-                    let point = CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
-
-                    if satellite.known {
-                        Path { path in
-                            path.move(to: center)
-                            path.addLine(to: point)
-                        }
-                        .trim(from: 0, to: appeared ? 1 : 0)
-                        .stroke(Color.appAccent.opacity(0.35), lineWidth: 1)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.5).delay(0.08 * Double(index)), value: appeared)
-                    }
-
-                    AdamDot(solid: satellite.known, size: 12)
-                        .scaleEffect(appeared ? 1 : 0.4)
-                        .opacity(appeared ? 1 : 0)
-                        .position(point)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.35).delay(0.1 + 0.08 * Double(index)), value: appeared)
-
-                    label(for: satellite, angle: angle)
-                        .position(Self.labelPoint(from: point, angle: angle))
-                        .opacity(appeared ? 1 : 0)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(0.2 + 0.08 * Double(index)), value: appeared)
-                }
-
-                Circle().fill(Color.appAccent.opacity(0.14)).frame(width: 44, height: 44).position(center)
-                AdamDot(solid: true, size: 18).position(center)
-            }
-        }
-        .frame(height: 208)
-        .onAppear { appeared = true }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            satellites.map { $0.known ? "\($0.label): \($0.count)" : "\($0.label): nothing yet" }.joined(separator: ". ")
-        )
-    }
-
-    private func label(for satellite: Satellite, angle: CGFloat) -> some View {
-        let cosine = cos(angle)
-        let side: Alignment = abs(cosine) < 0.25 ? .center : (cosine > 0 ? .leading : .trailing)
-        return Text(satellite.label)
-            .font(.appBody(12, weight: satellite.known ? .medium : .regular))
-            .foregroundStyle(satellite.known ? Color.appInk : Color.appMuted)
-            .lineLimit(1)
-            .frame(width: 112, alignment: side)
-    }
-
-    private static func angle(_ index: Int, of count: Int) -> CGFloat {
-        let step = 2 * CGFloat.pi / CGFloat(max(count, 1))
-        return -CGFloat.pi / 2 + step * CGFloat(index)
-    }
-
-    private static func labelPoint(from point: CGPoint, angle: CGFloat) -> CGPoint {
-        let cosine = cos(angle)
-        let sine = sin(angle)
-        if abs(cosine) < 0.25 {
-            return CGPoint(x: point.x, y: point.y + (sine < 0 ? -20 : 20))
-        }
-        return CGPoint(x: point.x + (cosine > 0 ? 70 : -70), y: point.y + (sine > 0.4 ? 4 : 0))
     }
 }
 
