@@ -607,11 +607,27 @@ async function observe(userId, { includeScreenshot = false } = {}) {
 
 function resolveElement(session, elements, elementId) {
   const index = Number(elementId);
-  if (!Number.isInteger(index) || index < 0 || index >= elements.length) {
-    throw new Error(`elementId ${elementId} is not on the current page (0–${Math.max(0, elements.length - 1)}). Observe again before acting.`);
+  if (Number.isInteger(index) && index >= 0 && index < elements.length) {
+    const el = elements[index];
+    return session.page.locator(CLICKABLE_SELECTOR).nth(el.locatorIndex);
   }
-  const el = elements[index];
-  return session.page.locator(CLICKABLE_SELECTOR).nth(el.locatorIndex);
+  // A model sometimes names the control instead of numbering it. That is the same click it
+  // meant, so resolve the name rather than failing the step and restarting the search.
+  const wanted = String(elementId ?? '').trim().toLowerCase();
+  if (wanted) {
+    const matches = elements
+      .map(el => ({ el, text: String(el.text || '').trim().toLowerCase() }))
+      .filter(entry => entry.text && (entry.text === wanted || entry.text.includes(wanted) || wanted.includes(entry.text)))
+      .sort((left, right) => Math.abs(left.text.length - wanted.length) - Math.abs(right.text.length - wanted.length));
+    if (matches.length) {
+      return session.page.locator(CLICKABLE_SELECTOR).nth(matches[0].el.locatorIndex);
+    }
+  }
+  // Say what is actually there, so the next call can name a real control instead of guessing again.
+  const examples = elements.slice(0, 8)
+    .map((el, i) => `${i} "${String(el.text || '').replace(/\s+/g, ' ').trim().slice(0, 40)}"`)
+    .join(', ');
+  throw new Error(`elementId ${elementId} is not on the current page (0–${Math.max(0, elements.length - 1)}). Observe again before acting.${examples ? ` The controls start: ${examples}.` : ''}`);
 }
 
 // Run one primitive against the live page and report what changed. `verify` is deliberately
@@ -626,11 +642,29 @@ async function act(userId, step = {}) {
 
   switch (kind) {
     case 'click': {
+      // A cookie banner that landed after the page was read swallows the click — the raw
+      // coordinate path silently, the locator path with an interception timeout. Clear it first.
+      if (await consentCandidatePresent(page).catch(() => false)) {
+        await dismissConsentOnce(page);
+        await settle(page, 200);
+      }
       // A click point measured with the controls skips the actionability checks Playwright
       // runs, each a round trip; anything not plainly clickable takes the careful path.
       const point = elements[Number(step.elementId)]?.fastClick;
-      if (point) await page.mouse.click(point.x, point.y);
-      else await resolveElement(session, elements, step.elementId).click({ timeout: 10000 });
+      if (point) {
+        await page.mouse.click(point.x, point.y);
+      } else {
+        const target = resolveElement(session, elements, step.elementId);
+        try {
+          await target.click({ timeout: 10000 });
+        } catch (error) {
+          // A dialog that appeared between the dismissal above and this click: clear it and retry once.
+          if (!/intercepts pointer events/i.test(String(error?.message || ''))) throw error;
+          await dismissConsentOnce(page);
+          await settle(page, 300);
+          await target.click({ timeout: 10000 });
+        }
+      }
       break;
     }
     case 'type': {
