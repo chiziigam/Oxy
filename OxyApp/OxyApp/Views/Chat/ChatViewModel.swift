@@ -601,11 +601,9 @@ final class ChatViewModel {
                 }
             }
 
-            // Polish the raw transcript — removes filler words, fixes grammar
-            let text = await chatService.polishTranscript(userId: userId, transcript: rawText)
-            if text != rawText {
-                print("[ChatVM] Polished: \(text)")
-            }
+            // There is no transcript-polishing endpoint; use what was heard rather than
+            // promising a cleanup that never happens.
+            let text = rawText
 
             // Try local actions first (music, reminders, etc.)
             if let localResult = await executeLocalRequestWithTimeout(text) {
