@@ -459,333 +459,358 @@ struct ChatView: View {
         #endif
     }
 
+    /// How many actions the last few messages carry, so a new review or draft is noticed.
+    private var recentActionCount: Int {
+        var count = 0
+        for message in viewModel.messages.suffix(3) { count += message.actions.count }
+        return count
+    }
+
     private var assistantReplySettled: Bool {
         guard let last = viewModel.messages.last else { return false }
         return last.role == .assistant && !last.isStreaming && !last.content.isEmpty
             && !ReactionText.isQuiet(last.content) && ReactionText.agentReaction(last.content) == nil
     }
 
-    var body: some View {
-        NavigationStack {
+    private var threadHeader: some View {
+        ThreadHeader(
+            isIncognito: isIncognito,
+            isWorking: !boardModel.working.isEmpty,
+            activity: hubActivity,
+            deviceOnline: boardModel.deviceOnline,
+            isDemo: appState.isDemoSession,
+            isComposing: isInputFocused,
+            showsStatus: !showsOverview,
+            onBack: showsOverview ? { withAnimation(.appStandard) { overviewSelected = false } } : nil,
+            backLabel: "Back to conversation",
+            title: isIncognito ? "Private" : (showsOverview || viewModel.messages.isEmpty ? HomeNowView.greeting() : conversationTitle),
+            largeTitle: showsOverview || viewModel.messages.isEmpty,
+            homeStatus: showsOverview ? HomeNowView.status(boardModel) : nil,
+            wheelOpen: $wheelOpen,
+            hubCenter: $hubCenter
+        )
+        .onChange(of: isIncognito) { _, on in
+            viewModel.incognito = on
+        }
+    }
+
+    @ViewBuilder
+    private var statusBanners: some View {
+        // Offline banner
+        if isOffline {
+            HStack(spacing: 8) {
+                    AppIcon(sf: "wifi.slash", size: 14)
+                    Text("No internet connection")
+                        .font(.appBody(12, weight: .medium))
+                }
+                .foregroundStyle(Color.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Color.appWarning)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if viewModel.isViewingHistorySnapshot {
+                HStack(spacing: 10) {
+                    AppIcon(sf: "clock.arrow.circlepath", size: 14)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Viewing history")
+                            .font(.appBody(12, weight: .semibold))
+                        if let label = viewModel.historySnapshotLabel {
+                            Text(label)
+                                .font(.appBody(12))
+                        }
+                    }
+                    Spacer()
+                    Button("Back to latest") {
+                        Task {
+                            await viewModel.returnToCurrentChat(userId: appState.userId)
+                        }
+                    }
+                    .font(.appBody(12, weight: .semibold))
+                }
+                .foregroundStyle(Color.appMuted)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.appMuted.opacity(0.1))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if let networkError = viewModel.networkError, !viewModel.messages.contains(where: { $0.turnError != nil }) {
+                ErrorBanner(
+                    message: networkError,
+                    onRetry: {
+                        if viewModel.messages.isEmpty {
+                            Task { await viewModel.loadHistory(userId: appState.userId) }
+                        } else {
+                            viewModel.retryLastFailedMessage(userId: appState.userId)
+                        }
+                    },
+                    onDismiss: {
+                        viewModel.networkError = nil
+                    }
+                )
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if let voiceErrorMessage {
+                ErrorBanner(
+                    message: voiceErrorMessage,
+                    onDismiss: {
+                        self.voiceErrorMessage = nil
+                        voiceInput.errorMessage = nil
+                    }
+                )
+                .padding(.top, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+    }
+
+    @ViewBuilder
+    private var composerStack: some View {
+        if let replyingTo {
+            ReplyPreviewBar(message: replyingTo) { withAnimation(.appSpring) { self.replyingTo = nil } }
+        }
+
+        if isLoadingAttachment {
+            AttachmentLoadingStatus {
+                selectedPhotoItem = nil
+                isLoadingAttachment = false
+            }
+        }
+
+        // Input bar
+        ChatInputBar(
+            text: $viewModel.inputText,
+            isSending: isOffline,
+            isBusy: viewModel.isSending,
+            isLoadingAttachment: isLoadingAttachment,
+            onStop: { viewModel.stopCurrentTurn() },
+            voiceLevel: { voiceInput.level() },
+            isRecording: voiceInput.isRecording,
+            isPreparingVoice: voiceInput.isTranscribing,
+            voiceTranscript: voiceInput.transcript,
+            attachmentLabel: pendingImageName,
+            attachmentData: pendingImageData,
+            attachmentIsImage: pendingIsImage,
+            isFocused: $isInputFocused,
+            incognito: isIncognito,
+            onSend: {
+                sendCurrentDraft()
+            },
+            onVoice: {
+                guard !voiceInput.isTranscribing else { return }
+                if voiceInput.isRecording {
+                    HapticManager.shared.impact(.rigid)
+                    HapticManager.shared.play(.voiceStop)
+                    voiceInput.stopRecording()
+                } else {
+                    HapticManager.shared.impact(.medium)
+                    HapticManager.shared.play(.voiceStart)
+                    voiceInput.startRecording(userId: appState.userId)
+                }
+            },
+            onAttach: {
+                HapticManager.shared.impact(.light)
+                isInputFocused = false
+                showAttachMenu = true
+            },
+            onCancelVoice: {
+                voiceInput.cancel()
+            },
+            onRemoveAttachment: {
+                pendingImageData = nil
+                pendingImageName = nil
+                pendingIsImage = true
+                selectedPhotoItem = nil
+            }
+        )
+    }
+
+    /// The scrolling thread with its composer pinned to the bottom.
+    private var messageScroll: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    if showsOverview {
+                        overview
+                    } else {
+                    nowLine
+                    if viewModel.messages.isEmpty {
+                        quietConversation
+                    }
+                    if viewModel.hasOlderHistory, !viewModel.messages.isEmpty, didSettleAtBottom {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { loadOlderMessages(proxy) }
+                    }
+                    ForEach(exchanges) { exchange in
+                        exchangeSection(exchange)
+                    }
+
+                    }
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ChatBottomDistanceKey.self,
+                                    value: geo.frame(in: .named("chatScroll")).maxY
+                                )
+                            }
+                        )
+                }
+                .padding(.vertical, 12)
+                .animation(.appSpring, value: viewModel.messages.count)
+            }
+            .defaultScrollAnchor(showsOverview || viewModel.messages.isEmpty ? .top : .bottom)
+            .modifier(ThreadShortContentAlignment())
+            .coordinateSpace(name: "chatScroll")
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: ChatViewportHeightKey.self, value: geo.size.height)
+                }
+            )
+            .onPreferenceChange(ChatViewportHeightKey.self) { height in
+                let resized = scrollViewportHeight != height
+                scrollViewportHeight = height
+                if !showsOverview, resized, didSettleAtBottom, isScrollPinnedToBottom {
+                    Task { @MainActor in
+                        await Task.yield()
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+            }
+            .onPreferenceChange(ChatBottomDistanceKey.self) { bottomY in
+                guard scrollViewportHeight > 0 else { return }
+                isScrollPinnedToBottom = bottomY <= scrollViewportHeight + 96
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    composerStack
+                }
+            }
+            #if DEBUG
+            .task(id: "\(showsOverview)-\(boardModel.decisionErrors.count)") {
+                guard PreviewData.isIsolated, showsOverview,
+                      let focus = ProcessInfo.processInfo.environment["OXY_DEBUG_OVERVIEW_FOCUS"] else { return }
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                if focus == "decision", let first = boardModel.needsYou.first {
+                    proxy.scrollTo("board-decision-\(first.id)", anchor: .bottom)
+                } else if focus == "context" {
+                    proxy.scrollTo("overview-context", anchor: .bottom)
+                } else if focus == "updates" {
+                    proxy.scrollTo("board-updates", anchor: .top)
+                } else if focus == "work" {
+                    proxy.scrollTo("board-work", anchor: .top)
+                } else if focus == "work-bottom", let last = boardModel.working.last {
+                    proxy.scrollTo("board-work-\(last.id)", anchor: .bottom)
+                } else if focus == "outcomes" {
+                    proxy.scrollTo("board-noticed", anchor: .top)
+                } else if focus == "outcome-bottom", let last = boardModel.finished.last {
+                    proxy.scrollTo("board-outcome-\(last.id)", anchor: .bottom)
+                }
+            }
+            #endif
+            #if DEBUG
+            .task(id: showsOverview) {
+                guard PreviewData.isIsolated, !showsOverview,
+                      let focus = ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION_FOCUS"] else { return }
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                if focus == "request", let first = exchanges.first {
+                    proxy.scrollTo("exchange-\(first.id)", anchor: .top)
+                } else if focus == "results",
+                          let message = viewModel.messages.first(where: { $0.actions.contains { !($0.results ?? []).isEmpty } }),
+                          let first = message.actions.compactMap(\.results).first?.first {
+                    proxy.scrollTo("result-option-\(message.id)-\(first.id)", anchor: .top)
+                }
+            }
+            #endif
+            .onChange(of: overviewSelected) { _, selected in
+                if selected { isInputFocused = false }
+                Task { @MainActor in
+                    await Task.yield()
+                    proxy.scrollTo(selected ? "overview" : "bottom", anchor: selected ? .top : .bottom)
+                    if !selected && !viewModel.messages.isEmpty { didSettleAtBottom = true }
+                }
+            }
+            .onChange(of: viewModel.isSending) { _, sending in
+                if sending { overviewSelected = false }
+            }
+            .onChange(of: isInputFocused) { _, focused in
+                if focused { overviewSelected = false }
+            }
+            .onChange(of: viewModel.messages.count) {
+                ReactionStore.shared.migrate(with: viewModel.messages)
+                guard !showsOverview else { return }
+                if !didSettleAtBottom, !viewModel.messages.isEmpty, viewModel.scrollTargetMessageID == nil {
+                    // First load: jump to the newest message, with no animation, and again once rows have measured.
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(250))
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                        didSettleAtBottom = true
+                    }
+                    return
+                }
+                guard viewModel.scrollTargetMessageID == nil else { return }
+                guard isScrollPinnedToBottom else { return }
+                withAnimation(.appSpring) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: viewModel.inputText) {
+                guard !showsOverview, isScrollPinnedToBottom else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(100))
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: viewModel.messages.last?.content) {
+                guard !showsOverview else { return }
+                guard viewModel.scrollTargetMessageID == nil else { return }
+                guard isScrollPinnedToBottom else { return }
+                withAnimation(.appSpring) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: viewModel.scrollTargetMessageID) { _, targetID in
+                guard let targetID else { return }
+                overviewSelected = false
+                if let exchange = exchanges.first(where: { $0.messages.contains { $0.id == targetID } }) {
+                    expandedExchanges.insert(exchange.id)
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    withAnimation(.appStandard) {
+                        proxy.scrollTo(targetID, anchor: .center)
+                    }
+                    try? await Task.sleep(for: .milliseconds(700))
+                    viewModel.scrollTargetMessageID = nil
+                }
+            }
+            .onChange(of: recentActionCount) {
+                presentPendingReviewIfNeeded()
+                presentMessageComposerIfNeeded()
+            }
+        }
+    }
+
+    /// The thread itself: header, banners, messages and composer, with its overlay layers.
+    private var threadCore: some View {
         ZStack {
             Color.appBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                            ThreadHeader(
-                                isIncognito: isIncognito,
-                                isWorking: !boardModel.working.isEmpty,
-                                activity: hubActivity,
-                                deviceOnline: boardModel.deviceOnline,
-                                isDemo: appState.isDemoSession,
-                                isComposing: isInputFocused,
-                                showsStatus: !showsOverview,
-                                onBack: showsOverview ? { withAnimation(.appStandard) { overviewSelected = false } } : nil,
-                                backLabel: "Back to conversation",
-                                title: isIncognito ? "Private" : (showsOverview || viewModel.messages.isEmpty ? HomeNowView.greeting() : conversationTitle),
-                                largeTitle: showsOverview || viewModel.messages.isEmpty,
-                                homeStatus: showsOverview ? HomeNowView.status(boardModel) : nil,
-                                wheelOpen: $wheelOpen,
-                                hubCenter: $hubCenter
-                            )
-                            .onChange(of: isIncognito) { _, on in
-                                viewModel.incognito = on
-                            }
-                // Offline banner
-                if isOffline {
-                    HStack(spacing: 8) {
-                            AppIcon(sf: "wifi.slash", size: 14)
-                            Text("No internet connection")
-                                .font(.appBody(12, weight: .medium))
-                        }
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(Color.appWarning)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
+                threadHeader
+                statusBanners
 
-                    if viewModel.isViewingHistorySnapshot {
-                        HStack(spacing: 10) {
-                            AppIcon(sf: "clock.arrow.circlepath", size: 14)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Viewing history")
-                                    .font(.appBody(12, weight: .semibold))
-                                if let label = viewModel.historySnapshotLabel {
-                                    Text(label)
-                                        .font(.appBody(12))
-                                }
-                            }
-                            Spacer()
-                            Button("Back to latest") {
-                                Task {
-                                    await viewModel.returnToCurrentChat(userId: appState.userId)
-                                }
-                            }
-                            .font(.appBody(12, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.appMuted)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.appMuted.opacity(0.1))
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    if let networkError = viewModel.networkError, !viewModel.messages.contains(where: { $0.turnError != nil }) {
-                        ErrorBanner(
-                            message: networkError,
-                            onRetry: {
-                                if viewModel.messages.isEmpty {
-                                    Task { await viewModel.loadHistory(userId: appState.userId) }
-                                } else {
-                                    viewModel.retryLastFailedMessage(userId: appState.userId)
-                                }
-                            },
-                            onDismiss: {
-                                viewModel.networkError = nil
-                            }
-                        )
-                        .padding(.top, 8)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    if let voiceErrorMessage {
-                        ErrorBanner(
-                            message: voiceErrorMessage,
-                            onDismiss: {
-                                self.voiceErrorMessage = nil
-                                voiceInput.errorMessage = nil
-                            }
-                        )
-                        .padding(.top, 8)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    // Messages
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                if showsOverview {
-                                    overview
-                                } else {
-                                nowLine
-                                if viewModel.messages.isEmpty {
-                                    quietConversation
-                                }
-                                if viewModel.hasOlderHistory, !viewModel.messages.isEmpty, didSettleAtBottom {
-                                    Color.clear
-                                        .frame(height: 1)
-                                        .onAppear { loadOlderMessages(proxy) }
-                                }
-                                ForEach(exchanges) { exchange in
-                                    exchangeSection(exchange)
-                                }
-
-                                }
-                                Color.clear
-                                    .frame(height: 1)
-                                    .id("bottom")
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.preference(
-                                                key: ChatBottomDistanceKey.self,
-                                                value: geo.frame(in: .named("chatScroll")).maxY
-                                            )
-                                        }
-                                    )
-                            }
-                            .padding(.vertical, 12)
-                            .animation(.appSpring, value: viewModel.messages.count)
-                        }
-                        .defaultScrollAnchor(showsOverview || viewModel.messages.isEmpty ? .top : .bottom)
-                        .modifier(ThreadShortContentAlignment())
-                        .coordinateSpace(name: "chatScroll")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(key: ChatViewportHeightKey.self, value: geo.size.height)
-                            }
-                        )
-                        .onPreferenceChange(ChatViewportHeightKey.self) { height in
-                            let resized = scrollViewportHeight != height
-                            scrollViewportHeight = height
-                            if !showsOverview, resized, didSettleAtBottom, isScrollPinnedToBottom {
-                                Task { @MainActor in
-                                    await Task.yield()
-                                    proxy.scrollTo("bottom", anchor: .bottom)
-                                }
-                            }
-                        }
-                        .onPreferenceChange(ChatBottomDistanceKey.self) { bottomY in
-                            guard scrollViewportHeight > 0 else { return }
-                            isScrollPinnedToBottom = bottomY <= scrollViewportHeight + 96
-                        }
-                        .scrollDismissesKeyboard(.interactively)
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            VStack(spacing: 0) {
-                    if let replyingTo {
-                        ReplyPreviewBar(message: replyingTo) { withAnimation(.appSpring) { self.replyingTo = nil } }
-                    }
-
-                    if isLoadingAttachment {
-                        AttachmentLoadingStatus {
-                            selectedPhotoItem = nil
-                            isLoadingAttachment = false
-                        }
-                    }
-
-                    // Input bar
-                    ChatInputBar(
-                        text: $viewModel.inputText,
-                        isSending: isOffline,
-                        isBusy: viewModel.isSending,
-                        isLoadingAttachment: isLoadingAttachment,
-                        onStop: { viewModel.stopCurrentTurn() },
-                        voiceLevel: { voiceInput.level() },
-                        isRecording: voiceInput.isRecording,
-                        isPreparingVoice: voiceInput.isTranscribing,
-                        voiceTranscript: voiceInput.transcript,
-                        attachmentLabel: pendingImageName,
-                        attachmentData: pendingImageData,
-                        attachmentIsImage: pendingIsImage,
-                        isFocused: $isInputFocused,
-                        incognito: isIncognito,
-                        onSend: {
-                            sendCurrentDraft()
-                        },
-                        onVoice: {
-                            guard !voiceInput.isTranscribing else { return }
-                            if voiceInput.isRecording {
-                                HapticManager.shared.impact(.rigid)
-                                HapticManager.shared.play(.voiceStop)
-                                voiceInput.stopRecording()
-                            } else {
-                                HapticManager.shared.impact(.medium)
-                                HapticManager.shared.play(.voiceStart)
-                                voiceInput.startRecording(userId: appState.userId)
-                            }
-                        },
-                        onAttach: {
-                            HapticManager.shared.impact(.light)
-                            isInputFocused = false
-                            showAttachMenu = true
-                        },
-                        onCancelVoice: {
-                            voiceInput.cancel()
-                        },
-                        onRemoveAttachment: {
-                            pendingImageData = nil
-                            pendingImageName = nil
-                            pendingIsImage = true
-                            selectedPhotoItem = nil
-                        }
-                    )
-                            }
-                        }
-                        #if DEBUG
-                        .task(id: "\(showsOverview)-\(boardModel.decisionErrors.count)") {
-                            guard PreviewData.isIsolated, showsOverview,
-                                  let focus = ProcessInfo.processInfo.environment["OXY_DEBUG_OVERVIEW_FOCUS"] else { return }
-                            try? await Task.sleep(for: .seconds(1))
-                            guard !Task.isCancelled else { return }
-                            if focus == "decision", let first = boardModel.needsYou.first {
-                                proxy.scrollTo("board-decision-\(first.id)", anchor: .bottom)
-                            } else if focus == "context" {
-                                proxy.scrollTo("overview-context", anchor: .bottom)
-                            } else if focus == "updates" {
-                                proxy.scrollTo("board-updates", anchor: .top)
-                            } else if focus == "work" {
-                                proxy.scrollTo("board-work", anchor: .top)
-                            } else if focus == "work-bottom", let last = boardModel.working.last {
-                                proxy.scrollTo("board-work-\(last.id)", anchor: .bottom)
-                            } else if focus == "outcomes" {
-                                proxy.scrollTo("board-noticed", anchor: .top)
-                            } else if focus == "outcome-bottom", let last = boardModel.finished.last {
-                                proxy.scrollTo("board-outcome-\(last.id)", anchor: .bottom)
-                            }
-                        }
-                        #endif
-                        #if DEBUG
-                        .task(id: showsOverview) {
-                            guard PreviewData.isIsolated, !showsOverview,
-                                  let focus = ProcessInfo.processInfo.environment["OXY_DEBUG_CONVERSATION_FOCUS"] else { return }
-                            try? await Task.sleep(for: .seconds(1))
-                            guard !Task.isCancelled else { return }
-                            if focus == "request", let first = exchanges.first {
-                                proxy.scrollTo("exchange-\(first.id)", anchor: .top)
-                            } else if focus == "results",
-                                      let message = viewModel.messages.first(where: { $0.actions.contains { !($0.results ?? []).isEmpty } }),
-                                      let first = message.actions.compactMap(\.results).first?.first {
-                                proxy.scrollTo("result-option-\(message.id)-\(first.id)", anchor: .top)
-                            }
-                        }
-                        #endif
-                        .onChange(of: overviewSelected) { _, selected in
-                            if selected { isInputFocused = false }
-                            Task { @MainActor in
-                                await Task.yield()
-                                proxy.scrollTo(selected ? "overview" : "bottom", anchor: selected ? .top : .bottom)
-                                if !selected && !viewModel.messages.isEmpty { didSettleAtBottom = true }
-                            }
-                        }
-                        .onChange(of: viewModel.isSending) { _, sending in
-                            if sending { overviewSelected = false }
-                        }
-                        .onChange(of: isInputFocused) { _, focused in
-                            if focused { overviewSelected = false }
-                        }
-                        .onChange(of: viewModel.messages.count) {
-                            ReactionStore.shared.migrate(with: viewModel.messages)
-                            guard !showsOverview else { return }
-                            if !didSettleAtBottom, !viewModel.messages.isEmpty, viewModel.scrollTargetMessageID == nil {
-                                // First load: jump to the newest message, with no animation, and again once rows have measured.
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                                Task { @MainActor in
-                                    try? await Task.sleep(for: .milliseconds(250))
-                                    proxy.scrollTo("bottom", anchor: .bottom)
-                                    didSettleAtBottom = true
-                                }
-                                return
-                            }
-                            guard viewModel.scrollTargetMessageID == nil else { return }
-                            guard isScrollPinnedToBottom else { return }
-                            withAnimation(.appSpring) {
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                            }
-                        }
-                        .onChange(of: viewModel.inputText) {
-                            guard !showsOverview, isScrollPinnedToBottom else { return }
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(100))
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                            }
-                        }
-                        .onChange(of: viewModel.messages.last?.content) {
-                            guard !showsOverview else { return }
-                            guard viewModel.scrollTargetMessageID == nil else { return }
-                            guard isScrollPinnedToBottom else { return }
-                            withAnimation(.appSpring) {
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                            }
-                        }
-                        .onChange(of: viewModel.scrollTargetMessageID) { _, targetID in
-                            guard let targetID else { return }
-                            overviewSelected = false
-                            if let exchange = exchanges.first(where: { $0.messages.contains { $0.id == targetID } }) {
-                                expandedExchanges.insert(exchange.id)
-                            }
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(150))
-                                withAnimation(.appStandard) {
-                                    proxy.scrollTo(targetID, anchor: .center)
-                                }
-                                try? await Task.sleep(for: .milliseconds(700))
-                                viewModel.scrollTargetMessageID = nil
-                            }
-                        }
-                        .onChange(of: viewModel.messages.suffix(3).reduce(0) { $0 + $1.actions.count }) {
-                            presentPendingReviewIfNeeded()
-                            presentMessageComposerIfNeeded()
-                        }
-                    }
+                messageScroll
                 }
 
             }
@@ -810,6 +835,11 @@ struct ChatView: View {
             }
             #endif
             .modifier(ThreadLayers(reaction: reactionOverlay, wheel: wheelOverlay, heldID: heldMessage?.message.id, displayText: $displayText))
+    }
+
+    /// Alarm, board refresh and app-wide ask notifications.
+    private func withBoardLifecycle<Content: View>(_ content: Content) -> some View {
+        content
             .fullScreenCover(item: $alarmClip) { clip in
                 HomeAlarmView(clip: clip) { alarmClip = nil }
             }
@@ -861,6 +891,11 @@ struct ChatView: View {
                     isInputFocused = true
                 }
             }
+    }
+
+    /// Private-mode explainer, haptics, action review and message drafts.
+    private func withReviewSheets<Content: View>(_ content: Content) -> some View {
+        content
             .sheet(isPresented: $showsPrivateExplainer) {
                 PrivateModeSheet()
                     .presentationDetents([.height(400)])
@@ -913,6 +948,11 @@ struct ChatView: View {
             } message: {
                 Text(messageComposerAlert ?? "")
             }
+    }
+
+    /// Attachment chooser, photo picker, camera and file import.
+    private func withAttachments<Content: View>(_ content: Content) -> some View {
+        content
             .sheet(isPresented: $showAttachMenu, onDismiss: presentAttachmentSource) {
                 AttachmentChooser { source in
                     nextAttachmentSource = source
@@ -995,6 +1035,11 @@ struct ChatView: View {
                     attachmentError = "The photo or video couldn't be loaded. Choose it again."
                 }
             }
+    }
+
+    /// Voice transcripts, Siri, drafts and pendant commands.
+    private func withVoiceAndCommands<Content: View>(_ content: Content) -> some View {
+        content
             .onChange(of: pendingReviewAction) { oldValue, newValue in
                 if let oldValue, newValue == nil {
                     handledReviewActionIDs.insert(oldValue.id)
@@ -1031,6 +1076,11 @@ struct ChatView: View {
                     queued.forEach(handlePendantCommand)
                 }
             }
+    }
+
+    var body: some View {
+        NavigationStack {
+            withVoiceAndCommands(withAttachments(withReviewSheets(withBoardLifecycle(threadCore))))
         .task {
             #if DEBUG
             ChatInputBar.runComposerRuleCheck()
