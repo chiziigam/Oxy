@@ -4271,6 +4271,8 @@ app.post('/auth/register', registerRateLimiter, async (req, res) => {
       .catch(err => log('warn', 'adam.provision.signup_failed', { userId, error: err.message }));
 
     if (email) {
+      // The account works unverified; this is what turns an address into a confirmed one.
+      issueEmailVerification(userId, email).catch((e) => log('warn', 'email.verify.failed', { error: e.message }));
       try {
         const { sendWelcomeEmail } = require('./services/email');
         await sendWelcomeEmail(email, userId);
@@ -4590,24 +4592,29 @@ app.get('/auth/verify-email/confirm', async (req, res) => {
   }
 });
 
+// Issue a verification link. Signup calls this so a new account can confirm its address without
+// hunting for an endpoint; the /auth/verify-email route calls it again when someone re-asks.
+async function issueEmailVerification(userId, email) {
+  const token = `${EMAIL_VERIFY_TOKEN_PREFIX}${crypto.randomBytes(32).toString('hex')}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const { error: tokenError } = await supabase.from('password_reset_tokens').insert({ user_id: userId, token, expires_at: expiresAt });
+  if (tokenError) throw tokenError;
+  const verifyUrl = `${process.env.APP_URL || ''}/auth/verify-email/confirm?token=${token}`;
+  const { sendVerificationEmail } = require('./services/email');
+  const result = await sendVerificationEmail(email, verifyUrl);
+  return { sent: Boolean(result?.ok) && result?.dev !== true };
+}
+
 app.post('/auth/verify-email', async (req, res) => {
   try {
     const userId = getAuthenticatedUserId(req);
     const account = await getUserAccount(userId);
     if (!account || !account.email) return res.status(400).json({ error: 'No email address on this account.' });
-    // Same table as reset tokens, so the prefix keeps one kind from working as the other.
-    const token = `${EMAIL_VERIFY_TOKEN_PREFIX}${crypto.randomBytes(32).toString('hex')}`;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const { error: tokenError } = await supabase.from('password_reset_tokens').insert({ user_id: userId, token, expires_at: expiresAt });
-    if (tokenError) throw tokenError;
-    const verifyUrl = `${process.env.APP_URL || ''}/auth/verify-email/confirm?token=${token}`;
     let sent = false;
     try {
-      const { sendVerificationEmail } = require('./services/email');
-      const result = await sendVerificationEmail(account.email, verifyUrl);
+      ({ sent } = await issueEmailVerification(userId, account.email));
       // Without a provider the mail service is a no-op; claiming it was sent sends the person
       // to an inbox that will never receive the link.
-      sent = Boolean(result?.ok) && result?.dev !== true;
       if (!sent) log('warn', 'email.verify.unconfigured', { userId });
     } catch (e) {
       log('warn', 'email.verify.failed', { error: e.message });
