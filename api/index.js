@@ -4450,7 +4450,9 @@ app.post('/auth/change-password', async (req, res) => {
     const { error: updateError } = await supabase.from('users').update({ password_hash: newHash, token_version: newVersion }).eq('user_id', userId);
     if (updateError) throw updateError;
     log('info', 'auth.change_password', { userId });
-    res.json({ success: true });
+    // Bumping token_version revokes the caller's own session too; without a replacement the
+    // very next request would 401.
+    res.json({ success: true, token: createSessionToken(userId, newVersion) });
   } catch (err) {
     log('error', 'auth.change_password.error', { error: err.message });
     res.status(500).json({ error: err.message });
