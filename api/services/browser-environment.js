@@ -704,6 +704,19 @@ function resolveElement(session, elements, elementId) {
   throw new Error(`elementId ${elementId} is not on the current page (0–${Math.max(0, elements.length - 1)}). Observe again before acting.${examples ? ` The controls start: ${examples}.` : ''}`);
 }
 
+// The general browser is not a payment rail. A control that would charge must go through
+// transaction_prepare/transaction_authorize, where the amount is read and a person approves it.
+// Lazy require: transaction.js imports this module at load time.
+function refusePaymentCommit(label) {
+  const text = String(label || '').trim();
+  if (!text) return;
+  let isPaymentCommit;
+  try { ({ isPaymentCommit } = require('./transaction')); } catch { return; }
+  if (typeof isPaymentCommit === 'function' && isPaymentCommit(text)) {
+    throw new Error('That control completes a payment, so it is not available through browser_act. Use transaction_prepare, then transaction_authorize after the person approves the amount.');
+  }
+}
+
 // Run one primitive against the live page and report what changed. `verify` is deliberately
 // mechanical (url + element count + a text digest) — the agent decides what the change MEANS.
 async function act(userId, step = {}) {
@@ -718,6 +731,10 @@ async function act(userId, step = {}) {
 
   switch (kind) {
     case 'click': {
+      // Refuse a charging control before anything touches the page. The reviewed transaction
+      // path clicks it itself; this primitive must never be the thing that spends money.
+      const idLabel = Number.isFinite(Number(step.elementId)) ? '' : String(step.elementId || '');
+      refusePaymentCommit(elements[Number(step.elementId)]?.text || idLabel);
       // A cookie banner that landed after the page was read swallows the click — the raw
       // coordinate path silently, the locator path with an interception timeout. Clear it first.
       if (await consentCandidatePresent(page).catch(() => false)) {
@@ -933,6 +950,7 @@ module.exports = {
   act,
   close,
   requireSession,
+  refusePaymentCommit,
 };
 
 // ── Known details ───────────────────────────────────────────────────────────────────────

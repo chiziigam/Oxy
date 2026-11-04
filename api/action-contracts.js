@@ -1442,7 +1442,7 @@ const ACTION_CONTRACTS = {
     failureSummary: 'That step did not work',
     confirmation: 'none',
     executionMode: 'direct',
-    guidance: 'Take ONE step on the page that is already open, then look at what came back before choosing the next one. Every call returns a fresh observation plus a `changed` flag saying whether the url or the content actually moved — if nothing changed, a required field is probably unfilled or the control was not the right one; do not simply repeat it. `type` presses Enter by default (set submit:false for a form field you are filling among several). Never guess an elementId: it must come from the observation you are looking at. This does not pay for anything — a page that asks for money still has to go through transaction_prepare and review-gated transaction_authorize.'
+    guidance: 'Take ONE step on the page that is already open, then look at what came back before choosing the next one. Every call returns a fresh observation plus a `changed` flag saying whether the url or the content actually moved — if nothing changed, a required field is probably unfilled or the control was not the right one; do not simply repeat it. `type` presses Enter by default (set submit:false for a form field you are filling among several). Never guess an elementId: it must come from the observation you are looking at. It refuses a control that would charge: a page that asks for money has to go through transaction_prepare and review-gated transaction_authorize.'
   },
   browser_upload: {
     adapter: { kind: 'inline' },

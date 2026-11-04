@@ -109,3 +109,13 @@ test('string "false" on a yes/no parameter is read as false, not as truthy text'
   assert.equal(declaration.parameters.properties.submit.type, 'BOOLEAN');
   assert.equal(declaration.parameters.properties.action.type, 'STRING');
 });
+
+test('browser_act refuses a control that would charge', () => {
+  const { refusePaymentCommit } = require('../../api/services/browser-environment');
+  for (const label of ['Place order', 'Pay now', 'Buy now', 'Complete purchase', 'Confirm and pay']) {
+    assert.throws(() => refusePaymentCommit(label), /transaction_prepare/, label);
+  }
+  for (const label of ['Add to basket', 'Continue to payment', 'Apply', 'Sign in']) {
+    assert.doesNotThrow(() => refusePaymentCommit(label), label);
+  }
+});
