@@ -28,13 +28,15 @@ test('weather falls back to grounded search when the forecast API cannot answer'
   }
 });
 
-test('stocks work through grounded search without an Alpha Vantage key', async () => {
+test('stocks fall back to grounded search when no live quote is available', async () => {
   const saved = brainProvider.webSearchBrain;
+  const savedFetch = global.fetch;
   let prompt = '';
   brainProvider.webSearchBrain = async input => {
     prompt = input.prompt;
     return 'AAPL: $200.00, down 1.2%, quote delayed. Updated 5 minutes ago.';
   };
+  global.fetch = async () => { throw new Error('offline'); };
   try {
     const result = await stocks.execute('user-1', 'get_stock_price', { symbol: 'AAPL' });
     assert.equal(result.success, true);
@@ -44,6 +46,7 @@ test('stocks work through grounded search without an Alpha Vantage key', async (
     assert.match(result.text, /\$200\.00/);
   } finally {
     brainProvider.webSearchBrain = saved;
+    global.fetch = savedFetch;
   }
 });
 

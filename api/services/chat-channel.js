@@ -28,6 +28,7 @@ const ROOM_DEVICE_TOOLS = Object.freeze([
   'find_place',
   'get_directions',
   'search_trains',
+  'get_stock_price',
   'remember_person',
   'find_people',
   'forget_memory',
