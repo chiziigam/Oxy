@@ -59,9 +59,20 @@ async function extractPdf(bytes) {
 
 // DOCX is a zip with the text in word/document.xml. fflate is already a dependency (see
 // agent-continuity.js), so this costs nothing extra.
+const MAX_DOCX_XML_BYTES = 10 * 1024 * 1024;
+
 async function extractDocx(bytes) {
   try {
-    const entries = unzipSync(new Uint8Array(bytes));
+    // Refuse to inflate a zip bomb before fflate allocates the bytes.
+    let tooLarge = false;
+    const entries = unzipSync(new Uint8Array(bytes), {
+      filter: (file) => {
+        if (file.name !== 'word/document.xml') return false;
+        if (file.originalSize > MAX_DOCX_XML_BYTES) { tooLarge = true; return false; }
+        return true;
+      }
+    });
+    if (tooLarge) return failed(EXTRACTION_PRODUCERS.docx, 'That Word document is too large to read.');
     const documentXml = entries['word/document.xml'];
     if (!documentXml) return failed(EXTRACTION_PRODUCERS.docx, 'Not a Word document — no word/document.xml inside.');
     const xml = strFromU8(documentXml);

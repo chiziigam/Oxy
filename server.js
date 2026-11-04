@@ -16,6 +16,19 @@ if (require.main === module) {
   server.on('upgrade', (req, socket, head) => {
     if (!require('./api/services/browser-live-view').handleUpgrade(req, socket, head)) socket.destroy();
   });
+  // Fly stops a machine with SIGTERM. Without a drain, a deploy cuts live chat streams and
+  // multi-minute browser runs with no marker on the work they were doing.
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[shutdown] ${signal}: draining connections`);
+    const force = setTimeout(() => process.exit(1), 15000);
+    force.unref();
+    server.close(() => { clearTimeout(force); process.exit(0); });
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Oxy listening on :${PORT}`);
     if (missing.length) {
