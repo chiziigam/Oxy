@@ -885,6 +885,7 @@ app.use((req, res, next) => {
     '/changelog',
     '/install-shortcut',
     '/auth/google/callback',
+    '/auth/microsoft/callback',
     '/auth/register',
     '/auth/login',
     '/auth/dev/demo-login',

@@ -162,3 +162,17 @@ test('a failed TTS clip cannot become an unhandled rejection', async () => {
     process.off('unhandledRejection', onUnhandled);
   }
 });
+
+test('the Microsoft OAuth browser redirect reaches its callback instead of a 401', async () => {
+  const http = require('node:http');
+  const app = require('../../api/index');
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address();
+    const res = await fetch(`http://127.0.0.1:${port}/auth/microsoft/callback?state=bogus&code=x`);
+    assert.equal(res.status, 400, 'a forged state must be rejected by the handler, not by the session gate');
+  } finally {
+    server.close();
+  }
+});
