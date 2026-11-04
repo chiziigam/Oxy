@@ -234,3 +234,25 @@ test('payment-action-required round-trips the currency the charge was attempted 
   const pending = await getPaymentActionRequired(supabase, 'user-1');
   assert.equal(pending.currency, 'gbp');
 });
+
+test('a failed card read is not reported as "no card linked"', async () => {
+  const { getLinkedCard } = require('../../api/services/stripe-cards');
+  const supabase = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                eq() {
+                  return { maybeSingle: async () => ({ data: null, error: { message: 'db down' } }) };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  await assert.rejects(getLinkedCard(supabase, 'u1'), /Could not read the linked card/);
+});

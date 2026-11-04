@@ -3,12 +3,15 @@ const { encryptTokens, decryptTokens } = require('./token-crypto');
 const STRIPE_CONNECTOR_ID = 'stripe';
 
 async function readStripeTokens(supabase, userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('connectors')
     .select('tokens, enabled')
     .eq('user_id', userId)
     .eq('connector_id', STRIPE_CONNECTOR_ID)
     .maybeSingle();
+  // "No row" means no card. A failed read means we do not know, and must not say "no card"
+  // or start a charge on an assumption.
+  if (error) throw new Error(`Could not read the linked card: ${error.message}`);
   if (!data) return { tokens: {}, enabled: false };
   return { tokens: decryptTokens(data.tokens || {}), enabled: !!data.enabled };
 }
