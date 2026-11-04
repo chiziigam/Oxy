@@ -419,6 +419,48 @@ app.use(cors({
   credentials: true
 }));
 
+// ── Support view ─────────────────────────────────────────────────────────────────────────
+// Read-only, admin-only: what a person's account is doing, without opening SQL. The allowlist is
+// an env list (OXY_SUPPORT_USER_IDS); anyone not on it gets a 403, not a peek.
+app.get('/support', requireSessionAuth, (req, res) => {
+  const support = require('./services/support-view');
+  if (!support.isSupportAdmin(getAuthenticatedUserId(req))) return res.status(403).json({ error: 'Forbidden' });
+  res.type('html').send(support.page(`
+    <h1>Support</h1>
+    <form method="get" action="/support/lookup">
+      <input name="userId" placeholder="Account id" autocomplete="off" autocapitalize="off">
+      <button type="submit">Look up</button>
+    </form>
+    <p style="color:#6b6b70;font-size:13px">Read-only. ${support.supportUserIds().length} admin account(s) allowed.</p>
+  `));
+});
+
+app.get('/support/lookup', requireSessionAuth, async (req, res) => {
+  const support = require('./services/support-view');
+  const me = getAuthenticatedUserId(req);
+  if (!support.isSupportAdmin(me)) return res.status(403).json({ error: 'Forbidden' });
+  const userId = String(req.query.userId || '').trim();
+  if (!userId) return res.redirect('/support');
+  try {
+    res.type('html').send(support.render(await support.snapshot(supabase, userId)));
+  } catch (error) {
+    res.status(500).type('html').send(support.page(`<h1>Support</h1><p>Could not read that account: ${escapeHtml(error.message)}</p>`));
+  }
+});
+
+app.get('/support/:userId', requireSessionAuth, async (req, res) => {
+  const support = require('./services/support-view');
+  const me = getAuthenticatedUserId(req);
+  if (!support.isSupportAdmin(me)) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const data = await support.snapshot(supabase, req.params.userId);
+    if (req.query.format === 'json') return res.json(data);
+    res.type('html').send(support.render(data));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ── Browser takeover ─────────────────────────────────────────────────────────────────────
 // When a site demands a step only a person can do, the agent hands over the live screen instead
 // of failing or fighting it. The link is signed and short-lived; whoever holds it can act on

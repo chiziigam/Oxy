@@ -79,6 +79,11 @@ async function storeDocument(supabase, userId, {
     return { document: existing, deduped: true };
   }
 
+  // Only new bytes count: an identical file was already deduped above and stores nothing.
+  const { checkQuota } = require('./storage-quota');
+  const quota = await checkQuota(supabase, userId, buffer.length);
+  if (!quota.ok) throw new Error(quota.error);
+
   const storagePath = buildStoragePath(userId, checksum);
   const { error: uploadError } = await supabase.storage
     .from(DOCUMENTS_BUCKET)
