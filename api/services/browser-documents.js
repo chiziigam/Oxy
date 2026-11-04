@@ -46,7 +46,14 @@ async function captureDownload(page, triggerAction, {
   // The listener must be armed BEFORE the click: a fast server can finish the download
   // before an after-the-fact waitForEvent is attached, and the event would be missed.
   const downloadPromise = page.waitForEvent('download', { timeout: timeoutMs });
-  await triggerAction();
+  try {
+    await triggerAction();
+  } catch (error) {
+    // The listener is already armed. If the click throws, its timeout must not become an
+    // unhandled rejection minutes later — there is no process-level handler to absorb it.
+    downloadPromise.catch(() => {});
+    throw error;
+  }
 
   let download;
   try {

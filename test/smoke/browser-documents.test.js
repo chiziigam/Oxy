@@ -212,3 +212,21 @@ test('an unattached personal file is usable by any responsibility', async () => 
   const result = await uploadDocument(fakeFileInput(), supabase, 'chizi', { documentId: document.id, workflowId: 'wf-anything' });
   assert.equal(result.ok, true);
 });
+
+test('a click that throws leaves no unhandled download rejection behind', async () => {
+  const supabase = fakeSupabase();
+  const page = fakePage({ fires: false });
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await assert.rejects(
+      captureDownload(page, async () => { throw new Error('element detached'); }, { supabase, userId: 'u1' }),
+      /element detached/
+    );
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
