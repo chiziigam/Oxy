@@ -61,7 +61,8 @@ jobs:
             -destination "id=$UDID" \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | tee build.log | grep -E "error:|\*\* BUILD" || true
+            OTHER_SWIFT_FLAGS='$(inherited) -Xfrontend -warn-long-expression-type-checking=250 -Xfrontend -warn-long-function-bodies=400' \
+            build 2>&1 | tee build.log | grep -E "error:|took [0-9]+ms to type-check|\*\* BUILD" || true
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Upload build log
