@@ -31,9 +31,11 @@ function backendName() {
 // OXY_BROWSER_SANDBOX_USERS (comma-separated user ids) limits the sandbox to those users, so it
 // can be tried on one account before everyone. Unset means every user.
 function isEnabled(userId) {
+  // A missing id is not "everyone": it used to map to one shared sandbox profile.
+  if (!userId) return false;
   if (backendName() !== 'e2b' || !process.env.E2B_API_KEY) return false;
   const list = String(process.env.OXY_BROWSER_SANDBOX_USERS || '').split(',').map((v) => v.trim()).filter(Boolean);
-  return !list.length || userId === undefined || list.includes(userId);
+  return !list.length || list.includes(userId);
 }
 
 // E2B is a third party: it gets an opaque tag, never the user id.

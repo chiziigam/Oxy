@@ -239,3 +239,31 @@ test('test-mode inventory is not described as a real, sellable fare', () => {
   assert.doesNotMatch(text, /real, sellable/i);
   assert.match(text, /example data|test-mode/i);
 });
+
+test('a missing user id never selects a shared browser sandbox', () => {
+  const previous = {
+    backend: process.env.OXY_BROWSER_BACKEND,
+    key: process.env.E2B_API_KEY,
+    users: process.env.OXY_BROWSER_SANDBOX_USERS,
+  };
+  process.env.OXY_BROWSER_BACKEND = 'e2b';
+  process.env.E2B_API_KEY = 'test-key';
+  delete process.env.OXY_BROWSER_SANDBOX_USERS;
+  try {
+    const { isEnabled } = require('../../api/services/browser-sandbox');
+    assert.equal(isEnabled(undefined), false);
+    assert.equal(isEnabled('u1'), true);
+    process.env.OXY_BROWSER_SANDBOX_USERS = 'u2';
+    assert.equal(isEnabled('u1'), false);
+    assert.equal(isEnabled('u2'), true);
+  } finally {
+    for (const [name, value] of [
+      ['OXY_BROWSER_BACKEND', previous.backend],
+      ['E2B_API_KEY', previous.key],
+      ['OXY_BROWSER_SANDBOX_USERS', previous.users],
+    ]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

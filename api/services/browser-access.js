@@ -12,6 +12,7 @@ const {
 const { getVaultCredential, saveVaultCredential, normalizeSite } = require('./vault-credentials');
 const { authorizeCredentialUse, recordUse } = require('./credential-grants');
 const { recordTaskStep } = require('./task-steps');
+const { assertPublicHttpUrl } = require('../lib/safe-url');
 // Filling a sign-in form uses the same frame-aware input machinery as filling a card form.
 const frameInputs = () => require('./transaction');
 // Lazy: transaction.js requires browser-environment, which this file also uses. Requiring it
@@ -726,7 +727,8 @@ async function inspectStoredSession(userId, site, path = '/', { useStoredSession
   // A control run opens the same page with no session at all. Comparing the two is the
   // difference between knowing the site honoured the shared session and merely hoping it
   // did: a page that looks the same both ways proves nothing.
-  const { browser } = await acquireBrowser();
+  const acquired = await acquireBrowser(userId);
+  const { browser } = acquired;
   const context = await browser.newContext({
     viewport: VIEWPORT,
     ...(useStoredSession && storageState ? { storageState } : {})
@@ -734,7 +736,9 @@ async function inspectStoredSession(userId, site, path = '/', { useStoredSession
   const page = await context.newPage();
   try {
     const target = `https://www.${site}${path.startsWith('/') ? path : `/${path}`}`;
-    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    // This used to be the one navigation that never checked where it was going.
+    await assertPublicHttpUrl(target);
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
     // These are heavy client-rendered pages: the account area arrives well after first
     // paint, and reading too early sees an empty shell and calls it inconclusive. This is a
     // diagnostic, so waiting is cheap.
@@ -760,6 +764,9 @@ async function inspectStoredSession(userId, site, path = '/', { useStoredSession
     };
   } finally {
     await context.close().catch(() => {});
+    // The browser itself was never returned, so every check leaked a Chromium process.
+    if (typeof acquired.release === 'function') await acquired.release().catch(() => {});
+    else await browser.close().catch(() => {});
   }
 }
 
