@@ -297,52 +297,6 @@ final class ThreadBoardModel {
 
 }
 
-/// What an approval is about, pulled from the one-line detail the server sends ("Up to £60 · Card ending 4242").
-struct ApprovalFacts: Equatable {
-    var qualifier: String?
-    var amount: String?
-    var card: String?
-    var others: [String] = []
-
-    var isEmpty: Bool { amount == nil && card == nil && others.isEmpty }
-
-    init(detail: String?) {
-        guard let detail else { return }
-        let parts = detail.components(separatedBy: " · ")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        for part in parts {
-            if amount == nil, let found = Self.money(in: part) {
-                qualifier = found.qualifier
-                amount = found.amount
-            } else if card == nil, let digits = Self.cardDigits(in: part) {
-                card = digits
-            } else {
-                others.append(part)
-            }
-        }
-    }
-
-    private static func money(in text: String) -> (qualifier: String?, amount: String)? {
-        let pattern = #"^(up to|about|total|around)?\s*([£$€]\s?\d[\d,]*(?:\.\d{1,2})?)$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              let amountRange = Range(match.range(at: 2), in: text) else { return nil }
-        let qualifier = Range(match.range(at: 1), in: text).map { String(text[$0]).lowercased() }
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-        return (qualifier, String(text[amountRange]).replacingOccurrences(of: " ", with: ""))
-    }
-
-    private static func cardDigits(in text: String) -> String? {
-        let lower = text.lowercased()
-        guard lower.contains("card") || text.contains("••••") else { return nil }
-        guard let regex = try? NSRegularExpression(pattern: #"(\d{4})\s*$"#),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              let range = Range(match.range(at: 1), in: text) else { return nil }
-        return String(text[range])
-    }
-}
-
 /// A status dot that sits on the text's x-height at every type size.
 struct StatusDot: View {
     var color: Color

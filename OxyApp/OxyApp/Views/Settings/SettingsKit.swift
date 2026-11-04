@@ -265,28 +265,3 @@ struct SettingsStatement: View {
         .accessibilityLabel(text)
     }
 }
-
-#if DEBUG
-enum AgentContextDemo {
-    static let snapshot = AgentContextSnapshot(
-        agent: AgentIdentity(name: "Adam", role: "personal companion", continuity: "always here"),
-        profile: AgentProfile(
-            text: "",
-            sections: [
-                "identity": ["Based in Birmingham"],
-                "work": ["Building Adam"],
-                "relationships": ["Your supplier"],
-                "goals": ["A calmer home and more time back"],
-                "context": ["You prefer direct communication"]
-            ]
-        ),
-        preferences: ["communication_style": "Direct"],
-        memories: ["You prefer direct communication"],
-        goals: [
-            AgentContextGoal(id: "demo-watch", goal: "Flight prices to Turkey", status: "running", autonomy: "active", guardMode: false, currentStep: 1, updatedAt: nil)
-        ],
-        connectedApps: ["Gmail", "Calendar", "Reminders"],
-        generatedAt: nil
-    )
-}
-#endif

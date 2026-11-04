@@ -72,7 +72,7 @@ struct TravelOptionsCard: View {
             if let price = priceText(option) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(price)
-                        .font(.sectionTitle)
+                        .font(.adamTitle)
                         .foregroundStyle(Color.appInk)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)

@@ -86,7 +86,6 @@ enum PreviewData {
         case "/agent/activity": json = activity
         case "/agent/state": json = #"{"needsYou":[],"handling":[],"changed":[],"completed":[],"counts":{"needsYou":0,"handling":0,"changed":0,"completed":0}}"#
         case "/agent/home-feed": json = homeFeed
-        case "/agent/context": json = context
         case let p where p.hasPrefix("/memory/") && p.hasSuffix("/items"): json = memory
         default: json = nil
         }
@@ -198,11 +197,6 @@ enum PreviewData {
           {"id":"u1","type":"scheduled","title":"Flight price check","detail":"Every Friday morning","at":"\(iso(-2000))"}
         ]}
         """
-    }
-
-    private static var context: String {
-        guard let data = try? JSONEncoder().encode(AgentContextDemo.snapshot), let text = String(data: data, encoding: .utf8) else { return "{}" }
-        return text
     }
 
     private static var memory: String {

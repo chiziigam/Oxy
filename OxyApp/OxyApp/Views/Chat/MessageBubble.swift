@@ -445,136 +445,6 @@ struct MessageBubble: View {
     }
 }
 
-struct DisplayRenderSheet: View {
-    let content: String
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var displays: [PairedDisplay] = []
-    @State private var isLoading = true
-    @State private var sendingDisplayID: String?
-    @State private var errorMessage: String?
-
-    private var title: String {
-        let firstLine = content
-            .components(separatedBy: .newlines)
-            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return String((firstLine?.isEmpty == false ? firstLine! : "From chat").prefix(160))
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Choose a paired display")
-                    .font(.appBody(21, weight: .semibold))
-                    .foregroundStyle(Color.appInk)
-
-                Text("This sends the reply as a short readable update.")
-                    .font(.appBody(13))
-                    .foregroundStyle(Color.appMuted)
-
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else if displays.isEmpty, let errorMessage {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(errorMessage)
-                            .font(.appBody(14))
-                            .foregroundStyle(Color.appDestructive)
-                        Button("Try again") {
-                            Task { await loadDisplays() }
-                        }
-                        .font(.appBody(13, weight: .semibold))
-                        .foregroundStyle(Color.appAccent)
-                    }
-                } else if displays.isEmpty {
-                    Text("No displays paired. Pair one in Settings.")
-                        .font(.appBody(14))
-                        .foregroundStyle(Color.appMuted)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(displays) { display in
-                            Button {
-                                guard sendingDisplayID == nil else { return }
-                                sendingDisplayID = display.id
-                                Task { await send(to: display) }
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(display.name)
-                                            .font(.appBody(15, weight: .semibold))
-                                            .foregroundStyle(Color.appInk)
-                                        Text("Paired")
-                                            .font(.appBody(12))
-                                            .foregroundStyle(Color.appMuted)
-                                    }
-                                    Spacer()
-                                    if sendingDisplayID == display.id {
-                                        ProgressView()
-                                    } else {
-                                        Text("Show")
-                                            .font(.appBody(13, weight: .semibold))
-                                            .foregroundStyle(Color.appAccent)
-                                    }
-                                }
-                                .padding(.vertical, 14)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(sendingDisplayID != nil)
-
-                            if display.id != displays.last?.id {
-                                SettingsDivider()
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .background { MissionGlassPlate() }
-                }
-
-                if !displays.isEmpty, let errorMessage {
-                    Text(errorMessage)
-                        .font(.appBody(12))
-                        .foregroundStyle(Color.appDestructive)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, AppSpacing.margin)
-            .padding(.top, 24)
-            .background { GlebChrome.pastelBlob.ignoresSafeArea() }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") { dismiss() }
-                }
-            }
-            .task { await loadDisplays() }
-        }
-    }
-
-    private func loadDisplays() async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            displays = try await PairedDisplaysService.fetchDisplays()
-        } catch {
-            errorMessage = "Couldn’t load paired displays."
-        }
-        isLoading = false
-    }
-
-    private func send(to display: PairedDisplay) async {
-        guard sendingDisplayID == display.id else { return }
-        errorMessage = nil
-        do {
-            try await PairedDisplaysService.render(displayId: display.id, title: title, body: content)
-            dismiss()
-        } catch {
-            errorMessage = "Couldn’t send this to the display."
-            sendingDisplayID = nil
-        }
-    }
-}
-
 // MARK: - Chat markdown
 
 extension AttributedString {
@@ -1446,7 +1316,6 @@ struct TravelResultCard: View {
     .background(Color.appObsidian)
 }
 
-
 /// Inside Adam's reply: what it just saved to (or removed from) memory.
 private struct MemoryNote: View {
     let action: ActionResult
@@ -1473,7 +1342,6 @@ private struct MemoryNote: View {
         .accessibilityElement(children: .combine)
     }
 }
-
 
 /// "Connect Gmail and Calendar": appears under a reply that could not finish because an app was not connected.
 private struct ConnectOfferCard: View {

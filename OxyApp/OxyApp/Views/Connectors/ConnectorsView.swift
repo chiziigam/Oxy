@@ -254,7 +254,7 @@ struct ConnectorsView: View {
                     .frame(width: 38, height: 38)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.name).font(.appRounded(17, weight: .semibold, relativeTo: .headline)).foregroundStyle(Color.appInk)
+                    Text(entry.name).font(.adamTitle).foregroundStyle(Color.appInk)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
                         Circle().fill(Color.appSuccess).frame(width: 6, height: 6)

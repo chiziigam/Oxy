@@ -79,7 +79,7 @@ struct TaskInterfaceView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(spec.title)
-                .font(.sectionTitle)
+                .font(.adamTitle)
                 .foregroundStyle(Color.appInk)
                 .accessibilityAddTraits(.isHeader)
             ForEach(spec.panel) { block in
@@ -104,7 +104,7 @@ struct TaskInterfaceView: View {
         switch block.type {
         case "text":
             Text(block.text ?? "")
-                .font(block.style == "h" ? .sectionTitle : .bodyText)
+                .font(block.style == "h" ? .adamTitle : .bodyText)
                 .foregroundStyle(block.style == "sub" ? Color.appMuted : Color.appInk)
                 .fixedSize(horizontal: false, vertical: true)
         case "choices": choices(block)
@@ -116,7 +116,7 @@ struct TaskInterfaceView: View {
             VStack(alignment: .leading, spacing: 6) {
                 if let label = block.label { Text(label).font(.rowSecondary).foregroundStyle(Color.appMuted) }
                 Text(number(block.value ?? 0, decimals: block.decimals ?? 0) + (block.unit.map { " \($0)" } ?? ""))
-                    .font(.heroTitle).monospacedDigit().foregroundStyle(Color.appInk)
+                    .font(.adamTitle).monospacedDigit().foregroundStyle(Color.appInk)
             }
         case "bars": bars(block)
         case "timeline": timeline(block)
@@ -206,7 +206,7 @@ struct TaskInterfaceView: View {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         VStack(alignment: .leading, spacing: 14) {
-                            Text(item.title ?? "").font(.sectionTitle).foregroundStyle(Color.appInk)
+                            Text(item.title ?? "").font(.adamTitle).foregroundStyle(Color.appInk)
                             ForEach(Array((item.facts ?? []).enumerated()), id: \.offset) { _, fact in
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(fact.label).font(.fineprint).foregroundStyle(Color.appMuted)
