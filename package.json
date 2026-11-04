@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "pretest": "node test/dev/ensure-test-user.js",
     "test": "node --test test/smoke/*.test.js",
     "smoke": "node --test test/smoke/*.test.js",
     "check:schema": "node scripts/check-live-schema.js",
