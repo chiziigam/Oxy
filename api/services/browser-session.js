@@ -55,17 +55,34 @@ function directChildPids(parentPid) {
 
 // --no-sandbox: the setuid sandbox can't initialise as root in the Fly container.
 // --disable-dev-shm-usage: the container gives /dev/shm ~64MB and Chromium stalls when it fills.
-const CHROMIUM_LAUNCH_ARGS = ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'];
+const CHROMIUM_LAUNCH_ARGS = [
+  '--no-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  // Playwright sets navigator.webdriver, which is what a retailer's bot wall reads first.
+  '--disable-blink-features=AutomationControlled',
+  '--window-size=1280,900',
+];
 const BROWSER_LAUNCH_TIMEOUT_MS = envInt('OXY_BROWSER_LAUNCH_TIMEOUT_MS', 45000);
 const BROWSER_CLOSE_TIMEOUT_MS = 5000;
 
 async function launchLocalBrowser() {
   const before = directChildPids(process.pid);
-  const browser = await chromium.launch({
-    headless: process.env.BROWSER_HEADLESS !== 'false',
-    args: CHROMIUM_LAUNCH_ARGS,
-    timeout: BROWSER_LAUNCH_TIMEOUT_MS,
-  });
+  const wantHeadless = process.env.BROWSER_HEADLESS !== 'false';
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: wantHeadless,
+      args: CHROMIUM_LAUNCH_ARGS,
+      timeout: BROWSER_LAUNCH_TIMEOUT_MS,
+    });
+  } catch (error) {
+    // A headed launch needs a display. If xvfb did not come up, run headless rather than
+    // leaving the app unable to browse at all.
+    if (wantHeadless) throw error;
+    console.warn(`[browser-session] headed launch failed (${error.message.split('\n')[0]}); falling back to headless`);
+    browser = await chromium.launch({ headless: true, args: CHROMIUM_LAUNCH_ARGS, timeout: BROWSER_LAUNCH_TIMEOUT_MS });
+  }
   // This Playwright build doesn't expose browser.process() on a locally launched browser, so
   // stash the OS PID from the before/after child diff for the force-kill in closeSession.
   const after = directChildPids(process.pid);

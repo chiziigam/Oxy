@@ -17,6 +17,13 @@ RUN npm ci --omit=dev
 # chromium.launch() fails at runtime in the slim Fly.io image without these libraries.
 RUN npx playwright install --with-deps chromium
 
+# Headless Chromium is refused at a retailer's checkout handover, so the browser has to run
+# headed. Fly machines have no display; xvfb provides one and docker-entrypoint.sh starts it.
+# xauth is required by xvfb-run and by Xvfb's own authentication plumbing.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends xvfb xauth \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 ENV NODE_ENV=production
@@ -31,4 +38,4 @@ ENV TZ=Europe/London
 
 EXPOSE 8080
 
-CMD ["npm", "start"]
+CMD ["/app/docker-entrypoint.sh", "node", "server.js"]
