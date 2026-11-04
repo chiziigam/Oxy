@@ -205,7 +205,7 @@ const { saveVaultCredential, listVaultCredentials, deleteVaultCredential } = req
 const { resolveCurrencyForLocation } = require('./services/currency-from-location');
 const { handleStripeWebhookEvent } = require('./services/stripe-webhook');
 const { getTaskSteps } = require('./services/task-steps');
-const { createRoutine, listRoutines, deleteRoutine, listDueRoutines, markRoutineRun } = require('./services/routines');
+const { createRoutine, listRoutines, deleteRoutine, listDueRoutines, claimDueRoutine, markRoutineRun } = require('./services/routines');
 const scheduledTasks = require('./services/scheduled-tasks');
 const {
   actionDisplayName,
@@ -6397,9 +6397,9 @@ async function runScheduledTasksForUser(userId, logger = console, now = new Date
         if (evaluation && evaluation.terminal === false) await scheduledTasks.advanceScheduledTask(claimed, now);
         else await scheduledTasks.completeScheduledTask(claimed, now);
       } else if (waiting) {
-        // Keep the watch alive, but do not create another run while this one waits
-        // for the person to review an action.
-        await scheduledTasks.deferScheduledTask(claimed, now);
+        // The approval itself resumes the run. Re-arming every ten minutes used to mint a
+        // new task and a new approval each time; one retry a day is enough until it is answered.
+        await scheduledTasks.deferScheduledTask(claimed, now, 24 * 60);
       } else {
         await scheduledTasks.advanceScheduledTask(claimed, now);
       }
@@ -6530,6 +6530,8 @@ async function runProactiveSweep(logger = console) {
   // uses for background agent runs), not a second dispatch mechanism.
   const dueRoutines = await listDueRoutines(supabase, new Date());
   for (const routine of dueRoutines) {
+    // Advance the slot before the run. A concurrent sweep must not start the same routine.
+    if (!await claimDueRoutine(supabase, routine)) continue;
     // runAgenticLoop resolves normally even when it stopped without finishing (its own
     // agentTrace.status is 'error'/'awaiting_approval') — only a genuine throw is an
     // exception here. Both cases must record a failed run; only 'completed' counts as one.

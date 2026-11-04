@@ -607,10 +607,11 @@ async function claimScheduledTask(task, now = new Date()) {
   return { ...task, ...data, claimedUntil: leaseUntil.toISOString(), claimedAtMs: now.getTime() };
 }
 
-async function deferScheduledTask(task, now = new Date()) {
+async function deferScheduledTask(task, now = new Date(), minutes = CLAIM_LEASE_MINUTES, client = null) {
   if (!task?.id) return { ok: false, error: 'scheduled task id required' };
-  const nextRunAt = new Date(now.getTime() + CLAIM_LEASE_MINUTES * 60000);
-  const { error } = await getSupabase().from('scheduled_tasks').update({
+  const delay = Number.isFinite(Number(minutes)) && Number(minutes) > 0 ? Number(minutes) : CLAIM_LEASE_MINUTES;
+  const nextRunAt = new Date(now.getTime() + delay * 60000);
+  const { error } = await (client || getSupabase()).from('scheduled_tasks').update({
     next_run_at: nextRunAt.toISOString(),
     last_run_at: now.toISOString()
   }).eq('id', task.id);

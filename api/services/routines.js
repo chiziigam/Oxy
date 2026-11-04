@@ -35,6 +35,27 @@ async function listDueRoutines(supabase, now) {
   }
 }
 
+// Take the slot before running. Two overlapping sweeps both see the same due row otherwise,
+// and both start a full agent run with real side effects. The compare-and-set on next_run_at
+// is what makes exactly one of them the owner.
+async function claimDueRoutine(supabase, routine, now = new Date()) {
+  const interval = Number(routine?.interval_minutes);
+  if (!routine?.id || !Number.isFinite(interval) || interval <= 0) return false;
+  const nextRunAt = new Date(now.getTime() + interval * 60000).toISOString();
+  try {
+    const { data, error } = await supabase
+      .from('routines')
+      .update({ next_run_at: nextRunAt, last_run_at: now.toISOString() })
+      .eq('id', routine.id)
+      .eq('next_run_at', routine.next_run_at)
+      .eq('enabled', true)
+      .select('id');
+    return !error && Array.isArray(data) && data.length === 1;
+  } catch (err) {
+    return false;
+  }
+}
+
 // `outcome.success` distinguishes a real completion from a run that stopped early (loop
 // error, unfinished tool calls) — a routine that keeps failing must be visibly failing, not
 // silently look identical to one that keeps succeeding just because next_run_at moved on.
@@ -105,4 +126,4 @@ async function deleteRoutine(supabase, userId, routineId) {
   }
 }
 
-module.exports = { createRoutine, listRoutines, deleteRoutine, listDueRoutines, markRoutineRun };
+module.exports = { createRoutine, listRoutines, deleteRoutine, listDueRoutines, claimDueRoutine, markRoutineRun };

@@ -5,7 +5,8 @@ const {
   buildScheduledRunInstruction,
   scheduledConditionTriggered,
   cleanScheduledResultText,
-  isRecurringCadence
+  isRecurringCadence,
+  deferScheduledTask
 } = require('../../api/services/scheduled-tasks');
 const { isScheduledRunNoteworthy } = require('../../api/index');
 
@@ -99,4 +100,23 @@ test('isRecurringCadence treats once, poll, and anything else as not a repeating
   assert.equal(isRecurringCadence(undefined), false);
   assert.equal(isRecurringCadence(''), false);
   assert.equal(isRecurringCadence('daily '), false, 'must not fuzzy-match — exact cadence values only');
+});
+
+test('a watch waiting on approval is deferred for a day, not ten minutes', async () => {
+  const patches = [];
+  const client = {
+    from() {
+      return {
+        update(patch) {
+          patches.push(patch);
+          return { eq: () => Promise.resolve({ error: null }) };
+        },
+      };
+    },
+  };
+  const now = new Date('2026-11-04T07:00:00.000Z');
+  const result = await deferScheduledTask({ id: 't1' }, now, 24 * 60, client);
+  assert.equal(result.ok, true);
+  assert.equal(result.nextRunAt, '2026-11-05T07:00:00.000Z');
+  assert.equal(patches.length, 1);
 });

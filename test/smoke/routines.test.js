@@ -309,3 +309,36 @@ test('markRoutineRun never throws even when the supabase client blows up', async
   const result = await markRoutineRun(brokenSupabase, 'r1', new Date());
   assert.ok(result.error);
 });
+
+test('a due routine is claimed once, so overlapping sweeps cannot both run it', async () => {
+  const { claimDueRoutine } = require('../../api/services/routines');
+  const now = new Date('2026-11-04T07:00:00.000Z');
+  const rows = [{
+    id: 'r1', user_id: 'u1', enabled: true, interval_minutes: 60,
+    next_run_at: '2026-11-04T07:00:00.000Z',
+  }];
+  const supabase = {
+    from() {
+      return {
+        update(patch) {
+          const filters = {};
+          const chain = {
+            eq(column, value) { filters[column] = value; return chain; },
+            select() {
+              const matched = rows.filter((row) => Object.entries(filters).every(([key, value]) => row[key] === value));
+              matched.forEach((row) => Object.assign(row, patch));
+              return Promise.resolve({ data: matched.map((row) => ({ id: row.id })), error: null });
+            },
+          };
+          return chain;
+        },
+      };
+    },
+  };
+
+  const sweepOne = { ...rows[0] };
+  assert.equal(await claimDueRoutine(supabase, sweepOne, now), true);
+  assert.equal(rows[0].next_run_at, '2026-11-04T08:00:00.000Z');
+  const sweepTwo = { ...rows[0], next_run_at: sweepOne.next_run_at };
+  assert.equal(await claimDueRoutine(supabase, sweepTwo, now), false, 'the slot is already taken');
+});
