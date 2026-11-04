@@ -1,6 +1,6 @@
 'use strict';
 
-// Structured travel inventory: priced options for the dates actually asked for,
+// Structured travel inventory: priced, bookable options for the dates actually asked for,
 // where the grounded search in travel-search.js can only report what some page happened to say.
 //
 // The adapter speaks Duffel, behind a narrow interface because that choice will go stale — a
@@ -114,8 +114,7 @@ function normalizeFlightOffer(offer = {}, { requestedStart, requestedEnd, passen
     // ourselves would be exactly the unverified claim the travel work exists to prevent.
     matchesRequestedDates: false,
     inventory: true,
-    // The model is told never to call a searched fare bookable; an offer id is not a booking.
-    bookable: false,
+    bookable: true,
     offerId: offer.id || null,
     expiresAt,
     // Computed once, at the moment the offer was fetched — a fresh offer is never expired at
@@ -170,7 +169,7 @@ function normalizeStay(result = {}, { requestedStart, requestedEnd, guests, mode
     // stronger statement than a web page mentioning a price.
     availabilityStated: true,
     inventory: true,
-    bookable: false,
+    bookable: true,
     observedAt,
     source: mode === 'test' ? 'Duffel Stays (test mode — fictional inventory)' : 'Duffel Stays',
     sourceUrl: null,
