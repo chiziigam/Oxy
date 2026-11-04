@@ -60,9 +60,9 @@ struct LoginView: View {
             do {
                 let response: AuthResponse
                 if isRegistering {
-                    response = try await authService.register(userId: userId, password: password, email: userId.contains("@") ? userId : nil)
+                    response = try await authService.register(email: userId, password: password)
                 } else {
-                    response = try await authService.login(userId: userId, password: password)
+                    response = try await authService.login(identifier: userId, password: password)
                 }
 
                 if let token = response.token, let returnedUserId = response.userId {

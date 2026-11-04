@@ -10,12 +10,24 @@ struct AuthService {
         return body
     }
 
-    func register(userId: String, password: String, email: String? = nil) async throws -> AuthResponse {
+    /// The server's user id charset is `[a-zA-Z0-9_-]`, so an email cannot be one. Derive a
+    /// stable-looking id from the local part and keep the email as the sign-in handle.
+    static func suggestedUserId(for email: String) -> String {
+        let local = email.split(separator: "@").first.map(String.init) ?? "user"
+        let slug = local.lowercased()
+            .replacingOccurrences(of: "[^a-z0-9_-]", with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        let stem = slug.isEmpty ? "user" : String(slug.prefix(24))
+        return "\(stem)-\(UUID().uuidString.prefix(6).lowercased())"
+    }
+
+    func register(email: String, password: String) async throws -> AuthResponse {
+        let identity = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         do {
             let data = try await api.request(
                 path: "/auth/register",
                 method: "POST",
-                body: registerBody(userId: userId, password: password, email: email)
+                body: registerBody(userId: Self.suggestedUserId(for: identity), password: password, email: identity)
             )
             return try JSONDecoder().decode(AuthResponse.self, from: data)
         } catch {
@@ -24,12 +36,17 @@ struct AuthService {
         }
     }
 
-    func login(userId: String, password: String) async throws -> AuthResponse {
+    /// An email signs in by email; anything else is a user id.
+    func login(identifier: String, password: String) async throws -> AuthResponse {
+        let identity = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        var body: [String: Any] = ["password": password]
+        if identity.contains("@") { body["email"] = identity.lowercased() }
+        else { body["userId"] = identity }
         do {
             let data = try await api.request(
                 path: "/auth/login",
                 method: "POST",
-                body: ["userId": userId, "password": password]
+                body: body
             )
             return try JSONDecoder().decode(AuthResponse.self, from: data)
         } catch {
