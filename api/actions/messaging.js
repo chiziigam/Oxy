@@ -6,6 +6,17 @@
 // deps: they are shared with the chat path, so duplicating them here would let the two
 // copies drift on a limit that exists to stop the agent messaging people repeatedly.
 
+// The message is already with the provider. A failed thread-log write must be reported, not
+// turned into a failure that makes the person send it twice.
+async function recordOutboundEvent(supabase, event) {
+  try {
+    const { appendEvent } = require('../services/external-conversations');
+    await appendEvent(supabase, event);
+  } catch (error) {
+    console.warn('[messaging] sent, but recording the thread failed:', error.message);
+  }
+}
+
 async function sendMessage({ userId, action, params, enrichedParams, context, deps, helpers }) {
   const { supabase, checkAdamSendCap, looksLikeMessageAddress, resolveNativeMessageContact } = deps;
   const contact = String(params?.contact || '').trim();
@@ -106,7 +117,7 @@ async function sendAdamEmail({ userId, action, params, enrichedParams, context, 
     return { success: false, error: `Couldn't send that: ${err.message}` };
   }
 
-  await appendEvent(supabase, {
+  await recordOutboundEvent(supabase, {
     conversationId: conversation.id,
     channelType: 'email',
     direction: 'outbound',
@@ -169,7 +180,7 @@ async function sendAdamSms({ userId, action, params, enrichedParams, context, de
     return { success: false, error: `Couldn't send that: ${err.message}` };
   }
 
-  await appendEvent(supabase, {
+  await recordOutboundEvent(supabase, {
     conversationId: conversation.id,
     channelType: 'phone_sms',
     direction: 'outbound',

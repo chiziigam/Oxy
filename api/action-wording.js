@@ -281,14 +281,14 @@ const ACTION_WORDING = Object.freeze({
     name: 'Ride',
     progress: (i) => pick(detail(i.destination) && `Getting an Uber to ${detail(i.destination)}`, 'Getting you an Uber'),
     summary: (p) => ({ summary: `Opened an Uber to ${field(p, 'destination', 'query', 'place', 'address') || 'a place'}`, kind: 'did', usedLocation: true }),
-    feed: () => 'Booked a ride',
+    feed: (i) => detail(i.destination) ? `Opened Uber for ${detail(i.destination)}` : 'Opened Uber',
     approval: 'Ride ready to book',
     failureLead: "I couldn't arrange the ride."
   },
   book_lyft: {
     name: 'Ride',
     progress: (i) => pick(detail(i.destination) && `Getting a Lyft to ${detail(i.destination)}`, 'Getting you a Lyft'),
-    feed: () => 'Booked a ride',
+    feed: () => 'Opened Lyft',
     approval: 'Ride ready to book',
     failureLead: "I couldn't arrange the ride."
   },
@@ -623,7 +623,7 @@ const ACTION_WORDING = Object.freeze({
   },
   transaction_authorize: {
     progress: () => 'Waiting for your yes',
-    feed: () => 'Placed an order'
+    feed: () => 'Approved a payment'
   },
   transaction_status: {
     progress: () => 'Checking the order',
