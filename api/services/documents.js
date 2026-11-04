@@ -63,6 +63,18 @@ async function storeDocument(supabase, userId, {
   // than accumulating near-identical rows that later have to be disambiguated.
   const existing = await findByChecksum(supabase, userId, checksum);
   if (existing) {
+    // Reusing the bytes must still attach the file to the work it was fetched for.
+    const patch = {};
+    if (workflowId && !existing.workflow_id) patch.workflow_id = workflowId;
+    if (agentTaskId && !existing.agent_task_id) patch.agent_task_id = agentTaskId;
+    if (participantId && !existing.participant_id) patch.participant_id = participantId;
+    if (conversationId && !existing.conversation_id) patch.conversation_id = conversationId;
+    if (Object.keys(patch).length) {
+      patch.last_used_at = new Date().toISOString();
+      const { data, error } = await supabase.from('documents').update(patch).eq('id', existing.id).select().single();
+      if (error) throw new Error(`Couldn't attach that file: ${error.message}`);
+      return { document: data || { ...existing, ...patch }, deduped: true };
+    }
     await touchDocument(supabase, existing.id);
     return { document: existing, deduped: true };
   }

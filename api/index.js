@@ -3469,21 +3469,23 @@ async function forgetMemory(userId, { scope = '', query = '' } = {}) {
   if (!normalizedQuery && normalizedScope === 'all') {
     const { error } = await supabase.from('memories').delete().eq('user_id', userId);
     if (error) throw error;
-    await clearCheckoutProfile(supabase, userId).catch(() => {});
-    await deleteAgentCard(supabase, userId).catch(() => {});
+    // If either delete fails, say so by failing the turn rather than claiming a clean wipe.
+    await clearCheckoutProfile(supabase, userId);
+    await deleteAgentCard(supabase, userId);
     return { success: true, text: 'I cleared what I had in memory, including any saved checkout details and payment card.' };
   }
 
   if (!normalizedQuery && normalizedScope === 'recent') {
     const { data, error } = await supabase
       .from('memories')
-      .select('id, content')
+      .select('id, content, source')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(10);
     if (error) throw error;
-    if (!data?.length) return { success: true, text: 'There was nothing stored to forget.' };
-    const { error: deleteError } = await supabase.from('memories').delete().eq('id', data[0].id);
+    const newestVisible = (data || []).find(isUserFacingMemory);
+    if (!newestVisible) return { success: true, text: 'There was nothing stored to forget.' };
+    const { error: deleteError } = await supabase.from('memories').delete().eq('id', newestVisible.id);
     if (deleteError) throw deleteError;
     return { success: true, text: 'I forgot the most recent memory.' };
   }
@@ -3496,8 +3498,8 @@ async function forgetMemory(userId, { scope = '', query = '' } = {}) {
     // profile; a query matching both clears both.
     const checkoutAsked = CHECKOUT_FORGET_PATTERN.test(normalizedQuery);
     const cardAsked = CARD_FORGET_PATTERN.test(normalizedQuery);
-    const cleared = checkoutAsked ? await clearCheckoutProfile(supabase, userId).catch(() => null) : null;
-    if (cardAsked) await deleteAgentCard(supabase, userId).catch(() => {});
+    const cleared = checkoutAsked ? await clearCheckoutProfile(supabase, userId) : null;
+    if (cardAsked) await deleteAgentCard(supabase, userId);
     if (cleared || cardAsked) {
       const parts = [cleared, cardAsked ? 'payment card' : null].filter(Boolean).join(' and ');
       return { success: true, text: `I've cleared your saved ${parts}.` };
@@ -3842,7 +3844,7 @@ async function recordConciergeSpend(userId, amount, currency = null, context = {
 }
 
 async function setPreferenceValue(userId, key, value) {
-  await supabase
+  const { error } = await supabase
     .from('preferences')
     .upsert({
       user_id: userId,
@@ -3850,6 +3852,7 @@ async function setPreferenceValue(userId, key, value) {
       value,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,key' });
+  return { error: error ? error.message : null };
 }
 
 async function resolveAgentTaskRoute(userId, task) {
@@ -9256,6 +9259,8 @@ app.get('/agent/home', requireSessionAuth, async (req, res) => {
       supabase.from('scheduled_tasks').select('id, title, recurrence, next_run_at, condition, active, watch_state')
         .eq('user_id', userId).eq('active', true).order('next_run_at', { ascending: true }).limit(24)
     ]);
+    if (nativeContext.error) throw nativeContext.error;
+    if (schedules.error) throw schedules.error;
     const now = new Date();
     res.json(homeModel.buildHomeModel({
       displays,
@@ -9303,6 +9308,9 @@ app.get('/agent/activity', requireSessionAuth, async (req, res) => {
       approvalRuntime.list(userId).then(list => list.map(agentApprovals.approvalSummary)).catch(() => []),
       require('./services/home-state').getHomeState(supabase, userId).catch(() => ({ completed: [], needsYou: [] }))
     ]);
+    if (actions.error) throw actions.error;
+    if (notices.error) throw notices.error;
+    if (schedules.error) throw schedules.error;
     res.json(activityFeed.buildActivityFeed({
       actionRows: actions.data || [],
       noticeRows: notices.data || [],
@@ -9633,6 +9641,7 @@ app.patch('/agent/tasks/:id', requireSessionAuth, async (req, res) => {
       updates.metadata = { guardMode };
     }
     const updated = await delegatedRunLifecycle.updateControls(userId, task.id, updates);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     res.json({ task: safeAgentTaskSummary(updated) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -9680,7 +9689,7 @@ app.post('/agent/simulate', requireSessionAuth, async (req, res) => {
   try {
     const sim = await taskManager.recordSimulation(userId, goal || 'adhoc', actions || [], { preview: true });
     res.json({ simulation: sim });
-  } catch (e) { res.json({ simulated: true }); }
+  } catch (e) { res.status(500).json({ error: 'Could not run that simulation.' }); }
 });
 
 // === Recipes endpoints (Poke-style custom automations) ===
@@ -10085,15 +10094,14 @@ app.put('/model-routing', requireSessionAuth, async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const route = validateModelRouteInput(req.body || {});
   if (route.error) return res.status(400).json({ error: route.error });
-  await Promise.all([
+  const writes = await Promise.all([
     setPreferenceValue(userId, ROUTE_KEYS.provider, route.provider),
     setPreferenceValue(userId, ROUTE_KEYS.model, route.model)
   ]);
-  res.json(publicModelRouting({
-    ...(await getPreferenceMap(userId)),
-    [ROUTE_KEYS.provider]: route.provider,
-    [ROUTE_KEYS.model]: route.model
-  }));
+  if (writes.some(result => result?.error)) {
+    return res.status(500).json({ error: 'Could not save that model route.' });
+  }
+  res.json(publicModelRouting(await getPreferenceMap(userId)));
 });
 
 // One-off address -> lat/lng lookup, used by the iOS Settings "Home address" field so a

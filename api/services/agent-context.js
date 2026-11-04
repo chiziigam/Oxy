@@ -125,12 +125,23 @@ async function loadAgentContext(supabase, userId) {
       .eq('enabled', true)
   ]);
 
-  return buildAgentContext({
+  const unavailableSources = [];
+  for (const [name, result] of [['memories', memories], ['preferences', preferences], ['tasks', tasks], ['connectors', connectors]]) {
+    if (result?.error) {
+      unavailableSources.push(name);
+      console.warn(`[agent-context] ${name} failed: ${result.error.message}`);
+    }
+  }
+
+  const context = buildAgentContext({
     memories: memories.data || [],
     preferences: preferences.data || [],
     tasks: tasks.data || [],
     connectors: connectors.data || []
   });
+  // An empty section must be distinguishable from a failed read.
+  if (unavailableSources.length) context.unavailableSources = unavailableSources;
+  return context;
 }
 
 module.exports = {

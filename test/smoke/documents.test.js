@@ -431,3 +431,20 @@ test('a tailored CV is a new version, and the original survives intact', async (
     assert.deepEqual(versions.map(v => v.version), [1, 2]);
   });
 });
+
+test('re-using identical bytes still attaches the file to the work it was fetched for', async () => {
+  await withKey(async () => {
+    const supabase = fakeSupabase();
+    const bytes = Buffer.from('same cv');
+    const first = await storeDocument(supabase, 'chizi', {
+      filename: 'cv.pdf', mimeType: 'application/pdf', bytes, source: 'upload'
+    });
+    assert.equal(first.document.workflow_id, null);
+    const again = await storeDocument(supabase, 'chizi', {
+      filename: 'cv.pdf', mimeType: 'application/pdf', bytes, source: 'browser_download', workflowId: 'wf-1'
+    });
+    assert.equal(again.deduped, true);
+    assert.equal(again.document.workflow_id, 'wf-1');
+    assert.equal(supabase._state.documents.length, 1);
+  });
+});

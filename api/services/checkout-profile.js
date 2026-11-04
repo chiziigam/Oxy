@@ -291,9 +291,10 @@ function buildEmailAskWithConsent(baseQuestion) {
 // --------------- Supabase persistence ---------------
 
 async function setPreferenceValue(supabase, userId, key, value) {
-  await supabase
+  const { error } = await supabase
     .from('preferences')
     .upsert({ user_id: userId, key, value, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+  if (error) throw new Error(`Could not save checkout details: ${error.message}`);
 }
 
 async function loadCheckoutProfile(supabase, userId) {
@@ -381,17 +382,19 @@ async function saveCheckoutEmail(supabase, userId, email, consent = false) {
  * Returns a human-readable summary of what was cleared.
  */
 async function clearCheckoutProfile(supabase, userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('preferences')
     .select('key')
     .eq('user_id', userId)
     .like('key', 'checkout_profile.%');
+  if (error) throw new Error(`Could not read checkout details: ${error.message}`);
   if (!data || data.length === 0) return null;
-  await supabase
+  const { error: deleteError } = await supabase
     .from('preferences')
     .delete()
     .like('key', 'checkout_profile.%')
     .eq('user_id', userId);
+  if (deleteError) throw new Error(`Could not delete checkout details: ${deleteError.message}`);
   return 'checkout details (email, name, phone, and delivery address)';
 }
 
