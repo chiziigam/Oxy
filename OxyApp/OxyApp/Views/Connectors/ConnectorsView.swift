@@ -194,6 +194,9 @@ struct ConnectorsView: View {
             if PreviewData.isIsolated, let raw = ProcessInfo.processInfo.environment["OXY_DEBUG_APPS"] {
                 try? await Task.sleep(for: .milliseconds(700))
                 place = Place(rawValue: raw)
+            } else if PreviewData.isScreen("vault", "payments") {
+                try? await Task.sleep(for: .milliseconds(700))
+                place = PreviewData.isScreen("vault") ? .logins : .payments
             }
         }
         #endif

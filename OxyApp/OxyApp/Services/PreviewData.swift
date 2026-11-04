@@ -5,6 +5,15 @@ import Foundation
 /// Debug builds only, and only for the "Continue as Test User" session; nothing here touches an account.
 enum PreviewData {
     static var isIsolated: Bool { ProcessInfo.processInfo.environment["OXY_DEBUG_AUTOLOGIN"] == "1" }
+
+    /// `OXY_DEBUG_SCREEN=<name>` opens one screen directly with sample data, for screenshots.
+    /// Names: signin, signup, onboarding, chat-empty, chat-thread, composer-typing, menu, now,
+    /// your-home, activity, apps, memory, vault, payments, settings, delete-account, history.
+    static var screen: String? { ProcessInfo.processInfo.environment["OXY_DEBUG_SCREEN"] }
+    static func isScreen(_ names: String...) -> Bool {
+        guard let screen else { return false }
+        return names.contains(screen)
+    }
     static var isActive: Bool { isIsolated || (KeychainHelper.shared.read(key: "session_token") ?? "").isEmpty }
 
     static func response(path: String, method: String) -> Data? {

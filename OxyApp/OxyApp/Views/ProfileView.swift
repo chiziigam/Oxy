@@ -81,7 +81,9 @@ struct ProfileView: View {
             .toolbar(.hidden, for: .navigationBar)
             #if DEBUG
             .task {
-                guard PreviewData.isIsolated, let state = ProcessInfo.processInfo.environment["OXY_DEBUG_ACCOUNT"] else { return }
+                guard PreviewData.isIsolated,
+                      let state = ProcessInfo.processInfo.environment["OXY_DEBUG_ACCOUNT"] ?? (PreviewData.isScreen("delete-account") ? "delete" : nil)
+                else { return }
                 try? await Task.sleep(for: .milliseconds(900))
                 switch state {
                 case "delete": showDeleteAccountConfirm = true

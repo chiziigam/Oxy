@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct LoginView: View {
+    /// Open on Create account instead of Sign in.
+    var startsRegistering = false
     @Environment(AppState.self) private var appState
     @State private var userId = ""
     @State private var password = ""
@@ -27,6 +29,7 @@ struct LoginView: View {
                 onDemoLogin: demoLogin
             )
         }
+        .onAppear { if startsRegistering { isRegistering = true } }
         .task {
             guard shouldAutoDemoLogin, !didAttemptAutoDemoLogin else { return }
             didAttemptAutoDemoLogin = true

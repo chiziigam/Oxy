@@ -44,6 +44,13 @@ struct MainTabView: View {
                        let choice = ThreadMenuChoice(rawValue: raw), choice != .now {
                         opened = choice
                     }
+                    switch PreviewData.screen {
+                    case "your-home": opened = .home
+                    case "activity": opened = .activity
+                    case "memory": opened = .memory
+                    case "settings", "apps", "vault", "payments", "delete-account": opened = .settings
+                    default: break
+                    }
                 }
                 #endif
             }
@@ -229,6 +236,8 @@ private struct AdamYouView: View {
                 else if raw == "sounds" { SoundClipStore.shared.seedPreviewClips(); showsSoundsPreview = true }
                 else if let target = Destination(rawValue: raw) { destination = target }
             }
+            if PreviewData.isScreen("apps", "vault", "payments") { destination = .apps }
+            if PreviewData.isScreen("delete-account") { destination = .account }
         }
         #endif
     }

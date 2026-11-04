@@ -28,12 +28,28 @@ struct OxyApp: App {
 
 struct RootView: View {
     @Environment(AppState.self) private var appState
+
+    /// Debug builds only: the signed-out screens, opened directly for screenshots.
+    private var debugAuthScreen: AnyView? {
+        #if DEBUG
+        switch PreviewData.screen {
+        case "signin": return AnyView(LoginView())
+        case "signup": return AnyView(LoginView(startsRegistering: true))
+        case "onboarding": return AnyView(LegalConsentView())
+        default: return nil
+        }
+        #else
+        return nil
+        #endif
+    }
     @State private var didRestoreSession = false
     @AppStorage(ThreadBackground.storageKey) private var backgroundRaw = ThreadBackground.automatic.rawValue
 
     var body: some View {
         Group {
-            if !didRestoreSession {
+            if let debugScreen = debugAuthScreen {
+                debugScreen
+            } else if !didRestoreSession {
                 Color.appBackground.ignoresSafeArea()
             } else if appState.isAuthenticated {
                 MainTabView()

@@ -194,6 +194,16 @@ struct ChatView: View {
     private func exchangeSection(_ exchange: ThreadExchange) -> some View {
         let isOpen = exchangeIsOpen(exchange)
         VStack(alignment: .leading, spacing: 0) {
+            // One plain date header where the day changes, never a date on every row.
+            if startsNewDay(exchange) {
+                Text(Self.dayLabel(for: exchange.date))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.appMuted)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.horizontal, AppSpacing.chatMargin)
+                    .padding(.top, AppSpacing.lg)
+                    .padding(.bottom, AppSpacing.xs)
+            }
             if exchange.id != exchanges.last?.id {
                 Button {
                     HapticManager.shared.select()
@@ -203,30 +213,20 @@ struct ChatView: View {
                         }
                     }
                 } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(Self.dayLabel(for: exchange.date))
-                                .font(.appBody(12, weight: .medium))
-                                .foregroundStyle(Color.appMuted)
-                            if !isOpen {
-                                Text(exchange.title)
-                                    .font(.appBody(17, weight: .medium))
-                                    .foregroundStyle(Color.appInk)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                        if !exchange.requiresAttention {
-                            AppIcon("chevron-down", size: 14)
-                                .foregroundStyle(Color.appMuted)
-                                .rotationEffect(.degrees(isOpen ? 180 : 0))
-                                .padding(.top, 5)
-                        }
+                    HStack(alignment: .firstTextBaseline, spacing: AppSpacing.md) {
+                        Text(Self.sentenceCase(exchange.title))
+                            .font(isOpen ? .subheadline.weight(.semibold) : .body)
+                            .foregroundStyle(isOpen ? Color.appMuted : Color.appInk)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: AppSpacing.sm)
+                        Text(exchange.date.formatted(date: .omitted, time: .shortened))
+                            .font(.footnote)
+                            .foregroundStyle(Color.appMuted)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .padding(.horizontal, AppSpacing.chatMargin)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, AppSpacing.xs)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -363,10 +363,26 @@ struct ChatView: View {
         }
     }
 
+    private func startsNewDay(_ exchange: ThreadExchange) -> Bool {
+        guard let index = exchanges.firstIndex(where: { $0.id == exchange.id }) else { return false }
+        guard index > 0 else { return true }
+        return !Calendar.current.isDate(exchanges[index - 1].date, inSameDayAs: exchange.date)
+    }
+
+    /// Display only: the user's words with a capital first letter.
+    static func sentenceCase(_ text: String) -> String {
+        guard let first = text.first, first.isLowercase else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
     private static func dayLabel(for date: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) { return "Today" }
         if calendar.isDateInYesterday(date) { return "Yesterday" }
+        if let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day,
+           days < 7 {
+            return date.formatted(.dateTime.weekday(.wide))
+        }
         let sameYear = calendar.isDate(date, equalTo: Date(), toGranularity: .year)
         return date.formatted(sameYear
             ? .dateTime.weekday(.abbreviated).day().month(.abbreviated)
@@ -397,7 +413,7 @@ struct ChatView: View {
         guard let latest = exchanges.last(where: { exchange in exchange.messages.contains { $0.role == .user } }) else {
             return "Conversation"
         }
-        return Self.cleanTitle(latest.title)
+        return Self.sentenceCase(Self.cleanTitle(latest.title))
     }
 
     static func cleanTitle(_ raw: String, limit: Int = 42) -> String {
@@ -1040,6 +1056,19 @@ struct ChatView: View {
             if let draft = ProcessInfo.processInfo.environment["OXY_DEBUG_DRAFT"] {
                 viewModel.inputText = draft
                 isInputFocused = true
+            }
+            switch PreviewData.screen {
+            case "now": overviewSelected = true
+            case "composer-typing":
+                viewModel.inputText = "Does John Lewis have Modern Warfare 4 for PS5"
+                isInputFocused = true
+            case "history":
+                try? await Task.sleep(for: .milliseconds(600))
+                expandedExchanges = []
+            case "menu":
+                try? await Task.sleep(for: .milliseconds(800))
+                wheelOpen = true
+            default: break
             }
             if ProcessInfo.processInfo.environment["OXY_DEBUG_ATTACHMENT"] == "file" {
                 pendingImageData = Data("Local UI review fixture.".utf8)

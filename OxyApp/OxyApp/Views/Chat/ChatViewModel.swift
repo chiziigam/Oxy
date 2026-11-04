@@ -129,7 +129,7 @@ final class ChatViewModel {
         #endif
         await loadHistory(userId: userId)
         #if DEBUG
-        if ProcessInfo.processInfo.environment["OXY_DEBUG_MESSAGES"] == "1" {
+        if ProcessInfo.processInfo.environment["OXY_DEBUG_MESSAGES"] == "1" || PreviewData.isScreen("chat-thread", "history", "composer-typing") {
             let now = Date()
             messages = [
                 Message(dbId: "d1", role: .user, content: "Can you book me a haircut on Saturday?", timestamp: now.addingTimeInterval(-90_000), actions: [], sources: []),
