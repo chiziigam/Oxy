@@ -60,9 +60,7 @@ struct ModelRoutingView: View {
                 .buttonStyle(.app(.primary, fullWidth: false))
                 .disabled(isSaving)
             }
-            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .settingsSurface()
         }
     }
 

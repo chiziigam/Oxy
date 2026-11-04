@@ -646,7 +646,7 @@ struct YourHomeView: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .appCard()
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
             SettingsList {
                 SettingsRow(title: "Room", subtitle: device.room ?? "Not assigned")

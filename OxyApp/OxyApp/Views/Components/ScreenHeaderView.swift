@@ -1,38 +1,31 @@
 import SwiftUI
 
+/// The standard page header: a system back chevron above a large title, as a large-title
+/// navigation bar reads on iOS.
 struct ScreenHeaderView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dynamicTypeSize) private var typeSize
     let title: String
     var onBack: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if typeSize.isAccessibilitySize {
-                HStack {
-                    backButton
-                    Spacer()
-                    sampleLabel
-                }
-                heading
-            } else {
-                HStack(spacing: 10) {
-                    backButton
-                    heading
-                    Spacer(minLength: 0)
-                    sampleLabel
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                backButton
+                Spacer(minLength: 0)
+                sampleLabel
             }
+            .frame(minHeight: onBack == nil ? 8 : 44)
+            heading
+                .padding(.horizontal, AppSpacing.margin)
+                .padding(.bottom, AppSpacing.sm)
         }
-        .padding(.horizontal, AppSpacing.margin)
-        .padding(.vertical, AppSpacing.sm)
-        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.appBackground.ignoresSafeArea(edges: .top))
     }
 
     private var heading: some View {
         Text(title)
-            .font(.screenTitle)
+            .font(.largeTitle.weight(.bold))
             .foregroundStyle(Color.appInk)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
@@ -42,15 +35,16 @@ struct ScreenHeaderView: View {
     private var backButton: some View {
         if let onBack {
             Button {
-                HapticManager.shared.impact(.light)
                 onBack()
             } label: {
-                AppIcon("chevron-left", size: 17)
-                    .foregroundStyle(Color.appInk)
+                Image(systemName: "chevron.backward")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.appAccent)
                     .frame(width: 44, height: 44)
-                    .background(Color.appSurface2, in: Circle())
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.appScale)
+            .buttonStyle(.plain)
+            .padding(.leading, AppSpacing.sm)
             .accessibilityLabel("Back")
         }
     }
@@ -59,8 +53,9 @@ struct ScreenHeaderView: View {
     private var sampleLabel: some View {
         if appState.isDemoSession {
             Text("Sample")
-                .font(.role(.caption, weight: .medium))
+                .font(.caption)
                 .foregroundStyle(Color.appMuted)
+                .padding(.trailing, AppSpacing.margin)
         }
     }
 }

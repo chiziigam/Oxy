@@ -47,7 +47,7 @@ struct YouPage: View {
                         .foregroundStyle(Color.appMuted)
                     TextField("", text: $settings.userName,
                         prompt: Text("Add your name").foregroundStyle(Color.appMuted))
-                        .font(.appBody(22, weight: .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.appInk)
                         .tint(Color.appAccent)
                         .textContentType(.givenName)
@@ -64,16 +64,14 @@ struct YouPage: View {
                 }
             }
 
-            SettingsList {
-                SettingsNavRow(title: "Memory", subtitle: "Notes, and what Adam learned from your photos") { destination = .saved }
-            }
+            // Memory has one entry point: the menu.
 
             if model.isLoading {
                 ProgressView("Loading your details")
                     .font(.appBody(15))
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else if model.failed {
-                ErrorBanner(message: "Couldn't load your details.", onRetry: { Task { await model.load(isDemo: appState.isDemoSession) } })
+                ErrorBanner(message: "Couldn't load your details", onRetry: { Task { await model.load(isDemo: appState.isDemoSession) } })
             } else {
                 let identity = model.context?.profile.identity ?? []
                 let known = areas.filter { !$0.lines.isEmpty && $0.id != "places" }

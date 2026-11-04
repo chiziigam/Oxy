@@ -1,5 +1,19 @@
 # Adam interface — local rebuild candidate
 
+## November 2026 rework (supersedes conflicting lines below)
+
+- Follow Apple's Human Interface Guidelines: system back chevron and large or inline titles,
+  system materials, SF Symbols (AppIcon renders them), semantic text styles, 44pt targets,
+  native Picker / Toggle / List where a custom control adds nothing.
+- No dividers, no bordered cards or rows, no chevrons on rows, no eyebrow labels, no ALL CAPS,
+  no italics, no negative tracking, no mono for ordinary text, no gradients, no decorative pills,
+  no full stops in titles. Separate with spacing; raise only the decision that needs the user.
+- The app opens on the conversation. Now is in the menu and behind one quiet line at the top of
+  the thread when something needs the user or is running.
+- The composer is one translucent capsule: text, then + and talk/send/stop inside it.
+- Feedback: haptics on meaningful moments only; quiet system sounds on send, reply and voice,
+  following the silent switch and the Sounds setting.
+
 ## Design system (implemented November 2026)
 
 One system, defined in `OxyApp/OxyApp/Extensions/AppTheme.swift`. Legacy `oxy*` colours in `Color+Oxy.swift` forward to it; new code uses the `app*` roles only.
