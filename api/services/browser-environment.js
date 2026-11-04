@@ -531,11 +531,24 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
   if (!url || !/^https?:\/\//i.test(String(url))) {
     throw new Error('browser_open needs an absolute http(s) url, or a site it already knows.');
   }
+  const host = siteKeyFromUrl(url);
   const existing = getSession(userId);
+  const openingASearch = String(resolvedVia).startsWith('search:');
+  // Three searches in a row is the loop that never buys anything: it throws away the page it
+  // already has. If we are on this shop's results and nothing has been touched, name the results
+  // and make the agent pick one instead of restarting.
+  if (existing && existing.site === host && openingASearch && (existing.searchOpens || 0) >= 1 && !existing.actedSinceSearch) {
+    const picks = await resultCandidates(existing.page).catch(() => []);
+    const error = new Error(
+      `Already on ${host} results. Click one of these instead of searching again`
+      + (picks.length ? `: ${picks.map(pick => `#${pick.index} "${pick.text}"`).join(', ')}` : '.')
+    );
+    error.code = 'ALREADY_ON_RESULTS';
+    throw error;
+  }
   if (existing) await closeSession(userId);
 
   const { browser, persistentContext, release } = await acquireBrowser(userId);
-  const host = siteKeyFromUrl(url);
   const storageState = await loadStorageState(userId, host).catch(() => null);
 
   // Reusing a stored session IS a credential use, and a stronger one than a password: a live
@@ -576,6 +589,7 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
   const session = createSession(userId, {
     browser, context, page, release, site: host, goal: objective, workflowId, agentTaskId,
     history: [], requestedUrl: url, usedStoredSession: Boolean(storageState),
+    searchOpens: openingASearch ? 1 : 0, actedSinceSearch: false, lastGoodUrl: url,
   });
   let observation = await observePage(page);
   // A consent banner can land after the first dismissal pass; ASOS shows its banner this way.
@@ -603,6 +617,17 @@ async function open(userId, { url, site = '', searchFor = '', objective = '', wo
 async function observe(userId, { includeScreenshot = false } = {}) {
   const session = requireSession(userId);
   return observePage(session.page, { includeScreenshot });
+}
+
+
+// The results on a shop's search page, named so the agent can pick one instead of searching again.
+async function resultCandidates(page) {
+  const seen = await perceive(page).catch(() => ({ elements: [] }));
+  const skip = /^(sort|filter|refine|sign in|my account|basket|help|search|skip|accept|reject|cookie|menu|home)/i;
+  return (seen.elements || [])
+    .map((el, index) => ({ index, text: String(el.text || '').replace(/\s+/g, ' ').trim() }))
+    .filter(entry => entry.text.length >= 18 && entry.text.length <= 120 && !skip.test(entry.text))
+    .slice(0, 5);
 }
 
 function resolveElement(session, elements, elementId) {
@@ -698,8 +723,23 @@ async function act(userId, step = {}) {
 
   if (step.settleMs) await settle(page, Number(step.settleMs));
   else await settleAfterAction(page, kind);
+
+  // A click can land on the browser's own error page (a failed redirect, a dropped connection).
+  // Go back to the last page that worked rather than handing the agent an empty page to explore.
+  let recoveredFrom = null;
+  if (/^chrome-error:\/\//i.test(page.url())) {
+    recoveredFrom = page.url();
+    const back = session.lastGoodUrl || before.url;
+    if (/^https?:\/\//i.test(String(back || ''))) {
+      await page.goto(back, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+      await settle(page, 800);
+    }
+  } else if (/^https?:\/\//i.test(page.url())) {
+    session.lastGoodUrl = page.url();
+  }
   // A banner that is going to appear does so on a new page, so only look again after one.
   if (page.url() !== before.url) await dismissConsent(page, { retry: false }).catch(() => {});
+  session.actedSinceSearch = true;
   session.history = [...(session.history || []), `${kind}${step.elementId != null ? ` #${step.elementId}` : ''}${step.value ? ` "${step.value}"` : ''}`].slice(-40);
   const target = elements[Number(step.elementId)];
   const label = !target?.isInput && !target?.isSelect ? target?.text?.replace(/\s+/g, ' ').trim().slice(0, 80) : null;
@@ -727,6 +767,7 @@ async function act(userId, step = {}) {
       urlBefore: before.url,
       content: before.text.slice(0, 400) !== observation.text.slice(0, 400),
     },
+    ...(recoveredFrom ? { recoveredFrom } : {}),
   };
 }
 
