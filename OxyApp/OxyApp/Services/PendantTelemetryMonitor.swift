@@ -37,6 +37,10 @@ final class PendantTelemetryMonitor {
         self.source = source
     }
 
+    /// True while the only readings available are simulated. The UI must not present these
+    /// as live hardware fact.
+    var isSimulated: Bool { source is MockPendantTelemetrySource }
+
     func start() {
         guard task == nil else { return }
         task = Task { [weak self] in

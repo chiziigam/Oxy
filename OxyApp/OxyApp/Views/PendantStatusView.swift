@@ -25,8 +25,12 @@ struct PendantStatusView: View {
 
             // Live numbers and behaviour only mean something once a device is linked.
             if pendant.isConnected {
-                SettingsGroup(title: "Live") {
-                    DeviceStatusCard(telemetry: telemetry)
+                // Only real CoreBluetooth readings belong here. The build's stand-in source
+                // used to render a battery and latency that no hardware reported.
+                if !telemetry.isSimulated {
+                    SettingsGroup(title: "Live") {
+                        DeviceStatusCard(telemetry: telemetry)
+                    }
                 }
                 hardwareConfig
             } else {
