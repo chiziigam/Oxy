@@ -41,6 +41,12 @@ final class LocationManager: NSObject, @preconcurrency CLLocationManagerDelegate
         }
     }
 
+    /// Signing out stops background wake-ups as well as foreground updates.
+    func stop() {
+        manager.stopMonitoringSignificantLocationChanges()
+        manager.stopUpdatingLocation()
+    }
+
     func requestLocation() {
         if isAuthorized {
             manager.requestLocation()

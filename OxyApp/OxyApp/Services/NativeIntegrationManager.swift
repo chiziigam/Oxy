@@ -195,6 +195,12 @@ final class NativeIntegrationManager {
 
     private init() {}
 
+    func shutdown() {
+        activeUserId = nil
+        locationSyncTask?.cancel()
+        locationSyncTask = nil
+    }
+
     func bootstrap(userId: String) {
         guard !userId.isEmpty else { return }
         activeUserId = userId
@@ -498,8 +504,10 @@ final class NativeIntegrationManager {
     }
 
     func markCurrentLocationAsHome(userId: String) async {
-        LocationManager.shared.requestLocation()
-        guard let location = LocationManager.shared.locationDict else { return }
+        guard let location = await LocationManager.shared.currentLocationForLocalRequest() else {
+            print("[Native] Couldn't get a location for home.")
+            return
+        }
         var settings = loadSettings()
         settings.homeLatitude = location["latitude"]
         settings.homeLongitude = location["longitude"]
@@ -2825,13 +2833,10 @@ final class NativeIntegrationManager {
             || lower.range(of: #"\b(at|by)\s+\d{1,2}(?::\d{2})?\s*(am|pm)?\b"#, options: .regularExpression) != nil
             || lower.range(of: #"\b\d{1,2}(?::\d{2})?\s*(am|pm)\b"#, options: .regularExpression) != nil
             else { return false }
-        return lower.contains("that")
-            || lower.contains("it")
-            || lower.contains("reminder")
-            || lower.hasPrefix("actually")
-            || lower.hasPrefix("make ")
-            || lower.hasPrefix("change ")
-            || lower.hasPrefix("move ")
+        // "is it going to rain tomorrow" must not reschedule the last reminder.
+        let updateVerb = lower.range(of: #"\b(move|change|make|push|set|reschedule)\b"#, options: .regularExpression) != nil
+        let refersToReminder = lower.range(of: #"\b(it|that|the reminder|my reminder)\b"#, options: .regularExpression) != nil
+        return (updateVerb && refersToReminder) || lower.hasPrefix("actually")
     }
 
     private func reminderFollowUpDate(in message: String) -> Date? {
@@ -3079,6 +3084,8 @@ final class PendantBLEManager: NSObject {
     }
 
     private(set) var connectionState: ConnectionState = .disconnected
+    /// False after an explicit unpair: a disconnected peripheral must not silently reconnect.
+    private var shouldReconnect = true
     var isConnected: Bool { connectionState == .connected }
     private(set) var lastError: String?
     var peripheralName: String? { peripheral?.name }
@@ -3143,6 +3150,7 @@ final class PendantBLEManager: NSObject {
     }
 
     func startScan() {
+        shouldReconnect = true
         guard central.state == .poweredOn else { return }
         lastError = nil
         connectionState = .scanning
@@ -3160,6 +3168,7 @@ final class PendantBLEManager: NSObject {
 
     /// Disconnects and forgets the currently paired pendant.
     func unpair() {
+        shouldReconnect = false
         if isCurrentBeaconTrustedForDoorwayPresence {
             UserDefaults.standard.removeObject(forKey: Self.doorwayPresenceBeaconKey)
         }
@@ -3189,7 +3198,7 @@ final class PendantBLEManager: NSObject {
 extension PendantBLEManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         print("[Pendant] CBCentralManager state: \(central.state.rawValue)")
-        if central.state == .poweredOn { startScan() }
+        if central.state == .poweredOn, shouldReconnect { startScan() }
     }
 
     func centralManager(_ central: CBCentralManager,
@@ -3226,7 +3235,7 @@ extension PendantBLEManager: CBCentralManagerDelegate {
         txCharacteristic = nil
         self.peripheral = nil
         NotificationCenter.default.post(name: PendantBLEManager.didDisconnect, object: nil)
-        startScan()
+        if shouldReconnect { startScan() }
     }
 
     func centralManager(_ central: CBCentralManager,
@@ -3238,7 +3247,7 @@ extension PendantBLEManager: CBCentralManagerDelegate {
         rxCharacteristic = nil
         txCharacteristic = nil
         self.peripheral = nil
-        startScan()
+        if shouldReconnect { startScan() }
     }
 }
 

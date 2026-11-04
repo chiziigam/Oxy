@@ -97,6 +97,8 @@ final class AppState {
     func logout() {
         Task { @MainActor in
             HouseholdSoundMonitor.shared.stopAndForgetUser()
+            NativeIntegrationManager.shared.shutdown()
+            LocationManager.shared.stop()
         }
         keychain.delete(key: "session_token")
         keychain.delete(key: "user_id")
