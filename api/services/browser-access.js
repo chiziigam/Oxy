@@ -535,10 +535,19 @@ function formatLoginValue(field, credential) {
   return null;
 }
 
-async function fillLoginCredential(session, credential, onProgress = () => {}) {
+// A stored password belongs to one site. An embedded frame from anywhere else must never
+// receive it, however much its inputs look like a login form.
+function frameInCredentialScope(frameUrl, site) {
+  if (!site) return true;
+  const frameSite = siteKeyFromUrl(frameUrl);
+  return Boolean(frameSite) && siteInScope(frameSite, [site]);
+}
+
+async function fillLoginCredential(session, credential, onProgress = () => {}, site = null) {
   const page = session.page;
   const done = new Set();
   for (const frame of page.frames()) {
+    if (!frameInCredentialScope(frame.url(), site)) continue;
     const inputs = await frameInputs().enumeratePaymentInputs(frame);
     for (const input of inputs) {
       const field = classifyLoginInput(input.hint);
@@ -626,7 +635,7 @@ async function signInWithStoredCredential(userId, { site: requestedSite = null, 
     const credential = await getVaultCredential(getSupabase(), userId, site);
     if (!credential) return { type: 'no_credential', site };
 
-    await fillLoginCredential(session, credential, onProgress);
+    await fillLoginCredential(session, credential, onProgress, site);
     await settle(session.page, 800);
     const clickedLabel = await findAndClickSignInButton(session.page);
 
@@ -677,11 +686,10 @@ async function fillReauthLogin(userId, { username, password, saveToVault = false
       return { type: 'error', error: "Couldn't find a sign-in form on the current page." };
     }
     const credential = { username: String(username), password: trimmedPassword };
-    await fillLoginCredential(session, credential, onProgress);
+    const site = siteKeyFromUrl(session.page.url());
+    await fillLoginCredential(session, credential, onProgress, site);
     await settle(session.page, 800);
     const clickedLabel = await findAndClickSignInButton(session.page);
-
-    const site = siteKeyFromUrl(session.page.url());
     await recordTaskStep(getSupabase(), {
       taskId: session.reauthTaskId || 'unknown',
       userId,
@@ -850,6 +858,7 @@ module.exports = {
   classifyLoginInput,
   formatLoginValue,
   fillLoginCredential,
+  frameInCredentialScope,
   loginCredentialFieldsPresent,
   findAndClickSignInButton,
   LOGIN_INPUT_CLASSIFIERS,

@@ -55,3 +55,12 @@ test('siteInScope: rejects redirect to an unrelated site, in the single-entry-ar
   assert.equal(siteInScope('paypal.com', ['delta.com']), false);
   assert.equal(siteInScope('evil.com', ['delta.com']), false);
 });
+
+test('a stored password is only filled into frames on the credential’s own site', () => {
+  const { frameInCredentialScope } = require('../../api/services/browser-access');
+  assert.equal(frameInCredentialScope('https://www.delta.com/login', 'delta.com'), true);
+  assert.equal(frameInCredentialScope('https://accounts.delta.com/signin', 'delta.com'), true);
+  assert.equal(frameInCredentialScope('https://evil.example/login', 'delta.com'), false);
+  assert.equal(frameInCredentialScope('about:blank', 'delta.com'), false);
+  assert.equal(frameInCredentialScope('https://evil.example/login', null), true);
+});
