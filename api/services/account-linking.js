@@ -3,10 +3,10 @@
 // The one thing that cannot be skipped: an address alone is not proof of ownership. A provider
 // that has *verified* the address is.
 //
-// So: if a password account exists on that address and its email was never verified, the merge
-// still happens — the provider has just proved what that account never could — but that account's
-// password stops working in the same step. Otherwise a squatter who registered the address first
-// would inherit the real owner's sign-in.
+// So the merge trusts a *verified* address. A password account on that address is merged into and
+// keeps its password: the person who can receive mail for the address can always reset that
+// password, so a squatter who registered it first has no lasting hold. Retiring the password
+// instead would lock out the actual owner, which is a worse failure than the one it prevents.
 
 async function findLinkedUserId(supabase, provider, subject) {
   try {
@@ -51,7 +51,7 @@ async function accountByEmail(supabase, email) {
  */
 async function resolveOrMergeAccount(supabase, {
   provider, subject, email = null, emailVerified = false,
-  deriveUserId, newPasswordHash
+  deriveUserId
 } = {}) {
   const linkedUserId = await findLinkedUserId(supabase, provider, subject);
   if (linkedUserId) return { userId: linkedUserId, created: false, merged: false, relinked: true };
@@ -60,18 +60,15 @@ async function resolveOrMergeAccount(supabase, {
     const existing = await accountByEmail(supabase, email);
     if (existing?.user_id) {
       const patch = {};
-      // The provider proved the address. If this account had never proved it, take that proof —
-      // and retire the password nobody verified, so the merge cannot hand the account over.
-      if (existing.email_verified !== true) {
-        patch.email_verified = true;
-        patch.password_hash = newPasswordHash();
-      }
+      // The provider proved the address, so record that. The password stays as it was: the owner
+      // of a verified address can reset it at any time, which is what closes the squatting case.
+      if (existing.email_verified !== true) patch.email_verified = true;
       if (Object.keys(patch).length) {
         patch.updated_at = new Date().toISOString();
         await supabase.from('users').update(patch).eq('user_id', existing.user_id);
       }
       await linkAccount(supabase, existing.user_id, provider, subject);
-      return { userId: existing.user_id, created: false, merged: true, relinked: false, passwordRetired: Boolean(patch.password_hash) };
+      return { userId: existing.user_id, created: false, merged: true, relinked: false };
     }
   }
 

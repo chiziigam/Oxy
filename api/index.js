@@ -4503,8 +4503,7 @@ app.post('/auth/apple', loginRateLimiter, async (req, res) => {
       subject: identity.sub,
       email: identity.email,
       emailVerified: identity.emailVerified === true,
-      deriveUserId: apple.userIdForSubject,
-      newPasswordHash: () => hashPassword(crypto.randomBytes(32).toString('hex'))
+      deriveUserId: apple.userIdForSubject
     });
 
     const userId = resolved.userId;
@@ -4547,6 +4546,30 @@ app.post('/auth/apple', loginRateLimiter, async (req, res) => {
   } catch (error) {
     log('error', 'auth.apple.error', { error: error.message });
     res.status(500).json({ error: 'Sign in with Apple did not complete. Try again.' });
+  }
+});
+
+// Set a password while already signed in. Needed by anyone whose account was created through a
+// provider and never had one, and by anyone who wants a second way in. The session is the proof:
+// no old password is asked for, because an account made with Apple has none to give.
+app.post('/auth/set-password', loginRateLimiter, async (req, res) => {
+  try {
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const password = req.body?.password;
+    if (typeof password !== 'string' || password.length < 8 || password.length > MAX_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be between 8 and ${MAX_PASSWORD_LENGTH} characters.` });
+    }
+    const { error } = await supabase
+      .from('users')
+      .update({ password_hash: hashPassword(password), updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    if (error) throw error;
+    log('info', 'auth.set_password', { userId });
+    res.json({ success: true });
+  } catch (error) {
+    log('error', 'auth.set_password.error', { error: error.message });
+    res.status(500).json({ error: 'Could not set that password.' });
   }
 });
 
