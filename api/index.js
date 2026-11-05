@@ -7327,6 +7327,42 @@ function triageEmailsForRequest(emails = [], message = '') {
   };
 }
 
+// A question about what an email SAYS (times, codes, amounts, "read it") needs the body. The
+// triage summary only carries a 220-character preview, which is why Adam answered "I only saw
+// the start of the confirmation" until the user pushed it to read the email again.
+function isEmailDetailRequest(message = '') {
+  const text = String(message || '');
+  if (!text) return false;
+  return /\b(when|what time|what.{0,20}(say|says|said)|details?|arriv\w*|depart\w*|leave|platform|journey|booking (?:ref|reference|number)|confirmation (?:code|number)|collection code|reference|read (?:it|that|the (?:full |whole )?(?:email|mail|message))|open (?:it|that|the (?:email|mail))|full (?:email|mail)|what does (?:it|the (?:email|mail)) (?:say|mean))\b/i.test(text);
+}
+
+const EMAIL_DETAIL_EXCERPT_MAX = 3000;
+
+function emailBodyExcerpt(email = {}, max = EMAIL_DETAIL_EXCERPT_MAX) {
+  const body = stripTrackingUrlsAndBoilerplate(email.body || email.text || '');
+  const text = body || stripTrackingUrlsAndBoilerplate(email.snippet || '');
+  const complete = Boolean(body) && body.length <= max;
+  const excerpt = text.length > max ? `${text.slice(0, max - 1).trim()}…` : text;
+  return { excerpt, complete, previewOnly: !body };
+}
+
+function emailDetailContextText(emails = [], message = '', limit = 2) {
+  const ranked = (Array.isArray(emails) ? emails : [])
+    .map((email, index) => ({ email, index, score: scoreEmailCandidate(email, message) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, limit);
+  const lines = ['Email contents (the full text of the email, not a preview; answer from it):'];
+  for (const { email } of ranked) {
+    const normalized = normalizeEmailForSynthesis(email);
+    const { excerpt, complete, previewOnly } = emailBodyExcerpt(email);
+    lines.push(`- From ${normalized.sender} | Subject ${normalized.subject}${normalized.date ? ` | Date ${normalized.date}` : ''}`);
+    lines.push(previewOnly
+      ? `  Only a short preview was available: ${excerpt || '(empty)'}`
+      : `  ${excerpt}${complete ? '' : ' [truncated]'}`);
+  }
+  return { text: lines.join('\n'), ranked };
+}
+
 function emailTriageContextText(triage) {
   const lines = [`Email triage: reviewed ${triage.total} candidate email${triage.total === 1 ? '' : 's'}.`];
   if (triage.primary.length) {
@@ -7494,6 +7530,16 @@ function buildStructuredDataSummary(entry, message = '') {
   const result = entry?.result || {};
   if (entry?.action === 'get_emails' || entry?.action === 'search_emails') {
     if (!Array.isArray(result.emails) || result.emails.length === 0) return { text: result.text || 'No emails found.', items: [] };
+    if (isEmailDetailRequest(message)) {
+      const detail = emailDetailContextText(result.emails, message);
+      return {
+        text: detail.text,
+        items: detail.ranked.map(({ email }) => {
+          const normalized = normalizeEmailForSynthesis(email);
+          return { sender: normalized.sender, subject: normalized.subject, date: normalized.date, snippet: emailBodyExcerpt(email).excerpt };
+        })
+      };
+    }
     const triage = triageEmailsForRequest(result.emails, message);
     const items = triage.primary.map(({ sender, subject, date, snippet, score, category, signals }) => ({
       sender,
@@ -10767,6 +10813,8 @@ module.exports.shouldIgnoreModelAuthoredActions = shouldIgnoreModelAuthoredActio
 module.exports.shouldPersistChatTurn = shouldPersistChatTurn;
 module.exports.isBroadEmailTriageRequest = isBroadEmailTriageRequest;
 module.exports.triageEmailsForRequest = triageEmailsForRequest;
+module.exports.isEmailDetailRequest = isEmailDetailRequest;
+module.exports.buildStructuredDataSummary = buildStructuredDataSummary;
 module.exports.emailTriageSignals = emailTriageSignals;
 module.exports.normalizeActionResultsForClient = normalizeActionResultsForClient;
 module.exports.agenticFailurePayload = agenticFailurePayload;

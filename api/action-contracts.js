@@ -215,6 +215,7 @@ const ACTION_CONTRACTS = {
     risk: 'low',
     required: ['query'],
     inputExample: { query: 'search term', max_results: 5 },
+    guidance: 'Search broadly: use the sender or one distinctive word (for example "trainpal", "ticket", "L&G"), not a long phrase or an exact subject, and add no date filter unless the user gave one. If a search finds nothing, retry once with a shorter or different term (sender name only, or a related word) before telling the user you cannot see it. When the user asks what an email says (times, codes, amounts, "read it"), the full text of the best matches is returned with the result; answer from it, and never say you only saw the start of an email.',
     successSummary: 'Emails searched',
     failureSummary: 'Email search failed',
     confirmation: 'none',
