@@ -4495,18 +4495,21 @@ app.post('/auth/apple', loginRateLimiter, async (req, res) => {
       return res.status(401).json({ error: error.message });
     }
 
-    const userId = apple.userIdForSubject(identity.sub);
-    let account = await getUserAccount(userId);
-    let created = false;
+    // One person, one account: a provider sign-in lands on the account they already have when the
+    // provider proved the address, rather than making a second one they forget about.
+    const { resolveOrMergeAccount } = require('./services/account-linking');
+    const resolved = await resolveOrMergeAccount(supabase, {
+      provider: 'apple',
+      subject: identity.sub,
+      email: identity.email,
+      emailVerified: identity.emailVerified === true,
+      deriveUserId: apple.userIdForSubject,
+      newPasswordHash: () => hashPassword(crypto.randomBytes(32).toString('hex'))
+    });
 
-    if (!account) {
-      // An email that already belongs to a password account is not silently merged: linking by
-      // an address Apple has not proven would be a way into someone else's account.
-      if (identity.email && await getUserAccountByEmail(identity.email)) {
-        return res.status(409).json({
-          error: 'That email already has an account. Sign in with your password instead.'
-        });
-      }
+    const userId = resolved.userId;
+    let created = resolved.created;
+    if (created) {
       const now = new Date().toISOString();
       const { error: insertError } = await supabase.from('users').insert({
         user_id: userId,
@@ -4518,9 +4521,10 @@ app.post('/auth/apple', loginRateLimiter, async (req, res) => {
         updated_at: now
       });
       if (insertError && !/duplicate key/i.test(insertError.message)) throw insertError;
-      account = await getUserAccount(userId);
-      created = true;
+      const { linkAccount } = require('./services/account-linking');
+      await linkAccount(supabase, userId, 'apple', identity.sub);
     }
+    const account = await getUserAccount(userId);
 
     if (fullName) {
       await supabase.from('preferences').upsert(
@@ -4529,13 +4533,16 @@ app.post('/auth/apple', loginRateLimiter, async (req, res) => {
       ).then(() => {}, () => {});
     }
 
-    log('info', 'auth.apple.login', { userId, created, privateEmail: identity.isPrivateEmail });
+    log('info', 'auth.apple.login', {
+      userId, created, merged: resolved.merged === true, privateEmail: identity.isPrivateEmail
+    });
     res.json({
       success: true,
       token: createSessionToken(userId),
       userId,
       email: account?.email || identity.email || null,
-      created
+      created,
+      merged: resolved.merged === true
     });
   } catch (error) {
     log('error', 'auth.apple.error', { error: error.message });
