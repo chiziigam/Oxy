@@ -67,6 +67,14 @@ function hasExplicitUserAuthorization(action, userMessage) {
   return targetWords.some(word => messageWords.has(word));
 }
 
+// A person tapping a device's own control in the app is their explicit request for that one command.
+// It authorizes only contracts that opt in, never money, and never in guard mode (checked by caller).
+function hasDirectControlAuthorization(type, contract, context = {}) {
+  return context.directControl === true
+    && contract?.directControlAuthorizes === true
+    && !MONEY_ACTION_TYPES.has(type);
+}
+
 async function safeLogAction(trace, label, fn) {
   try {
     if (trace) await trace.run(label, fn);
@@ -108,7 +116,7 @@ function createActionExecution({
         (context.guardMode && !isReadOnlyAction(type)) ||
         ((contract?.executionMode === 'review' || contract?.reviewWhen?.(action.input || {})) && !(
           contract.explicitRequestAuthorizes && hasExplicitUserAuthorization(action, context.userMessage)
-        ))
+        ) && !hasDirectControlAuthorization(type, contract, context))
       ) && !context.bypassReview) {
         const parked = await setPendingAction(userId, action, context);
         const cardInfo = MONEY_ACTION_TYPES.has(type) ? await getLinkedCardInfo(userId) : null;
@@ -186,4 +194,4 @@ function createActionExecution({
   };
 }
 
-module.exports = { createActionExecution, hasExplicitUserAuthorization, unavailableActionResult };
+module.exports = { createActionExecution, hasDirectControlAuthorization, hasExplicitUserAuthorization, unavailableActionResult };

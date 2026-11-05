@@ -80,6 +80,9 @@ function formatProviderFailure(rawError = '') {
   if (/timeout|timed out|aborted|deadline exceeded/i.test(error)) {
     return 'That took too long. Try again.';
   }
+  if (/that's as far as I can go today/i.test(error)) {
+    return "That's as far as I can go today. It resets tomorrow.";
+  }
   return 'Adam could not answer right now. Try again later.';
 }
 

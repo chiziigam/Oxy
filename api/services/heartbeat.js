@@ -1,13 +1,22 @@
 'use strict';
 
 // Adam's heartbeat: runs the proactive sweep (reminders, watches, briefings, deliveries) on a timer.
-// Off unless OXY_HEARTBEAT=on, so a laptop running the server never sweeps the live database.
+// On in production unless OXY_HEARTBEAT=off, so a laptop running the server never sweeps the live
+// database, and a Fly machine does even if the flag was left out of the environment.
 
 const DEFAULT_INTERVAL_MINUTES = 5;
 const FIRST_RUN_DELAY_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function heartbeatEnabled(env = process.env) {
+  const flag = String(env.OXY_HEARTBEAT || '').trim().toLowerCase();
+  if (flag === 'off' || flag === '0' || flag === 'false') return false;
+  if (flag === 'on' || flag === '1' || flag === 'true') return true;
+  return String(env.NODE_ENV || '').toLowerCase() === 'production';
+}
 
 function heartbeatSettings(env = process.env) {
-  const enabled = String(env.OXY_HEARTBEAT || '').toLowerCase() === 'on';
+  const enabled = heartbeatEnabled(env);
   const minutes = Number(env.OXY_HEARTBEAT_MINUTES);
   const intervalMinutes = Number.isFinite(minutes) && minutes >= 1 ? minutes : DEFAULT_INTERVAL_MINUTES;
   return { enabled, intervalMs: intervalMinutes * 60 * 1000 };
@@ -57,4 +66,38 @@ function startHeartbeat({
   return { tick, stop() { timers.clearTimeout(first); timers.clearInterval(repeat); } };
 }
 
-module.exports = { heartbeatSettings, retentionSettings, startHeartbeat, DEFAULT_INTERVAL_MINUTES };
+// Daily retention. Same overlap guard as the heartbeat. The sweep is idempotent, so a restart
+// that runs it again the same day only deletes rows that are already due.
+function startDailyJob({
+  job,
+  intervalMs = DAY_MS,
+  firstRunDelayMs = 2 * 60 * 1000,
+  logger = console,
+  label = 'retention',
+  timers = { setTimeout, setInterval, clearTimeout, clearInterval }
+} = {}) {
+  let running = false;
+
+  async function tick() {
+    if (running) return { skipped: true };
+    running = true;
+    try {
+      const summary = await job(logger);
+      logger.log?.(`[${label}] ${JSON.stringify(summary)}`);
+      return { summary };
+    } catch (error) {
+      logger.error?.(`[${label}] failed: ${error.message}`);
+      return { error };
+    } finally {
+      running = false;
+    }
+  }
+
+  const first = timers.setTimeout(tick, firstRunDelayMs);
+  const repeat = timers.setInterval(tick, intervalMs);
+  first.unref?.();
+  repeat.unref?.();
+  return { tick, stop() { timers.clearTimeout(first); timers.clearInterval(repeat); } };
+}
+
+module.exports = { heartbeatSettings, heartbeatEnabled, retentionSettings, startHeartbeat, startDailyJob, DEFAULT_INTERVAL_MINUTES, DAY_MS };

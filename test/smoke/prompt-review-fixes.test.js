@@ -49,7 +49,7 @@ test('attachments guidance is chat-only', () => {
 });
 
 test('spoken replies avoid lists, URLs and symbols', () => {
-  assert.match(CORE_SYSTEM_PROMPT, phrase('nothing that sounds wrong out loud, like a list, a URL or a symbol'));
+  assert.match(CORE_SYSTEM_PROMPT, phrase('nothing that sounds wrong out loud, like markdown, a list, a URL or a symbol'));
 });
 
 test('the pinned refusal line stays verbatim and is immediately qualified, on every surface that has it', () => {

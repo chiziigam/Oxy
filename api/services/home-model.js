@@ -70,7 +70,39 @@ function normalizeWatches(rows = [], now) {
     .slice(0, 12);
 }
 
-function buildHomeModel({ displays = [], presence = null, scheduledRows = [], observations = [], now = new Date() } = {}) {
+// Smart-home controls arrive already described by their connector (see connectors/home-assistant.js
+// describeEntity). Home only keeps the shape stable and the source state explicit: "not_configured"
+// when no smart-home server is set up, "unavailable" when it did not answer, "ok" otherwise.
+const CONTROL_SOURCE_STATES = Object.freeze(['ok', 'not_configured', 'unavailable']);
+
+function normalizeControl(raw) {
+  const id = clean(raw?.id, 120);
+  if (!id) return null;
+  const number = value => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  return {
+    id,
+    name: clean(raw?.name, 60) || id,
+    room: clean(raw?.room, 40) || null,
+    kind: clean(raw?.kind, 30) || 'device',
+    state: clean(raw?.state, 40) || 'unknown',
+    available: raw?.available === true,
+    isOn: raw?.isOn === true,
+    brightness: number(raw?.brightness),
+    temperature: number(raw?.temperature),
+    targetTemperature: number(raw?.targetTemperature),
+    minTemperature: number(raw?.minTemperature),
+    maxTemperature: number(raw?.maxTemperature),
+    capabilities: Array.isArray(raw?.capabilities) ? raw.capabilities.map(cap => clean(cap, 20)).filter(Boolean) : [],
+    updatedAt: validDate(raw?.updatedAt)?.toISOString() || null
+  };
+}
+
+function normalizeControlSource(source) {
+  const status = CONTROL_SOURCE_STATES.includes(source?.status) ? source.status : 'not_configured';
+  return { status, detail: clean(source?.detail, 140) || null };
+}
+
+function buildHomeModel({ displays = [], presence = null, scheduledRows = [], observations = [], controls = null, now = new Date() } = {}) {
   const devices = displays.map(display => normalizeDevice(display, now)).filter(device => device.id);
   const rooms = new Map();
   for (const device of devices) {
@@ -92,8 +124,10 @@ function buildHomeModel({ displays = [], presence = null, scheduledRows = [], ob
     })),
     unassignedDevices: devices.filter(device => !device.room),
     watches: normalizeWatches(scheduledRows, now),
-    observations: sensed
+    observations: sensed,
+    controls: (controls?.controls || []).map(normalizeControl).filter(Boolean),
+    controlSource: normalizeControlSource(controls)
   };
 }
 
-module.exports = { ONLINE_WINDOW_MS, SOURCES, normalizeDevice, normalizeObservation, buildHomeModel };
+module.exports = { ONLINE_WINDOW_MS, SOURCES, CONTROL_SOURCE_STATES, normalizeDevice, normalizeObservation, normalizeControl, buildHomeModel };

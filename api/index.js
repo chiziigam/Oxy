@@ -138,6 +138,7 @@ const {
   getAuthenticatedUserId,
   hashPassword,
   requireSessionAuth,
+  sessionRevocationDecision,
   signPayload,
   verifyPassword,
   verifySignedPayload
@@ -161,6 +162,13 @@ const connectorState = require('./services/connector-state');
 const clientIp = require('./services/client-ip');
 const usageMeter = require('./services/usage-meter');
 const userBudget = require('./services/user-budget');
+const spendCap = require('./services/spend-cap');
+const {
+  ttsPreviewLimit,
+  geocodeLimit,
+  homeAddressLimit,
+  proactiveRunLimit
+} = require('./services/cost-route-limits');
 const researchSynthesis = require('./services/research-synthesis');
 const homeModel = require('./services/home-model');
 const agentProjectRuntime = require('./services/agent-project-runtime');
@@ -1002,14 +1010,18 @@ app.use((req, res, next) => {
           .select('token_version')
           .eq('user_id', userId)
           .maybeSingle();
-        if (lookupError) throw lookupError;
-        // A deleted account has no row, and its old tokens must stop working with it.
-        if (!userRow || userRow.token_version !== tokenVersion) {
-          log('warn', 'auth.middleware.rejected', { reason: userRow ? 'token_version_mismatch' : 'account_missing', userId });
-          return res.status(401).json({ error: 'Session expired' });
+        const decision = sessionRevocationDecision({ lookupError, userRow, tokenVersion });
+        if (!decision.ok) {
+          log('warn', 'auth.middleware.rejected', {
+            reason: lookupError ? 'token_version_lookup_failed' : (userRow ? 'token_version_mismatch' : 'account_missing'),
+            userId
+          });
+          return res.status(decision.status).json({ error: decision.error });
         }
       } catch (e) {
         log('warn', 'auth.middleware.token_version_check_failed', { error: e.message });
+        const decision = sessionRevocationDecision({ lookupError: e, userRow: null, tokenVersion });
+        return res.status(decision.status).json({ error: decision.error });
       }
     }
     next();
@@ -4771,7 +4783,7 @@ app.post('/auth/verify-email', async (req, res) => {
   }
 });
 
-app.post('/process-audio', upload.single('audio'), async (req, res) => {
+app.post('/process-audio', upload.single('audio'), chatUsageMeter, async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file received.' });
   }
@@ -4796,6 +4808,13 @@ app.post('/process-audio', upload.single('audio'), async (req, res) => {
     }
     res.write(`data: ${scrubbedSse(obj)}\n\n`);
   };
+
+  usageMeter.bindUser(userId);
+  if (spendCap.status(userId).blocked) {
+    sse({ type: 'response', text: spendCap.USER_MESSAGE, actions: [], tasks: [] });
+    sse({ type: 'done' });
+    return res.end();
+  }
 
   try {
     const [userText, context] = await Promise.all([
@@ -4972,7 +4991,7 @@ app.post('/images/generate', imageRateLimiter, upload.single('image'), async (re
   }
 });
 
-app.post('/chat-with-image', imageRateLimiter, upload.single('image'), async (req, res) => {
+app.post('/chat-with-image', imageRateLimiter, upload.single('image'), chatUsageMeter, async (req, res) => {
   try {
     const userId = req.body.userId;
     const message = (req.body.message || '').trim();
@@ -4983,6 +5002,10 @@ app.post('/chat-with-image', imageRateLimiter, upload.single('image'), async (re
     if (!requireMatchingUser(req, res, userId)) return;
     if (!req.file) return res.status(400).json({ error: 'file is required.' });
     if (!message) return res.status(400).json({ error: 'message is required.' });
+    usageMeter.bindUser(userId);
+    if (spendCap.status(userId).blocked) {
+      return res.json({ text: spendCap.USER_MESSAGE, actions: [] });
+    }
 
     const isImage = (req.file.mimetype || '').startsWith('image/');
     const fileLabel = isImage ? 'image' : 'file';
@@ -5654,7 +5677,7 @@ app.post('/emails/action-plan', async (req, res) => {
   }
 });
 
-app.post('/proactive/:userId/run', async (req, res) => {
+app.post('/proactive/:userId/run', proactiveRunLimit, async (req, res) => {
   try {
     const { userId } = req.params;
     if (!requireMatchingUser(req, res, userId)) return;
@@ -5678,7 +5701,7 @@ app.all('/proactive/sweep', async (req, res) => {
   }
 });
 
-app.post('/tts-preview', async (req, res) => {
+app.post('/tts-preview', ttsPreviewLimit, async (req, res) => {
   try {
     const { voice = 'Aoede', text = 'Hi, it is lovely to meet you. This is how I sound.' } = req.body || {};
     console.log(`[audio][backend:tts-preview] request voice=${voice} chars=${String(text || '').trim().length}`);
@@ -6460,6 +6483,10 @@ function emptyProactiveSummary() {
 async function runProactiveForUser(userId, logger = console, now = new Date()) {
   const summary = emptyProactiveSummary();
   summary.usersScanned = 1;
+  if (spendCap.status(userId).blocked) {
+    logger.warn?.(`[spend] skipping proactive model work for ${userId}`);
+    return summary;
+  }
   try {
     const nativeContext = await getLatestNativeContext(userId);
     const [briefing, followUp, contextWatchResult, offer] = await Promise.all([
@@ -6504,6 +6531,26 @@ async function runSavedGoal(userId, {
   now = new Date(),
   deviceType = 'ambient_home',
 } = {}) {
+  if (!usageMeter.currentTurn()) {
+    return usageMeter.runWithMeter((turn) => {
+      turn.userId = userId;
+      return runSavedGoal(userId, { title, instruction, metadata, maxIterations, now, deviceType });
+    });
+  }
+  if (spendCap.status(userId).blocked) {
+    return {
+      result: {
+        spoken: spendCap.USER_MESSAGE,
+        agentTrace: { status: 'error', spendCapped: true, lastError: 'daily spend cap' }
+      },
+      persistedTask: null,
+      runtimeSession: null,
+      waiting: false,
+      failed: true,
+      completed: false,
+      spendCapped: true
+    };
+  }
   const persistedTask = await delegatedRunLifecycle.create(userId, title, { autonomy: 'Active', metadata });
   try {
   const claimedTask = await delegatedRunLifecycle.claimStart(userId, persistedTask.id, {
@@ -6576,6 +6623,16 @@ async function runScheduledTasksForUser(userId, logger = console, now = new Date
   for (const due of dueTasks.slice(0, 3)) {
     const staleReason = scheduledTasks.staleScheduledReason(due, now);
     if (staleReason) {
+      if (staleReason === 'missed') {
+        const notice = scheduledTasks.missedReminderNotice(due);
+        await createBriefing(userId, {
+          kind: notice.kind,
+          title: notice.title,
+          body: notice.body,
+          source: 'agent',
+          metadata: { scheduledTaskId: due.id, status: 'missed' }
+        }).catch(error => logger.warn?.(`[scheduled] missed-reminder notice failed for ${due.id}: ${error.message}`));
+      }
       await scheduledTasks.completeScheduledTask(due, now).catch(() => {});
       logger.log?.(`[scheduled] closed ${staleReason} task ${due.id} (${due.title}) without running it`);
       continue;
@@ -6599,6 +6656,11 @@ async function runScheduledTasksForUser(userId, logger = console, now = new Date
       const { result, waiting, failed } = run;
       persistedTask = run.persistedTask;
       runtimeSession = run.runtimeSession;
+      if (run.spendCapped) {
+        await scheduledTasks.deferScheduledTask(claimed, now);
+        logger.warn?.(`[spend] skipped scheduled task ${claimed.id} for ${userId}`);
+        continue;
+      }
       // Re-read the row: the run may have written a real observation, and that recorded
       // verdict outranks whatever marker the model put in its answer.
       const { data: afterRun } = await supabase.from('scheduled_tasks')
@@ -6759,21 +6821,39 @@ async function runProactiveSweep(logger = console) {
     try {
       // Same background runner the scheduler uses, so a routine run now gets a durable task,
       // a runtime session and the user's model routing rather than running invisibly.
-      const { result, completed } = await runSavedGoal(routine.user_id, {
+      const run = await runSavedGoal(routine.user_id, {
         title: routine.name || 'Routine',
         instruction: routine.prompt,
         metadata: { routineId: routine.id, routineName: routine.name || null }
       });
-      const status = result?.agentTrace?.status;
-      outcome = completed
-        ? { success: true }
-        : { success: false, error: result?.agentTrace?.lastError || result?.spoken || `Routine stopped (${status || 'unknown'}) before finishing.` };
+      if (run.spendCapped) {
+        outcome = { success: false, spendCapped: true, error: 'daily spend cap' };
+      } else {
+        const { result, completed } = run;
+        const status = result?.agentTrace?.status;
+        outcome = completed
+          ? { success: true }
+          : { success: false, error: result?.agentTrace?.lastError || result?.spoken || `Routine stopped (${status || 'unknown'}) before finishing.` };
+      }
     } catch (err) {
-      outcome = { success: false, error: err.message };
+      outcome = err?.code === 'spend_cap'
+        ? { success: false, spendCapped: true, error: 'daily spend cap' }
+        : { success: false, error: err.message };
     }
-    if (!outcome.success) logger?.error?.('routine_run_failed', { routineId: routine.id, error: outcome.error });
+    if (!outcome.success && !outcome.spendCapped) logger?.error?.('routine_run_failed', { routineId: routine.id, error: outcome.error });
     const marked = await markRoutineRun(supabase, routine.id, new Date(), outcome);
-    if (marked?.error) logger?.error?.('routine_run_record_failed', { routineId: routine.id, error: marked.error });
+    if (marked?.paused) {
+      const name = marked.name || routine.name || 'A routine';
+      const why = marked.error ? ` ${marked.error}` : '';
+      await createBriefing(routine.user_id, {
+        kind: 'routine_paused',
+        title: name,
+        body: `I paused “${name}” after ${marked.failures} failed runs.${why}`.replace(/\s+/g, ' ').trim(),
+        source: 'agent',
+        metadata: { routineId: routine.id, status: 'paused' }
+      }).catch(error => logger?.error?.('routine_pause_notify_failed', { routineId: routine.id, error: error.message }));
+    }
+    if (marked?.error && marked.ok === false) logger?.error?.('routine_run_record_failed', { routineId: routine.id, error: marked.error });
   }
 
   summary.durationMs = Date.now() - startedAt;
@@ -7553,6 +7633,7 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
     if (!budget.ok) {
       return res.status(429).json({ error: budget.error, budget: { used: budget.used, cap: budget.cap } });
     }
+    usageMeter.bindUser(userId);
     const settings = rawSettings && typeof rawSettings === 'object' && !Array.isArray(rawSettings) ? { ...rawSettings } : {};
     // The saved guard mode applies even when this client did not send it.
     if ((await getChatSettings(supabase, userId)).guardMode === true) settings.guardMode = true;
@@ -8014,6 +8095,13 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       chatStartedAt,
       pendingAction: pendingAction && isPendingRevisionMessage(message) ? pendingAction : null
     };
+    if (spendCap.status(userId).blocked) {
+      await respondWithResult({
+        res, streaming, wantsTTS: false, settings, trace, userId, message,
+        spoken: spendCap.USER_MESSAGE
+      });
+      return;
+    }
     const {
       history,
       useSearch,
@@ -9476,11 +9564,14 @@ app.get('/agent/home', requireSessionAuth, async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const pairedDisplays = require('./services/paired-displays');
-    const [nativeContext, displays, schedules] = await Promise.all([
+    const homeAssistant = require('../connectors/home-assistant');
+    const [nativeContext, displays, schedules, controls] = await Promise.all([
       supabase.from('native_context').select('location, settings, updated_at').eq('user_id', userId).maybeSingle(),
       pairedDisplays.listDisplays(supabase, userId),
       supabase.from('scheduled_tasks').select('id, title, recurrence, next_run_at, condition, active, watch_state')
-        .eq('user_id', userId).eq('active', true).order('next_run_at', { ascending: true }).limit(24)
+        .eq('user_id', userId).eq('active', true).order('next_run_at', { ascending: true }).limit(24),
+      // Read-only smart-home state; a slow or missing server becomes an explicit source state.
+      homeAssistant.listControls().catch(() => ({ status: 'unavailable', detail: null, controls: [] }))
     ]);
     if (nativeContext.error) throw nativeContext.error;
     if (schedules.error) throw schedules.error;
@@ -9491,11 +9582,59 @@ app.get('/agent/home', requireSessionAuth, async (req, res) => {
       scheduledRows: schedules.data || [],
       // No hardware reports observations yet. When it does, they arrive from their own store, never from chat.
       observations: [],
+      controls,
       now
     }));
   } catch (e) {
     log('warn', 'home.load.failed', { userId, error: e.message });
     res.status(503).json({ error: 'Home details are unavailable right now.' });
+  }
+});
+
+// One tap on a device's Home control. The command goes through the same execution boundary as
+// anything Adam does (action-execution.js → control_smart_home → Home Assistant connector), is
+// logged to the action log, and is reported only after the device's state is read back.
+// The route checks the device and command against what the device reports it can do; it never
+// widens what the capability allows, and guard mode still parks it for review.
+app.post('/agent/home/controls/:id', requireSessionAuth, async (req, res) => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const entityId = String(req.params.id || '').trim().toLowerCase();
+  const command = String(req.body?.command || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!/^[a-z][a-z0-9_]+\.[a-z0-9_]+$/.test(entityId) || !command || command.length > 40) {
+    return res.status(400).json({ error: 'A device and command are required.' });
+  }
+  try {
+    const homeAssistant = require('../connectors/home-assistant');
+    const before = await homeAssistant.listControls();
+    if (before.status !== 'ok') {
+      return res.status(503).json({ error: before.status === 'not_configured' ? 'Smart-home control is not set up.' : 'Smart-home control is unavailable right now.', status: before.status });
+    }
+    const control = before.controls.find(item => item.id === entityId);
+    if (!control) return res.status(404).json({ error: 'That device is not available.' });
+    if (!homeAssistant.directCommandAllowed(control, command)) {
+      return res.status(422).json({ error: `${control.name} can't do that from here.` });
+    }
+    const { guardMode } = await getChatSettings(supabase, userId);
+    const [entry] = await executeActions(userId, [{ type: 'control_smart_home', input: { device: entityId, command } }], {
+      userMessage: `Home control: ${command} ${control.name}`,
+      directControl: true,
+      guardMode: guardMode === true
+    });
+    const result = entry?.result || {};
+    const after = await homeAssistant.listControls().catch(() => null);
+    const updated = after?.controls?.find(item => item.id === entityId) || null;
+    const pending = result.pending === true || result.outcome === 'awaiting_user';
+    res.status(result.success || pending ? 200 : 502).json({
+      success: result.success === true,
+      pending,
+      outcome: result.outcome || null,
+      error: result.success || pending ? null : (result.error || 'The device did not confirm the change.'),
+      control: updated ? homeModel.normalizeControl(updated) : null
+    });
+  } catch (e) {
+    log('warn', 'home.control.failed', { userId, error: e.message });
+    res.status(500).json({ error: 'Could not change that device.' });
   }
 });
 
@@ -10329,7 +10468,7 @@ app.put('/model-routing', requireSessionAuth, async (req, res) => {
 
 // One-off address -> lat/lng lookup, used by the iOS Settings "Home address" field so a
 // saved home location can be resolved once (not repeated per ride/route request).
-app.post('/geocode', requireSessionAuth, async (req, res) => {
+app.post('/geocode', requireSessionAuth, geocodeLimit, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const address = String(req.body?.address || '').trim();
@@ -10343,7 +10482,7 @@ app.post('/geocode', requireSessionAuth, async (req, res) => {
 });
 
 // Resolves UK home addresses server-side so the Ideal Postcodes key never enters the app.
-app.post('/home-addresses', requireSessionAuth, async (req, res) => {
+app.post('/home-addresses', requireSessionAuth, homeAddressLimit, async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const query = String(req.body?.query || '').trim();

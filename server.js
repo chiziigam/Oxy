@@ -34,15 +34,14 @@ if (require.main === module) {
     if (missing.length) {
       console.warn(`[boot] Oxy started with missing env vars: ${missing.join(', ')}`);
     }
-    const { heartbeatSettings, retentionSettings, startHeartbeat } = require('./api/services/heartbeat');
+    const { heartbeatSettings, startHeartbeat, startDailyJob } = require('./api/services/heartbeat');
     const heartbeat = heartbeatSettings();
     if (heartbeat.enabled) {
       startHeartbeat({ sweep: app.runProactiveSweep, intervalMs: heartbeat.intervalMs });
       console.log(`[heartbeat] on, every ${heartbeat.intervalMs / 60000} min`);
+      startDailyJob({ job: () => app.runRetentionSweep(console), label: 'retention' });
+      console.log('[retention] daily sweep scheduled');
       setInterval(() => app.escalateUnseenAlerts().catch(e => console.error(`[escalation] ${e.message}`)), 30000).unref();
-      const retention = retentionSettings();
-      startHeartbeat({ sweep: app.runRetentionSweep, intervalMs: retention.intervalMs, firstRunDelayMs: retention.firstRunDelayMs });
-      console.log(`[retention] on, every ${retention.intervalMs / 3600000} h`);
     }
     // Launch one spare browser now (it's a ~4s cold start) so the first browser task of
     // this instance's life grabs it instantly instead of paying that inside the request.
