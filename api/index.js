@@ -965,6 +965,7 @@ app.use((req, res, next) => {
     '/auth/microsoft/callback',
     '/auth/register',
     '/auth/login',
+    '/auth/apple',
     '/auth/dev/demo-login',
     '/proactive/sweep',
     '/auth/forgot-password',

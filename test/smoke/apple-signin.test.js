@@ -67,6 +67,13 @@ test('a token for a different request is refused when a nonce was expected', asy
   );
 });
 
+test('a token that is not even JSON is refused with a readable message', async () => {
+  await assert.rejects(
+    () => apple.verifyIdentityToken('a.b.c', { env, fetchImpl: fakeFetch }),
+    /not a valid token/i
+  );
+});
+
 test('a token with no subject is refused', async () => {
   const { token } = sign({ sub: '' });
   await assert.rejects(() => apple.verifyIdentityToken(token, { env, fetchImpl: fakeFetch }), /did not identify/i);

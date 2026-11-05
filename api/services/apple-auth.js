@@ -30,7 +30,11 @@ async function appleKeys(fetchImpl = fetch) {
 }
 
 function decodeSegment(segment) {
-  return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+  try {
+    return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
 }
 
 // Returns { sub, email, emailVerified } or throws with a message worth showing a person.
@@ -42,6 +46,7 @@ async function verifyIdentityToken(identityToken, { nonce = null, env = process.
   const [encodedHeader, encodedPayload, signature] = parts;
   const header = decodeSegment(encodedHeader);
   const payload = decodeSegment(encodedPayload);
+  if (!header || !payload) throw new Error('That Apple sign-in response was not a valid token.');
 
   if (header.alg !== 'RS256') throw new Error('Apple signed that token with an unexpected algorithm.');
 
