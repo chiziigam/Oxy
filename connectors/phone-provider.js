@@ -55,6 +55,12 @@ function inboundAck(provider) {
   return getProvider(provider).inboundAck();
 }
 
+// Providers that sign their webhooks supply verifyInbound(req); the route calls it when present.
+function verifyInbound(req, provider) {
+  const implementation = getProvider(provider);
+  return typeof implementation.verifyInbound === 'function' ? implementation.verifyInbound(req) : null;
+}
+
 // --- Built-in adapters ---------------------------------------------------------
 // Twilio's connector keeps its own export names; the adapter shape is applied here so
 // the existing module (and its tests) stay untouched.
@@ -70,6 +76,17 @@ registerProvider('twilio', {
   inboundAck: () => ({ contentType: 'text/xml', body: '<Response></Response>' })
 });
 
+const linq = require('./adam-imessage-linq');
+
+registerProvider('linq', {
+  provisionPhoneNumber: (userId) => linq.provisionPhoneNumber(userId),
+  sendSms: ({ from, to, body }) => linq.sendMessage({ from, to, body }),
+  parseInboundSms: (payload) => linq.parseInboundWebhook(payload),
+  verifyInbound: (req) => linq.verifyWebhookSignature(req.rawBody || '', req.headers, process.env.LINQ_WEBHOOK_SECRET),
+  // Linq retries on non-2xx, so acknowledge with an empty JSON object.
+  inboundAck: () => ({ contentType: 'application/json', body: '{}' })
+});
+
 module.exports = {
   registerProvider,
   getProvider,
@@ -77,5 +94,6 @@ module.exports = {
   provisionPhoneNumber,
   sendSms,
   parseInboundSms,
-  inboundAck
+  inboundAck,
+  verifyInbound
 };

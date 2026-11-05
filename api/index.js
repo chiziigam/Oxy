@@ -630,7 +630,11 @@ function safeEqual(given, expected) {
 function inboundSmsSignatureOk(req, providerName) {
   const token = process.env.TWILIO_AUTH_TOKEN;
   const provider = (providerName || process.env.MILLIE_PHONE_PROVIDER || 'twilio').toLowerCase();
-  if (provider !== 'twilio') return true;
+  if (provider !== 'twilio') {
+    // A provider that signs its webhooks decides for itself; one that does not is let through.
+    const verdict = require('../connectors/phone-provider').verifyInbound(req, provider);
+    return verdict === null ? true : verdict === true;
+  }
   if (!token) return process.env.NODE_ENV !== 'production';
   const given = String(req.get('x-twilio-signature') || '');
   const url = `https://${req.get('host')}${req.originalUrl}`;
@@ -643,7 +647,8 @@ function inboundSmsSignatureOk(req, providerName) {
 
 // The optional :provider segment is for vendor switches: numbers already provisioned keep
 // posting to the URL they were given. With one provider, only the bare path is used.
-app.post(['/webhooks/millie-sms', '/webhooks/millie-sms/:provider'], express.urlencoded({ extended: false }), async (req, res) => {
+const keepRawBody = (req, res, buf) => { req.rawBody = buf.toString('utf8'); };
+app.post(['/webhooks/millie-sms', '/webhooks/millie-sms/:provider'], express.urlencoded({ extended: false, verify: keepRawBody }), express.json({ limit: '256kb', verify: keepRawBody }), async (req, res) => {
   const { parseInboundSms, inboundAck } = require('../connectors/phone-provider');
   const providerName = req.params?.provider || undefined;
   try {
