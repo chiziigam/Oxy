@@ -37,6 +37,15 @@ struct AuthService {
     }
 
     /// An email signs in by email; anything else is a user id.
+    /// Apple hands the app an identity token; the server verifies it against Apple's keys before
+    /// it mints a session. The nonce proves this exchange belongs to this sign-in attempt.
+    func signInWithApple(identityToken: String, nonce: String, fullName: String?) async throws -> AuthResponse {
+        var body: [String: Any] = ["identityToken": identityToken, "nonce": nonce]
+        if let fullName, !fullName.isEmpty { body["fullName"] = fullName }
+        let data = try await api.request(path: "/auth/apple", method: "POST", body: body)
+        return try JSONDecoder().decode(AuthResponse.self, from: data)
+    }
+
     func login(identifier: String, password: String) async throws -> AuthResponse {
         let identity = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
         var body: [String: Any] = ["password": password]

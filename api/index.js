@@ -4477,6 +4477,71 @@ app.post('/auth/dev/demo-login', async (req, res) => {
   }
 });
 
+// Sign in with Apple. The client sends the identity token Apple issued to the app; the server
+// verifies it against Apple's keys and only then mints a session. Nothing the client says about
+// who it is counts until that check passes.
+app.post('/auth/apple', loginRateLimiter, async (req, res) => {
+  try {
+    const apple = require('./services/apple-auth');
+    const identityToken = req.body?.identityToken || req.body?.identity_token;
+    const nonce = req.body?.nonce || null;
+    const fullName = String(req.body?.fullName || '').trim().slice(0, 80);
+
+    let identity;
+    try {
+      identity = await apple.verifyIdentityToken(identityToken, { nonce });
+    } catch (error) {
+      return res.status(401).json({ error: error.message });
+    }
+
+    const userId = apple.userIdForSubject(identity.sub);
+    let account = await getUserAccount(userId);
+    let created = false;
+
+    if (!account) {
+      // An email that already belongs to a password account is not silently merged: linking by
+      // an address Apple has not proven would be a way into someone else's account.
+      if (identity.email && await getUserAccountByEmail(identity.email)) {
+        return res.status(409).json({
+          error: 'That email already has an account. Sign in with your password instead.'
+        });
+      }
+      const now = new Date().toISOString();
+      const { error: insertError } = await supabase.from('users').insert({
+        user_id: userId,
+        password_hash: hashPassword(crypto.randomBytes(32).toString('hex')),
+        email: identity.email || null,
+        email_verified: identity.emailVerified === true,
+        token_version: 1,
+        created_at: now,
+        updated_at: now
+      });
+      if (insertError && !/duplicate key/i.test(insertError.message)) throw insertError;
+      account = await getUserAccount(userId);
+      created = true;
+    }
+
+    if (fullName) {
+      await supabase.from('preferences').upsert(
+        { user_id: userId, key: 'profile.name', value: fullName },
+        { onConflict: 'user_id,key' }
+      ).then(() => {}, () => {});
+    }
+
+    log('info', 'auth.apple.login', { userId, created, privateEmail: identity.isPrivateEmail });
+    res.json({
+      success: true,
+      token: createSessionToken(userId),
+      userId,
+      email: account?.email || identity.email || null,
+      created
+    });
+  } catch (error) {
+    log('error', 'auth.apple.error', { error: error.message });
+    res.status(500).json({ error: 'Sign in with Apple did not complete. Try again.' });
+  }
+});
+
 app.post('/auth/logout', (req, res) => {
   res.json({ success: true });
 });

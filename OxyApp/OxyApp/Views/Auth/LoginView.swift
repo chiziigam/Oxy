@@ -1,10 +1,12 @@
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
 
 struct LoginView: View {
     @Environment(AppState.self) private var appState
     @State private var userId = ""
     @State private var password = ""
-    @State private var isRegistering = !UserDefaults.standard.bool(forKey: "adam_signed_in_before")
+    @State private var isRegistering = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var didAttemptAutoDemoLogin = false
@@ -13,7 +15,7 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color.adamBackground.ignoresSafeArea()
+            Color.appBackground.ignoresSafeArea()
 
             // Straight to the sign-in form — no intro carousel, no mic slide.
             LoginFormPage(
@@ -24,7 +26,8 @@ struct LoginView: View {
                 errorMessage: $errorMessage,
                 showDemoLogin: shouldShowDemoLogin,
                 onSubmit: submit,
-                onDemoLogin: demoLogin
+                onDemoLogin: demoLogin,
+                onAppleCredential: handleAppleCredential
             )
         }
         .task {
@@ -34,10 +37,33 @@ struct LoginView: View {
         }
     }
 
+    private func handleAppleCredential(token: String, nonce: String, fullName: String?) {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        Task {
+            do {
+                let response = try await authService.signInWithApple(identityToken: token, nonce: nonce, fullName: fullName)
+                await MainActor.run {
+                    isLoading = false
+                    guard response.success, let id = response.userId, let sessionToken = response.token else {
+                        errorMessage = response.error ?? "Apple sign-in did not complete."
+                        return
+                    }
+                    appState.login(userId: id, token: sessionToken, isDemo: false)
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
     private var shouldShowDemoLogin: Bool {
         #if DEBUG
-        return ProcessInfo.processInfo.environment["OXY_DEBUG_DEMO_LOGIN"] == "1"
-            || UserDefaults.standard.bool(forKey: "oxy_enable_local_dev_auth")
+        return true
         #else
         return UserDefaults.standard.bool(forKey: "oxy_enable_local_dev_auth")
         #endif
@@ -49,10 +75,6 @@ struct LoginView: View {
 
     private func submit() {
         guard !userId.isEmpty, !password.isEmpty else { return }
-        if isRegistering, !userId.contains("@") {
-            withAnimation { errorMessage = "Enter your email address." }
-            return
-        }
         isLoading = true
         errorMessage = nil
 
@@ -142,64 +164,130 @@ private struct LoginFormPage: View {
     let showDemoLogin: Bool
     let onSubmit: () -> Void
     let onDemoLogin: () -> Void
+    let onAppleCredential: (String, String, String?) -> Void
 
     @FocusState private var focusedField: Field?
     private enum Field { case userId, password }
-
-    private var canSubmit: Bool { !userId.isEmpty && !password.isEmpty }
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var appleNonce = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                AdamMark().frame(width: 30, height: 30)
-                    .padding(.top, 72)
-                    .padding(.bottom, 40)
-                    .accessibilityHidden(true)
+                Spacer().frame(height: 96)
 
-                Text(isRegistering ? "Create your account" : "Sign in")
-                    .font(.appBody(32, weight: .semibold))
-                    .foregroundStyle(Color.adamInk)
-                    .padding(.bottom, 36)
+                BrandWordmark(height: 24)
+                    .padding(.bottom, 44)
+
+                Text(isRegistering ? "Create your account." : "Welcome back.")
+                    .font(.heroTitle)
+                    .foregroundStyle(Color.appInk)
+                    .padding(.bottom, 44)
 
                 VStack(alignment: .leading, spacing: 28) {
-                    lineField(placeholder: isRegistering ? "Email" : "Email or username", text: $userId, secure: false, field: .userId, keyboard: isRegistering ? .emailAddress : .default)
+                    lineField(placeholder: "Email or username", text: $userId, secure: false, field: .userId)
                     lineField(placeholder: "Password", text: $password, secure: true, field: .password)
                 }
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(.adamBody)
-                        .foregroundStyle(Color.adamInk)
+                        .font(Font.appBody(12, weight: .medium))
+                        .foregroundStyle(Color.appDanger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 20)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                AdamButton(title: isLoading ? "One moment" : (isRegistering ? "Create account" : "Sign in"), prominent: true, isEnabled: canSubmit && !isLoading, action: onSubmit)
-                    .padding(.top, 32)
-
-                if isRegistering {
-                    Text(.init("By creating an account you agree to the [Terms](\(APIClient.shared.baseURL)/terms) and [Privacy Policy](\(APIClient.shared.baseURL)/privacy)."))
-                        .font(.adamLabel)
-                        .foregroundStyle(Color.adamInk.opacity(0.8))
-                        .tint(Color.adamInk)
-                        .padding(.top, 14)
+                Button(action: onSubmit) {
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .tint(Color.appBackground)
+                                .scaleEffect(0.8)
+                        }
+                        Text(isRegistering ? "Create Account" : "Sign In")
+                            .font(.appBody(15, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.appBackground)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Color.appInk, in: RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
                 }
+                .buttonStyle(.appScale)
+                .disabled(isLoading || userId.isEmpty || password.isEmpty)
+                .opacity(userId.isEmpty || password.isEmpty ? 0.4 : 1)
+                .animation(.appFast, value: userId.isEmpty || password.isEmpty)
+                .padding(.top, 36)
 
                 if showDemoLogin {
-                    AdamButton(title: "Continue as test user", isEnabled: !isLoading, action: onDemoLogin)
-                        .padding(.top, 14)
+                    Button(action: onDemoLogin) {
+                        HStack(spacing: 8) {
+                            AppIcon("person-check", size: 16)
+                            Text("Continue as Test User")
+                                .font(.appBody(14, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.appInk)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.appFillSubtle)
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous)
+                                .stroke(Color.appHairline, lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.appScale)
+                    .disabled(isLoading)
+                    .opacity(isLoading ? 0.55 : 1)
+                    .padding(.top, 14)
+
+                    Text("Debug demo session")
+                        .font(.appBody(12, weight: .light))
+                        .foregroundStyle(Color.appMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 8)
                 }
+
+                SignInWithAppleButton(.continue) { request in
+                    let nonce = Self.makeNonce()
+                    appleNonce = nonce
+                    request.requestedScopes = [.fullName, .email]
+                    request.nonce = Self.sha256Hex(nonce)
+                } onCompletion: { result in
+                    switch result {
+                    case .success(let authorization):
+                        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                              let data = credential.identityToken,
+                              let token = String(data: data, encoding: .utf8) else {
+                            errorMessage = "Apple did not return a sign-in token."
+                            return
+                        }
+                        let name = [credential.fullName?.givenName, credential.fullName?.familyName]
+                            .compactMap { $0 }
+                            .joined(separator: " ")
+                        onAppleCredential(token, appleNonce, name.isEmpty ? nil : name)
+                    case .failure(let error):
+                        if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+                .padding(.top, 14)
+                .disabled(isLoading)
 
                 Button {
                     withAnimation(.appFast) { isRegistering.toggle() }
-                    errorMessage = nil
                 } label: {
-                    Text(isRegistering ? "I already have an account" : "New here? Create account")
-                        .font(.adamButton)
-                        .foregroundStyle(Color.adamInk)
-                        .frame(maxWidth: .infinity, minHeight: AdamLayout.buttonHeight)
+                    Text(isRegistering ? "Already have an account? Sign in" : "New here? Create account")
+                        .font(.appBody(14))
+                        .foregroundStyle(Color.appMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 12)
+                .buttonStyle(.appScale)
+                .padding(.top, 20)
 
                 Spacer().frame(height: 60)
             }
@@ -208,28 +296,39 @@ private struct LoginFormPage: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private func lineField(placeholder: String, text: Binding<String>, secure: Bool, field: Field, keyboard: UIKeyboardType = .default) -> some View {
+    private static func makeNonce(length: Int = 32) -> String {
+        var bytes = [UInt8](repeating: 0, count: length)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func sha256Hex(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func lineField(placeholder: String, text: Binding<String>, secure: Bool, field: Field) -> some View {
         VStack(spacing: 9) {
             Group {
                 if secure {
-                    SecureField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.adamMuted))
-                        .textContentType(isRegistering ? .newPassword : .password)
+                    SecureField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.appMuted))
                 } else {
-                    TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.adamMuted))
+                    TextField("", text: text, prompt: Text(placeholder).foregroundStyle(Color.appMuted))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .keyboardType(keyboard)
-                        .textContentType(keyboard == .emailAddress ? .emailAddress : .username)
                 }
             }
-            .font(.appBody(18))
-            .foregroundStyle(Color.adamInk)
-            .tint(Color.adamInk)
+            .font(.appBody(16))
+            .foregroundStyle(Color.appInk)
+            .tint(Color.appTitanium)
             .focused($focusedField, equals: field)
 
             Rectangle()
-                .fill(Color.adamInk.opacity(focusedField == field ? 0.7 : 0.3))
-                .frame(height: focusedField == field ? 1.5 : 1)
+                .fill(focusedField == field ? Color.appInk.opacity(0.55) : Color.appFillSubtle)
+                .frame(height: focusedField == field ? 1 : 0.5)
+                .animation(.appFast, value: focusedField)
         }
     }
 }
