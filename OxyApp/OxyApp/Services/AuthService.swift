@@ -46,6 +46,20 @@ struct AuthService {
         return try JSONDecoder().decode(AuthResponse.self, from: data)
     }
 
+    /// Set or replace the password for the signed-in account. No old password: an account created
+    /// with Apple has never had one.
+    func setPassword(_ password: String) async throws {
+        let data = try await api.request(
+            path: "/auth/set-password",
+            method: "POST",
+            body: ["password": password]
+        )
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let error = json["error"] as? String {
+            throw NSError(domain: "Auth", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
+        }
+    }
+
     func login(identifier: String, password: String) async throws -> AuthResponse {
         let identity = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
         var body: [String: Any] = ["password": password]
