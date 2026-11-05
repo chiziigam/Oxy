@@ -94,13 +94,20 @@ test('a lookup that already answers in words ends the run without another model 
   let calls = 0;
   brainProvider.callToolsBrain = async () => {
     calls += 1;
-    return { text: '', functionCalls: [{ id: 'c', name: 'get_weather', args: {} }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'get_weather', args: {} } }] } }] };
+    return { text: '', functionCalls: [{ id: 'c', name: 'get_stock_price', args: {} }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'get_stock_price', args: {} } }] } }] };
   };
-  const exec = async (_u, actions) => actions.map(a => ({ action: a.type, result: { success: true, text: 'London: 12°C, overcast.' } }));
-  const out = await runAgentLoop({ userId: 'u', initialMessage: 'weather', maxIterations: 4, executeActionsFn: exec });
-  assert.equal(out.spoken, 'London: 12°C, overcast.');
+  const exec = async (_u, actions) => actions.map(a => ({ action: a.type, result: { success: true, text: 'AAPL: 190.00 USD.' } }));
+  const out = await runAgentLoop({ userId: 'u', initialMessage: 'apple stock price', maxIterations: 4, executeActionsFn: exec });
+  assert.equal(out.spoken, 'AAPL: 190.00 USD.');
   assert.equal(calls, 1, 'the answer was already written; no second model pass');
   assert.equal(out.agentTrace.status, 'completed');
+});
+
+test('a weather lookup is not spoken verbatim, so the model can answer what was actually asked', () => {
+  const { getActionContract } = require('../../api/action-contracts');
+  assert.notEqual(getActionContract('get_weather').speaksResult, true);
+  assert.notEqual(getActionContract('get_forecast').speaksResult, true);
+  assert.match(getActionContract('get_forecast').guidance, /what to wear/);
 });
 
 test('a failed model call after tools ran tells the user so instead of dumping tool JSON', async (t) => {
