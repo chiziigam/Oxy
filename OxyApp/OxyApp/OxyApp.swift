@@ -17,7 +17,8 @@ struct OxyApp: App {
         WindowGroup {
             RootView()
                 .environment(appState)
-                .tint(Color.appAccent)
+                .tint(DS.accent)
+                .preferredColorScheme(DSAppearance.shared.theme.scheme)
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active, appState.isAuthenticated, !appState.isDemoSession {
                         Task { await PhotoLearner.shared.runIfEnabled() }
@@ -33,11 +34,11 @@ struct RootView: View {
     var body: some View {
         Group {
             if !didRestoreSession {
-                Color.appBackground.ignoresSafeArea()
+                DS.bg.ignoresSafeArea()
             } else if appState.isAuthenticated {
-                MainTabView()
+                MainScreen()
             } else {
-                LoginView()
+                AuthFlow()
             }
         }
         .animation(.easeInOut(duration: 0.35), value: appState.isAuthenticated)

@@ -97,8 +97,6 @@ Deploy the committed checkout to Fly.io with `node scripts/deploy-fly.js`. **Com
 3. **Never call an API you haven't confirmed exists.** Before referencing a member of another class/module, open that file and check. If you add UI that needs new members on a service, implement the full surface (wired to real lifecycle, not stubs) in the same pass, and grep ALL call sites of the type across the codebase.
 4. **Don't copy identifiers across scopes without checking they resolve.** Node won't catch ReferenceErrors at parse time. Check import/require names against the module's actual exports (aliases in one file are not exports of the package). After nontrivial JS edits, run eslint `no-undef` across `api/**/*.js` (ignore `document`/`window` inside `page.evaluate` blocks).
 5. **A broken build from a multi-file pass needs a full sweep, not single-file patching.** Expect the fix to ripple across every file touched by the same pass.
-6. **No AI-isms in user-facing copy.** Don't write chatty, first-person, over-explaining UI text — subtitles that restate an obvious label ("Pendant" / "The piece you wear"), disclaimers about how the assistant works ("Ask naturally. I'll use your connected context only when it is available."), or soft marketing phrasing ("Good starting points"). Real product copy is terse and factual, or absent. If a label is self-explanatory, ship it without a subtitle.
-7. **SF Symbols are banned — non-negotiable, no fallback, no second option.** Never write `Image(systemName:)` / `Label(_, systemImage:)` / `.tabItem` system images anywhere. Every icon is a real bundled asset in `Assets.xcassets` rendered via `Image("asset-name")`. Brand/app glyphs use the real logo asset (there are many under `Resources/Assets.xcassets/*.imageset` — uber, netflix, outlook, …); generic UI glyphs use bundled vector icon assets. If an icon you need has no asset yet, add the asset — do not fall back to an SF Symbol even temporarily.
 
 ## Memory discipline — mandatory handoff
 
@@ -113,18 +111,3 @@ Shared memory lives at `~/.claude/projects/-Users-chizigamonyewuchi-Documents-Ox
 - Before proposing a fix for a bug, reproduce it or read the actual error output — don't pattern-match to a plausible cause.
 - When blocked on a decision only the user can make, ask; for everything reversible that follows from the request, proceed.
 - Don't leave background processes running for the user to clean up.
-
-## UI work
-
-UI changes follow the loop in [docs/UI_LOOP.md](docs/UI_LOOP.md): look at real screenshots, critique hard, fix in small commits, look again, then swap roles. Check `docs/ui-loop/BATON.md` for whose turn it is.
-
-### Reference-led UI craft
-
-Use [the screenshot-derived UI playbook](docs/ui-loop/UI_CRAFT_PLAYBOOK_2026-10-26.md) alongside the existing visual references and DESIGN.md.
-
-- Inspect actual reference screens. State which layout, hierarchy, spacing, type, control or interaction quality is being adapted; a product name or a vague mood is insufficient.
-- Establish palette, typography, spacing, hierarchy and reusable component rules before implementation. Build one coherent component or flow at a time within the whole-app design.
-- Never add gratuitous text or eyebrow labels. Keep labels short; remove subtitles that repeat the label, design commentary, dotted status strings and parenthetical explanations. Necessary help belongs in accessible contextual disclosure; essential amounts, risks, errors and approval facts stay visible.
-- Avoid arbitrary gradients, emoji navigation icons and repeated generic cards. Use the existing native component system and bundled assets; add a reusable primitive only when needed.
-- Compare real before/after captures and critique the result against named references. Check populated, empty, loading, error, large-text and dark states. A successful build is not visual acceptance; a generated comp is not runtime proof.
-- Use purposeful, interruptible motion and respect Reduce Motion. Award-site polish is an aspiration, never a reason to sacrifice native usability or invent a completion claim.

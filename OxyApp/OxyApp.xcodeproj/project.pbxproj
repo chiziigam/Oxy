@@ -32,7 +32,6 @@
 		A10000010000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* APIClient.swift */; };
 		A10000010000000000000006 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000006 /* AuthService.swift */; };
 		A10000010000000000000007 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* ChatService.swift */; };
-		A10000010000000000000008 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* LoginView.swift */; };
 		A10000010000000000000010 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* ChatViewModel.swift */; };
 		A10000010000000000000011 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* MessageBubble.swift */; };
 		F10C0A110000000000000001 /* CheckoutInformationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10C0A120000000000000001 /* CheckoutInformationSheet.swift */; };
@@ -42,7 +41,6 @@
 		A10000010000000000000012 /* Color+Oxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* Color+Oxy.swift */; };
 		A10000010000000000000013 /* LoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* LoadingIndicator.swift */; };
 		A10000010000000000000014 /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* ErrorBanner.swift */; };
-		A10000010000000000000015 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* MainTabView.swift */; };
 		A10000010000000000000017 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000017 /* MemoryView.swift */; };
 		A10000010000000000000018 /* ConnectorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000018 /* ConnectorsView.swift */; };
 		A10000010000000000000019 /* SettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000019 /* SettingsModel.swift */; };
@@ -90,6 +88,20 @@
 		AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001003A35D2C361ED3F /* CornerReveal.swift */; };
 		AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001000761B49F110C7C /* TaskInterfaceView.swift */; };
 		AD0000010062C409272AB7AB /* SetupFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001008056B401330E17 /* SetupFlowView.swift */; };
+		DD2C5D54911DA44E145E5FB6 /* DSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD58CE1680D71C9C40513C9A /* DSComponents.swift */; };
+		DDE2C5390A143CA012DE865F /* DSComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2F39B1DC2AF0F3BA843C15 /* DSComposer.swift */; };
+		DDE8666C0D9EE002A11656DA /* DSIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4A5FFBB6561604E1D24F3F /* DSIcons.swift */; };
+		DD5EE4B894FD21B7B55F0F8E /* DSTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD76508B256F3673C5FA01DA /* DSTokens.swift */; };
+		DD5471511BBFC4E99D01FA9A /* AuthFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD52F3AE7D405668E893B23F /* AuthFlow.swift */; };
+		DDDA172663012764E468C062 /* ConversationScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDFD0DB5007A8A9AE98322C8 /* ConversationScreen.swift */; };
+		DDE1CC8591C66EA46595CC45 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA8ED94C12DD5E1BE9E62DD /* HomeScreen.swift */; };
+		DD4C99EFAFC4C1FB3673D0E8 /* MainScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0A747CDF8F2BED0D18CC2A /* MainScreen.swift */; };
+		DD8AF1E89BC464F7C58B3798 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE89B5ACDB6DFC2E5FC432C /* SettingsScreen.swift */; };
+		DDD09BD60AF4283B36F5F3CD /* TaskScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0DACC50D794F98B026E3A2 /* TaskScreen.swift */; };
+		DD68866819EA07AA1C993515 /* Geist-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DD40429F4D0C305BD531D351 /* Geist-Regular.ttf */; };
+		DD7D1AFEC3BA5F4857D262A9 /* Geist-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDD45F9002AB2B6566761051 /* Geist-Medium.ttf */; };
+		DD9F3270E5E1C2AF8ED0AAA8 /* Geist-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */; };
+		DD9B815CDA3A01C4E2C784E6 /* Geist-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -118,7 +130,6 @@
 		A20000010000000000000005 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A20000010000000000000006 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A20000010000000000000007 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
-		A20000010000000000000008 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A20000010000000000000010 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		A20000010000000000000011 /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBubble.swift; sourceTree = "<group>"; };
 		F10C0A120000000000000001 /* CheckoutInformationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutInformationSheet.swift; sourceTree = "<group>"; };
@@ -128,7 +139,6 @@
 		A20000010000000000000012 /* Color+Oxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Oxy.swift"; sourceTree = "<group>"; };
 		A20000010000000000000013 /* LoadingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicator.swift; sourceTree = "<group>"; };
 		A20000010000000000000014 /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
-		A20000010000000000000015 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		A20000010000000000000017 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
 		A20000010000000000000018 /* ConnectorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorsView.swift; sourceTree = "<group>"; };
 		A20000010000000000000048 /* PaymentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentsView.swift; sourceTree = "<group>"; };
@@ -181,6 +191,20 @@
 		AD000001003A35D2C361ED3F /* CornerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CornerReveal.swift; sourceTree = "<group>"; };
 		AD000001000761B49F110C7C /* TaskInterfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInterfaceView.swift; sourceTree = "<group>"; };
 		AD000001008056B401330E17 /* SetupFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupFlowView.swift; sourceTree = "<group>"; };
+		DD58CE1680D71C9C40513C9A /* DSComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSComponents.swift; sourceTree = "<group>"; };
+		DD2F39B1DC2AF0F3BA843C15 /* DSComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSComposer.swift; sourceTree = "<group>"; };
+		DD4A5FFBB6561604E1D24F3F /* DSIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSIcons.swift; sourceTree = "<group>"; };
+		DD76508B256F3673C5FA01DA /* DSTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSTokens.swift; sourceTree = "<group>"; };
+		DD52F3AE7D405668E893B23F /* AuthFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFlow.swift; sourceTree = "<group>"; };
+		DDFD0DB5007A8A9AE98322C8 /* ConversationScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationScreen.swift; sourceTree = "<group>"; };
+		DDA8ED94C12DD5E1BE9E62DD /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		DD0A747CDF8F2BED0D18CC2A /* MainScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainScreen.swift; sourceTree = "<group>"; };
+		DDE89B5ACDB6DFC2E5FC432C /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+		DD0DACC50D794F98B026E3A2 /* TaskScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskScreen.swift; sourceTree = "<group>"; };
+		DD40429F4D0C305BD531D351 /* Geist-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-Regular.ttf; sourceTree = "<group>"; };
+		DDD45F9002AB2B6566761051 /* Geist-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-Medium.ttf; sourceTree = "<group>"; };
+		DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-SemiBold.ttf; sourceTree = "<group>"; };
+		DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fonts/Geist-OFL.txt; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -222,6 +246,8 @@
 				A50000010000000000000005 /* Views */,
 				A50000010000000000000009 /* Extensions */,
 				A50000010000000000000010 /* Resources */,
+				DDBA31A53815ABE457265C07 /* Design */,
+				DD24C03FA8D4FEF77E5D3D8C /* Features */,
 			);
 			path = OxyApp;
 			sourceTree = "<group>";
@@ -274,7 +300,6 @@
 			isa = PBXGroup;
 			children = (
 				AD000001003F7FBB44F24CA5 /* Adam */,
-				A20000010000000000000015 /* MainTabView.swift */,
 				A20000010000000000000038 /* ProfileView.swift */,
 				A20000010000000000000039 /* PendantStatusView.swift */,
 				A50000010000000000000006 /* Auth */,
@@ -298,7 +323,6 @@
 		A50000010000000000000006 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
-				A20000010000000000000008 /* LoginView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -350,6 +374,10 @@
 				D9000001000000000000000A /* HouseholdSounds.mlmodel */,
 				E1000001000000000000B002 /* PrivacyInfo.xcprivacy */,
 				A20000010000000000000F01 /* Fraunces.ttf */,
+				DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */,
+				DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */,
+				DDD45F9002AB2B6566761051 /* Geist-Medium.ttf */,
+				DD40429F4D0C305BD531D351 /* Geist-Regular.ttf */,
 				A20000010000000000000F02 /* Inter.ttf */,
 			);
 			path = Resources;
@@ -495,6 +523,78 @@
 			path = Adam;
 			sourceTree = "<group>";
 		};
+		DDBA31A53815ABE457265C07 /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				DD58CE1680D71C9C40513C9A /* DSComponents.swift */,
+				DD2F39B1DC2AF0F3BA843C15 /* DSComposer.swift */,
+				DD4A5FFBB6561604E1D24F3F /* DSIcons.swift */,
+				DD76508B256F3673C5FA01DA /* DSTokens.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		DD24C03FA8D4FEF77E5D3D8C /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				DDCFADEB5942D21079D027A8 /* Auth */,
+				DDF234CA6B1A2CDC3AC49E9C /* Conversation */,
+				DDBDFC174B0F195078658D06 /* Home */,
+				DDE74CB973DD8C6E3F97924E /* Main */,
+				DDFFCF434E1A1056C8EAF5F9 /* Settings */,
+				DDFDE025AED3F587FE5CB056 /* Task */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		DDCFADEB5942D21079D027A8 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				DD52F3AE7D405668E893B23F /* AuthFlow.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		DDF234CA6B1A2CDC3AC49E9C /* Conversation */ = {
+			isa = PBXGroup;
+			children = (
+				DDFD0DB5007A8A9AE98322C8 /* ConversationScreen.swift */,
+			);
+			path = Conversation;
+			sourceTree = "<group>";
+		};
+		DDBDFC174B0F195078658D06 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				DDA8ED94C12DD5E1BE9E62DD /* HomeScreen.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		DDE74CB973DD8C6E3F97924E /* Main */ = {
+			isa = PBXGroup;
+			children = (
+				DD0A747CDF8F2BED0D18CC2A /* MainScreen.swift */,
+			);
+			path = Main;
+			sourceTree = "<group>";
+		};
+		DDFFCF434E1A1056C8EAF5F9 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				DDE89B5ACDB6DFC2E5FC432C /* SettingsScreen.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		DDFDE025AED3F587FE5CB056 /* Task */ = {
+			isa = PBXGroup;
+			children = (
+				DD0DACC50D794F98B026E3A2 /* TaskScreen.swift */,
+			);
+			path = Task;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -575,6 +675,9 @@
 			files = (
 				A10000010000000000000020 /* Assets.xcassets in Resources */,
 				A10000010000000000000F03 /* Fraunces.ttf in Resources */,
+				DD9F3270E5E1C2AF8ED0AAA8 /* Geist-SemiBold.ttf in Resources */,
+				DD7D1AFEC3BA5F4857D262A9 /* Geist-Medium.ttf in Resources */,
+				DD68866819EA07AA1C993515 /* Geist-Regular.ttf in Resources */,
 				A10000010000000000000F04 /* Inter.ttf in Resources */,
 				E1000001000000000000B001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -587,6 +690,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DDD09BD60AF4283B36F5F3CD /* TaskScreen.swift in Sources */,
+				DD8AF1E89BC464F7C58B3798 /* SettingsScreen.swift in Sources */,
+				DD4C99EFAFC4C1FB3673D0E8 /* MainScreen.swift in Sources */,
+				DDE1CC8591C66EA46595CC45 /* HomeScreen.swift in Sources */,
+				DDDA172663012764E468C062 /* ConversationScreen.swift in Sources */,
+				DD5471511BBFC4E99D01FA9A /* AuthFlow.swift in Sources */,
+				DD5EE4B894FD21B7B55F0F8E /* DSTokens.swift in Sources */,
+				DDE8666C0D9EE002A11656DA /* DSIcons.swift in Sources */,
+				DDE2C5390A143CA012DE865F /* DSComposer.swift in Sources */,
+				DD2C5D54911DA44E145E5FB6 /* DSComponents.swift in Sources */,
 				AD0000010062C409272AB7AB /* SetupFlowView.swift in Sources */,
 				AD00000100B109EE7B23D159 /* TaskInterfaceView.swift in Sources */,
 				AD000001007A7CE99F28AC9C /* CornerReveal.swift in Sources */,
@@ -617,7 +730,6 @@
 				A10000010000000000000041 /* OxyShortcuts.swift in Sources */,
 				A10000010000000000000043 /* PendantLiveActivity.swift in Sources */,
 				A10000010000000000000044 /* ScreenHeaderView.swift in Sources */,
-				A10000010000000000000008 /* LoginView.swift in Sources */,
 				A10000010000000000000010 /* ChatViewModel.swift in Sources */,
 				A10000010000000000000011 /* MessageBubble.swift in Sources */,
 				F10C0A110000000000000001 /* CheckoutInformationSheet.swift in Sources */,
@@ -633,7 +745,6 @@
 				A10000010000000000000032 /* AppTheme.swift in Sources */,
 				A10000010000000000000013 /* LoadingIndicator.swift in Sources */,
 				A10000010000000000000014 /* ErrorBanner.swift in Sources */,
-				A10000010000000000000015 /* MainTabView.swift in Sources */,
 				A10000010000000000000017 /* MemoryView.swift in Sources */,
 				A10000010000000000000018 /* ConnectorsView.swift in Sources */,
 				A10000010000000000000019 /* SettingsModel.swift in Sources */,

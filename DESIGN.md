@@ -1,39 +1,84 @@
-# Adam interface — local rebuild candidate
+# Design
 
-26 October 2026. Chizi chose option A from the colour studies, particularly its decision-heading typography and cohesive brand feel. The generated study is a reference, not evidence of an approved implementation. Operate mode: a native iPhone control surface for a general-purpose personal worker. This replaces the September composition rules. The whole-app rebuild remains local, uncommitted, unaccepted and unfinished. Product truth remains in PRODUCT.md; scope and acceptance remain in docs/ui-loop/EXHAUSTIVE_UI_AUDIT.md.
+This is the design for the iPhone app. It replaces every earlier design note. Where this file and an older document disagree, this file wins.
+
+The full set of screens is in `docs/design/adam-app-design.html`. Open it in a browser. The Theme switch at the top flips every screen between light and dark. `docs/design/build_design.py` regenerates it.
+
+## What the product is
+
+- A smart speaker with two plugs.
+- You talk to it and it does things: buy this, research this, show me how this looks, did anything happen, where are my keys.
+- It works with most smart home gear, but it is not only a smart home product.
+- Alexa, Google and Apple limit what you can do to what the company allows. This one is as polished as they are, but you use it how you see fit.
+- It acts without being asked. Examples: you run out of groceries, you sit at your desk and focus mode turns on.
+
+## What the app is for
+
+The speaker is the main way in. The app covers everything the speaker cannot:
+
+1. See what is happening at home from anywhere.
+2. Approve or decline things that need you.
+3. Send things to it: text, voice, photos, links, PDFs.
+4. Set it up and control it: accounts, cards, devices, permissions, people, routines.
 
 ## Structure
 
-The entry defaults to Now, with a native Now / Conversation picker. Now orders pending decisions, active work, recent outcomes and Updates before one real Today suggestion and Memory / Your home shortcuts. The decision leads directly on the canvas, with its question, qualified amount and review action together; Work detail remains the review destination. Active work uses separate detail and Stop controls. Memory and Your home use compact destination rows on Now. Review decision opens the existing work detail. The composer remains available; entering a request moves into Conversation. Each user turn starts an inspectable section; earlier turns collapse to their actual request text while the newest stays open. Visible sections measure eagerly so initial bottom anchoring does not lose the conversation at large text; closed sections still omit their message bodies. Assistant replies remain with that turn even after delays; day/time separators preserve chronology. Pending decisions and errors stay open.
+- **Main screen.** Nearly empty, with the message box at the bottom. Three chips at the top left (needs you, working, done) each open a short list. A group with nothing in it is not shown. Two icons at the top right open Home and Settings.
+- **A task.** Each request has its own conversation. Open it from a list. The header and message box are frosted over the thread.
+- **Home.** Who is home, devices, things like keys, today's events.
+- **Settings.** Connections, Home (People, Routines, Things), Permissions, You.
+- No tab bar. No sidebar. No endless single thread. No app name in the interface. The launch screen and notifications use the A mark only.
 
-The spinning wheel remains the distinctive navigation control. Its rotary hub keeps Adam’s mark; a small status dot and accessible value carry the current work state. Today, Activity, Memory, Your home and Settings open as full native presentations with a visible return control. The wheel also has a list containing every destination and private mode; larger accessibility text uses that list directly. Subpages never repeat the root Adam hub. Accessibility sizes stack header identity and context controls. Now leads directly with work content; Activity stays in the navigation menu. The decision question needs no extra eyebrow, and Memory / Your home use their destination names without a Your context heading.
+## Look
 
-Today separates one suggested next action from compact remaining suggestions. Now reuses the same suggestion content, handled state and loading / failure / quiet states; dismissals stay in sync with full Today through shared notifications and saved-state reloads. Suggestions ask Adam; they do not grant authority. Payment and other protected decisions use a focused, scrollable review sheet with server-supplied facts above a fixed, reachable action area. An approval is not a verified result.
+| | Light | Dark |
+| --- | --- | --- |
+| Background | #f5f5f6 | #0d0e10 |
+| Card | #ffffff | #17181b |
+| Item | #f5f5f6 | #0d0e10 |
+| Text | #111213 | #f2f3f4 |
+| Secondary text | #6b6f76 | #8d9199 |
+| Line | #e4e5e8 | #26282c |
+| Accent (graphite, the default) | #1a1b1e | #eceef0 |
+| Warning | #b45309 | #f0a23b |
+| Danger | #c2362f | #f06a62 |
 
-You prioritises Name, Home address and Memory before saved context; its old decorative orbit is removed. Memory prioritises saved content and search. Retained photo notes can expand and participate in search. Connected apps are recognisable objects with real logos; ordinary settings remain flat rows. Unknown and not configured home states must stay explicit.
+- Font: Geist everywhere. Times use tabular figures.
+- Type: title 28/600, screen title 24/600, card title 15/600, body 14/400, secondary 13/400, caption 12/500.
+- Radii: card 18, item 12 (card padding 6, so the corners line up), button 12, small button 9, chips and the message box fully round.
+- Spacing steps: 4, 8, 12, 16, 24. Screen edge padding is 16. Rows inside a card are 6 apart.
+- One level of nesting: a group card with item rows inside. Controls inside a row have no box of their own.
+- Frosted glass only on the header and message box, when a conversation scrolls under them. Cards are plain. Never glass on glass.
+- One accent, used for buttons and the selected chip. Warning and danger show state only.
+- Icons sit next to a count or a word. An icon alone is only used for Home and Settings.
+- Words are plain and literal. No taglines, no mood words.
 
-## Visual grammar
+## Behaviour
 
-A warm off-white canvas, dark ink, forest-green actions and a small instrument-like rotary bezel. Selected reference qualities: Family's object identity, Things' reading hierarchy, Flighty's facts before action, Gentler Streak's approachable forms, Oura's intentional focus, Halide's separate control zone and !Boring's confidence in silhouette. These are ingredients for testing, not seven themes or a claim that their full character has already been achieved.
+- **Money.** Spending can be set to Always ask, Ask above an amount you scroll to (a wheel from £1 to £500), or Never ask. The Never ask option says what it means: purchases go through without asking.
+- **People.** Modelled on Apple Home. Invite someone as a Resident or a Guest. Guests get limited access for set days and hours. Each person has their own switches. Only the owner approves spending unless that is switched on for someone.
+- **Things.** Asking where something is works with or without a tag. A tag gives the exact spot. Without one, the answer is a best guess from what the home noticed, marked Estimate.
+- **Status.** Shown with colour, icon and words together. Progress is visible. A failure says why and what to do.
+- **Haptics.** Only for results that matter (success, error, warning) and for controls (a tick). Nothing for opening screens or lists.
+- **Animation.** Follows the phone's Reduce Motion setting. Reduced means a short fade.
+- **Appearance choices.** Theme, accent colour and haptics. Nothing else. Cards, spacing, fonts and corners are fixed.
 
-- Canvas: warm near-white in light appearance; dark green-black in dark appearance. Existing appearance preferences remain available.
-- Surfaces: white / deep neutral green-grey. Inset controls use warm neutrals.
-- Primary actions: deep forest green with white ink in light appearance; pale muted green with dark ink in dark appearance.
-- Meaning: amber asks for attention, green denotes confirmed success, red denotes failure or destructive controls. Colour alone never carries status.
-- Type: native system sans serif text styles that respond live to Dynamic Type. The decision question uses a bold, slightly tightened title to evoke the selected study; its exact generated typeface is unknown. Body, caption, subheadline and title roles establish hierarchy; requested point sizes map to those semantic roles. No serif receipt amounts or private-font-name lookup.
-- Shapes: circular rotary and voice controls, 16–18pt text fields and buttons, a 16pt neutral suggestion surface with a forest-green action. Decision buttons become full-width padded rounded rectangles at accessibility sizes. Do not make all content into identical cards.
-- Depth: restrained borders and native presentation. No decorative halos, fake sensing visualisations or nested receipt cards.
+## Dropped from the old app
 
-Now groups active work in open rows, with separate detail and Stop controls and a compact, truthful Workspace entry beside its task. Results are open receipts: task identity, actual result or failure reason, and date. At accessibility sizes the status icon and disclosure sit above full-width receipt facts. Regular-width iPad uses a primary work column and a 280pt Today/context column; accessibility text returns to one column. These source91 compositions have inspected Simulator geometry; manual scrolling, workspace opening and whole-app visual acceptance remain open.
+Memory page, full history page, paired displays, import from ChatGPT or Claude, Private mode, the four colour themes, the opening-style option, the round menu button and the wheel menu, and the app name in the interface. The Done list replaces history. The two plugs have no screen of their own; they appear in Home as devices if they report anything.
 
-Result collections show actual source, title, stated price and supporting facts as objects. Ordinary sizes use horizontal collections; accessibility sizes use full-width vertical options. Static facts are grouped per option, with separate named View controls. Compare uses an ordinary horizontal table and vertical criterion sections at accessibility sizes; missing fields say Not stated and Best is conveyed in text as well as colour. Actual notes remain available in comparison. Native Compare/Back and earlier-request expansion/collapse have bounded AX proof; full VoiceOver and physical scrolling are still open.
+## Not settled
 
-## Interaction and states
+- Whether the hardware can notice enough to make the keys estimate useful. The design labels it as a guess either way.
+- The icons for needs you, working and done (bell, clock, check) are not tested with people.
+## Build status (2026-11-05)
 
-The composer reserves its own lower zone. Attachment, text and voice are distinct targets. Growing text and the keyboard must leave the last message reachable. The attachment menu contains camera, photos/video and files; private mode lives with navigation.
+Built in the app, in `OxyApp/OxyApp/Design` and `OxyApp/OxyApp/Features`: colours (light and dark, six accents), icons drawn from this design, shared parts, the main screen with real chips and lists from `/agent/state` and working Approve buttons, the message box with attach and voice, the conversation screen, the task screen, Home (from the real home data), Settings (Connections, You), Appearance, and sign in, create account and Sign in with Apple.
 
-Decision answers show Sending answer during submission, then Updating until a matching checkpoint-resolution event is read back; unavailable status retains the decision with Check status, and rejection stays inline with the original decision.
+Not built yet: first-run setup (notification permission, speaker pairing, connecting accounts), People, Things, Routines, notification settings and quiet hours, Privacy, the speaker screen and its fix flow, share from other apps, no-internet and signed-out states, lock-screen notification buttons, the spending options with the scroll wheel, and the dot on the Home icon.
 
-Use bundled icon assets through AppIcon and real service logos. SF Symbols remain banned even where a platform skill suggests them. All targets are at least 44pt. Standard native controls and real return paths take precedence over custom page-reveal effects. Preserve the wheel spin, haptics and reordering; Reduce Motion and large-text alternatives must remain usable.
+Geist (regular, medium, semibold) is bundled in `OxyApp/OxyApp/Resources/Fonts` with its licence, taken from the official v1.9.1 release. The app's font is chosen in one place, `Font.ds` in `Design/DSTokens.swift`.
 
-Every surface requires actual populated, quiet, loading, error and relevant interactive proof. Now distinguishes initial work-load failure, failed refresh with saved work, and partial source unavailability; none may become a false quiet state. Fixture captures say Sample and do not imply connected accounts, observed occupancy, executed payments or real verified outcomes. Native accessibility actions verify Menu/Today/local dismissal/return and focusing the composer selecting Conversation with a keyboard edit. Direct mode taps and scrolling, VoiceOver, wheel motion and successful mutations remain unproven. Files opens through the actual attachment chooser, but picker cancellation/selection and modal containment remain unverified. Review progress and remaining faults live in the exhaustive audit, not in a blanket design-pass claim.
+Accounts, Cards, Saved logins and Account still open the old screens, full screen, until they are restyled. The Permissions page is not in Settings yet. The old main screen and its helpers are still in the project but no longer used.
+
+Run it with launch environment `OXY_DEBUG_AUTOLOGIN=1`, plus `OXY_DEBUG_BOARD=sample` and `OXY_DEBUG_HOME=sample` to fill the screens without a server.

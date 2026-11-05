@@ -1,16 +1,6 @@
-# Oxy north star (locked)
+# Product scope
 
-**UI generated for the job. Alive. Nice to use. Stuff you love.**
-
-Reference: Gleb Kuznetsov agentic gen UI concept (soft home + mission cards + chat as mode).
-
-## Product rules
-
-1. **Home is the product** — greeting + living mission cards + composer.
-2. **Chat is a mode** — open from composer or a card CTA; not the whole identity.
-3. **Cards are outcomes** — rides, mail, orders, confirmations land on Home and stay scannable.
-4. **One fat primary CTA** per card when something needs you.
-5. **No aesthetic archaeology** — soft glass + soft wash. Not silent luxury / Didot / multi-theme thrash.
+The design is in DESIGN.md. This file is the product scope and status only.
 
 ## Product scope checklist
 
@@ -177,28 +167,3 @@ negotiate with someone, and create follow-up tasks while they carry on with life
 
 The deeper thesis is that computers should be delegated to, not operated by
 people step by step. The device is the physical presence of that shift.
-
-## The mum test
-
-Every screen must pass this test:
-
-- A normal person can understand what it does in a few seconds.
-- A normal person can see why it matters.
-- A normal person can see the next action.
-
-Use human outcomes as the main language:
-
-- “Adam is watching this.”
-- “Adam handled this.”
-- “This needs your OK.”
-- “Here is what matters today.”
-
-Keep runtimes, artifacts, project references, diffs, schedulers, and background jobs
-hidden unless the person needs that detail. Developer work is a proving ground. It is
-not the product identity.
-
-## Out of scope until Home feels right
-
-- Full generative 3D surfaces
-- Orb memory graphs as primary UX
-- More design-system rewrites

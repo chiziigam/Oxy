@@ -45,11 +45,10 @@ Also still open, unrelated: `OXY_TOKEN_ENCRYPTION_KEY` missing from `.env` — c
 
 **Connectors** — Monzo/Eventbrite/Plaid deleted (`8df498c9`, never had a real connect flow). Oura/Strava/GitHub kept. Outlook/Microsoft + Google Docs connectors wired up but need real `MS_CLIENT_ID`/`SECRET` to go live.
 
-**iOS/product** — Nav redesign shipped (`ff109b3`): tab bar killed, Home is sole root screen, Chat/More reached via composer/avatar/edge-swipe; scenePhase reload + 90s foreground poll for Home refresh. Gleb light/glass UI + real-icon system spread app-wide (`4001a8e`, `871b430`). SF Symbols are banned, no exceptions — real bundled assets only (AGENTS.md rule #7). No AI-isms in UI copy (no chatty first-person subtitles/disclaimers). Push/APNs blocked until a paid Apple Developer account exists; briefings land in-app instead. Real Xcode project is `OxyApp/OxyApp.xcodeproj` scheme `OxyApp` — root `Oxy.xcodeproj` was a stub, deleted.
+**iOS** — Real Xcode project is `OxyApp/OxyApp.xcodeproj` scheme `OxyApp` — root `Oxy.xcodeproj` was a stub, deleted.
 
 **Model/cost** — chat/voice on `gemini-3-flash-preview`, helpers on `3.1-flash-lite`, env-overridable (`OXY_REASONING_MODEL`/`GEMINI_MODEL`). 2026-07-10 incident: streaming chat got silently downgraded to the lite tier and actions got dropped — fixed same day, restored to primary tier (`935aa35`). Watch for this regressing again.
 
-**Product/design** — product is nameless in-app (strip "Oxy"/"Adam" branding from UI), aiming inclusive/feminine-leaning luxury via de-gadgeting rather than cliché; a light-mode pivot was tried and reverted, dark-only is pinned. Adam wordmark/logo: dotted-M monogram, Didot Regular. Design language went through an editorial pure-black/Didot direction that was scrapped 2026-07-03 in favor of charcoal + gold accent + SF type.
 
 **Hardware** — pendant (`OxyPendantFirmware/`, BLE mic + button, Seeed XIAO nRF52840) is **dead** — not a technical failure, a desirability one; confirmed by the user directly. No replacement hardware direction is committed. A 2026-07-29 session already pressure-tested a "pivot to home-device/agentic-Alexa" idea and the recommendation was to not chase it — phone/app is the actual wedge, the shipped agent capability (transacts: basket, guest checkout, card fill, reauth walls, honest outcome reporting) is the asset regardless of shell, and hardware is an earned move once software demand is undeniable, not an opening one. Nothing has overturned that since. Don't propose new hardware without the user raising it.
 
