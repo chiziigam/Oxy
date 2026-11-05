@@ -23,8 +23,8 @@ The speaker is the main way in. The app covers everything the speaker cannot:
 
 ## Structure
 
-- **Main screen.** Nearly empty, with the message box at the bottom. Three chips at the top left (needs you, working, done) each open a short list. A group with nothing in it is not shown. Two icons at the top right open Home and Settings.
-- **A task.** Each request has its own conversation. Open it from a list. The header and message box are frosted over the thread.
+- **Main screen.** One screen. The conversation, with its history, fills it and the message box sits at the bottom. Sending a message does not open another screen. Two chips at the top left (needs you, working) each open a short list. A group with nothing in it is not shown. Two icons at the top right open Home and Settings.
+- **A task.** Something that needs you or is being worked on opens its own detail screen from the chips.
 - **Home.** Who is home, devices, things like keys, today's events.
 - **Settings.** Connections, Home (People, Routines, Things), Permissions, You.
 - No tab bar. No sidebar. No endless single thread. No app name in the interface. The launch screen and notifications use the A mark only.
@@ -48,7 +48,7 @@ The speaker is the main way in. The app covers everything the speaker cannot:
 - Radii: card 18, item 12 (card padding 6, so the corners line up), button 12, small button 9, chips and the message box fully round.
 - Spacing steps: 4, 8, 12, 16, 24. Screen edge padding is 16. Rows inside a card are 6 apart.
 - One level of nesting: a group card with item rows inside. Controls inside a row have no box of their own.
-- Frosted glass only on the header and message box, when a conversation scrolls under them. Cards are plain. Never glass on glass.
+- No header bar and no lines above or below the thread. The chips and the Home and Settings round buttons float over the thread, which fades out under them. A reply you are answering shows as a small muted bubble above your own, like a messaging app. A reply is plain text with no card and no border. Your own messages are a filled bubble. Cards are plain.
 - One accent, used for buttons and the selected chip. Warning and danger show state only.
 - Icons sit next to a count or a word. An icon alone is only used for Home and Settings.
 - Words are plain and literal. No taglines, no mood words.
@@ -65,15 +65,15 @@ The speaker is the main way in. The app covers everything the speaker cannot:
 
 ## Dropped from the old app
 
-Memory page, full history page, paired displays, import from ChatGPT or Claude, Private mode, the four colour themes, the opening-style option, the round menu button and the wheel menu, and the app name in the interface. The Done list replaces history. The two plugs have no screen of their own; they appear in Home as devices if they report anything.
+Memory page, full history page, paired displays, import from ChatGPT or Claude, Private mode, the four colour themes, the opening-style option, the round menu button and the wheel menu, and the app name in the interface. The conversation history on the main screen replaces the Done list. The two plugs have no screen of their own; they appear in Home as devices if they report anything.
 
 ## Not settled
 
 - Whether the hardware can notice enough to make the keys estimate useful. The design labels it as a guess either way.
-- The icons for needs you, working and done (bell, clock, check) are not tested with people.
+- The icons for needs you and working (bell, clock) are not tested with people.
 ## Build status (2026-11-05)
 
-Built in the app, in `OxyApp/OxyApp/Design` and `OxyApp/OxyApp/Features`: colours (light and dark, six accents), icons drawn from this design, shared parts, the main screen with real chips and lists from `/agent/state` and working Approve buttons, the message box with attach and voice, the conversation screen, the task screen, Home (from the real home data), Settings (Connections, You), Appearance, and sign in, create account and Sign in with Apple.
+Built in the app, in `OxyApp/OxyApp/Design` and `OxyApp/OxyApp/Features`: colours (light and dark, six accents), icons drawn from this design, shared parts, the main screen with the conversation and its history, real chips and lists from `/agent/state` and working Approve buttons, the message box with attach and voice, the task screen, Home (from the real home data), Settings (Connections, You), Appearance, and sign in, create account and Sign in with Apple.
 
 Not built yet: first-run setup (notification permission, speaker pairing, connecting accounts), People, Things, Routines, notification settings and quiet hours, Privacy, the speaker screen and its fix flow, share from other apps, no-internet and signed-out states, lock-screen notification buttons, the spending options with the scroll wheel, and the dot on the Home icon.
 

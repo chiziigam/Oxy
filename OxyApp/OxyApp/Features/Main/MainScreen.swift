@@ -1,14 +1,14 @@
 import SwiftUI
 
 enum DSRoute: Hashable {
-    case home, settings, conversation
+    case home, settings
     case task(BoardItem)
 }
 
 private enum DecisionState: Equatable { case sending, failed }
 
-/// The first screen after signing in. Nearly empty: a message box, three chips for open items,
-/// and two icons for Home and Settings. See DESIGN.md.
+/// The one screen after signing in: the conversation with its history, a message box, two chips for
+/// open items, and two icons for Home and Settings. See DESIGN.md.
 struct MainScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
@@ -29,7 +29,26 @@ struct MainScreen: View {
         NavigationStack(path: $path) {
             ZStack {
                 DS.bg.ignoresSafeArea()
-                VStack(spacing: 14) {
+                ConversationThread(chat: chat, topInset: 56)
+                    .mask {
+                        VStack(spacing: 0) {
+                            Color.clear.frame(height: DS.safeTop)
+                            LinearGradient(stops: [.init(color: .clear, location: 0.35), .init(color: .black, location: 1)], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 64)
+                            Rectangle()
+                        }
+                    }
+                if chat.messages.isEmpty, hasLoaded, !loadFailed {
+                    Text("Ask for anything, or talk to the speaker.")
+                        .font(.ds(13))
+                        .foregroundStyle(DS.muted)
+                }
+            }
+            .overlay(alignment: .top) {
+                DS.bg.frame(height: DS.safeTop).ignoresSafeArea(edges: .top).allowsHitTesting(false)
+            }
+            .overlay(alignment: .top) {
+                VStack(spacing: 10) {
                     header
                     if loadFailed {
                         DSBanner(text: "No connection.", actionTitle: "Retry") { Task { await loadBoard() } }
@@ -40,28 +59,23 @@ struct MainScreen: View {
                     if let group = openGroup, !items(group).isEmpty {
                         panel(group)
                     }
-                    Spacer(minLength: 0)
-                    if hasLoaded, !loadFailed, DSGroup.allCases.allSatisfy({ items($0).isEmpty }) {
-                        Text("Ask for anything, or talk to the speaker.")
-                            .font(.ds(13))
-                            .foregroundStyle(DS.muted)
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 8)
-                    }
                 }
                 .padding(.horizontal, DS.Space.edge)
+                .padding(.top, 4)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 DSComposer(
                     text: $draft,
                     attachment: attachments.pending,
+                    isBusy: chat.isSending,
                     voice: voice,
                     onSend: send,
+                    onStop: { chat.stopCurrentTurn() },
                     onAttach: { attachments.showSheet = true },
                     onVoice: toggleVoice,
                     onRemoveAttachment: { attachments.pending = nil }
                 )
-                .background(DS.bg)
+                .background(DS.bg.ignoresSafeArea(edges: .bottom))
             }
             .dsAttachments(attachments, draft: $draft)
             .dsVoice(voice) { text in
@@ -73,11 +87,11 @@ struct MainScreen: View {
                 switch route {
                 case .home: HomeScreen()
                 case .settings: SettingsScreen()
-                case .conversation: ConversationScreen(chat: chat)
                 case .task(let item): TaskScreen(item: item) { Task { await loadBoard() } }
                 }
             }
         }
+        .task { await chat.prepareChat(userId: appState.userId) }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
@@ -93,7 +107,7 @@ struct MainScreen: View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 if !hasLoaded {
-                    DSChipSkeleton(); DSChipSkeleton(); DSChipSkeleton()
+                    DSChipSkeleton(); DSChipSkeleton()
                 } else {
                     ForEach(DSGroup.allCases, id: \.self) { group in
                         let list = items(group)
@@ -104,20 +118,20 @@ struct MainScreen: View {
                 }
             }
             Spacer(minLength: 0)
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 iconButton(.house, label: "Home") { path.append(.home) }
                 iconButton(.sliders, label: "Settings") { path.append(.settings) }
             }
-            .padding(.trailing, -8)
+            .background(Capsule().fill(DS.card))
         }
-        .frame(height: 40)
+        .frame(height: 36)
     }
 
     private func iconButton(_ icon: DSIcon, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            DSIconView(icon: icon, size: 22)
+            DSIconView(icon: icon, size: 18)
                 .foregroundStyle(DS.ink)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 36)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -126,28 +140,12 @@ struct MainScreen: View {
 
     // MARK: Lists
 
-    private var chatItem: BoardItem? {
-        guard let first = chat.messages.first(where: { $0.role == .user }) else { return nil }
-        let title = first.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        let reply = chat.messages.last(where: { $0.role == .assistant && !$0.content.isEmpty })?.content
-        return BoardItem(
-            id: "chat", kind: "chat",
-            title: title.count > 54 ? String(title.prefix(54)) + "…" : title,
-            detail: chat.isSending ? nil : reply.map { String($0.prefix(90)) },
-            at: nil
-        )
-    }
-
     private func items(_ group: DSGroup) -> [BoardItem] {
         switch group {
         case .needsYou:
             return board.needsYou
         case .working:
-            return (chat.isSending ? [chatItem].compactMap { $0 } : []) + board.handling
-        case .done:
-            var seen = Set<String>()
-            let mine = chat.isSending ? [] : [chatItem].compactMap { $0 }
-            return (mine + board.completed + board.changed).filter { seen.insert($0.id).inserted }
+            return board.handling
         }
     }
 
@@ -228,7 +226,7 @@ struct MainScreen: View {
     }
 
     private func open(_ item: BoardItem) {
-        path.append(item.kind == "chat" ? .conversation : .task(item))
+        path.append(.task(item))
     }
 
     // MARK: Actions
@@ -290,7 +288,6 @@ struct MainScreen: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || attachments.pending != nil else { return }
         let userId = appState.userId
-        chat.startNewChat(userId: userId)
         chat.inputText = text
         if let file = attachments.pending {
             chat.sendImageMessage(userId: userId, imageData: file.data, fileName: file.name, mimeType: file.mime, isImage: file.isImage)
@@ -299,7 +296,6 @@ struct MainScreen: View {
             chat.sendMessage(userId: userId)
         }
         draft = ""
-        path.append(.conversation)
     }
 }
 

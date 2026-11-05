@@ -175,35 +175,34 @@ struct DSComposer: View {
         .padding(.bottom, 8)
     }
 
+    /// One box: plus on the left, the text, and send, stop or record on the right.
     private var bar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .bottom, spacing: 2) {
             Button {
                 focused = false
                 onAttach()
             } label: {
-                DSIconView(icon: .clip, size: 18)
-                    .foregroundStyle(DS.ink)
+                DSIconView(icon: .plus, size: 20)
+                    .foregroundStyle(DS.muted)
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(DS.card))
-                    .overlay(Circle().strokeBorder(DS.line, lineWidth: 1))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Attach")
 
             TextField(placeholder, text: $text, axis: .vertical)
-                .font(.ds(14))
-                .lineLimit(1...4)
+                .font(.ds(15))
+                .lineLimit(1...5)
                 .focused($focused)
                 .foregroundStyle(DS.ink)
                 .tint(DS.accent)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
+                .padding(.vertical, 10)
                 .frame(minHeight: 40)
-                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(DS.card))
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(DS.line, lineWidth: 1))
 
             trailing
         }
+        .padding(4)
+        .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(DS.card))
     }
 
     @ViewBuilder

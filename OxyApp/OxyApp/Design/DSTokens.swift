@@ -142,6 +142,14 @@ enum DS {
         return color(light: 0xffffff, dark: a.darkInk)
     }
 
+    /// Height of the status bar and camera area, so a screen can keep content out from under it.
+    @MainActor
+    static var safeTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.keyWindow?.safeAreaInsets.top ?? 0
+    }
+
     enum Radius {
         static let card: CGFloat = 18
         static let item: CGFloat = 12

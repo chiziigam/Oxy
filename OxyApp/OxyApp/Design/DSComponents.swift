@@ -29,13 +29,12 @@ enum DSHaptics {
 // MARK: - Groups and chips
 
 enum DSGroup: String, Hashable, CaseIterable {
-    case needsYou, working, done
+    case needsYou, working
 
     var icon: DSIcon {
         switch self {
         case .needsYou: return .bell
         case .working: return .clock
-        case .done: return .check
         }
     }
 
@@ -43,7 +42,6 @@ enum DSGroup: String, Hashable, CaseIterable {
         switch self {
         case .needsYou: return "Needs you"
         case .working: return "Working"
-        case .done: return "Done"
         }
     }
 
@@ -51,7 +49,6 @@ enum DSGroup: String, Hashable, CaseIterable {
         switch self {
         case .needsYou: return "need you"
         case .working: return "working"
-        case .done: return "done"
         }
     }
 }
@@ -69,10 +66,9 @@ struct DSChip: View {
                 Text("\(count)").font(.ds(13, .semibold)).monospacedDigit()
             }
             .padding(.horizontal, 11)
-            .frame(height: 34)
-            .foregroundStyle(isOn ? DS.accentInk : DS.muted)
+            .frame(height: 36)
+            .foregroundStyle(isOn ? DS.accentInk : DS.ink)
             .background(Capsule().fill(isOn ? DS.accent : DS.card))
-            .overlay(Capsule().strokeBorder(isOn ? DS.accent : DS.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(count) \(group.spoken)")
@@ -82,7 +78,7 @@ struct DSChip: View {
 
 struct DSChipSkeleton: View {
     var body: some View {
-        Capsule().fill(DS.line).frame(width: 56, height: 34)
+        Capsule().fill(DS.card).frame(width: 60, height: 36)
     }
 }
 

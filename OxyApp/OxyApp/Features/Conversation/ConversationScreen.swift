@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// One conversation. The header and message box are frosted over the thread.
-struct ConversationScreen: View {
+/// The conversation on the main screen: history above, newest at the bottom.
+struct ConversationThread: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
 
     var chat: ChatViewModel
+    var topInset: CGFloat = 0
 
-    @State private var voice = VoiceInputManager()
-    @State private var attachments = DSAttachments()
-    @State private var draft = ""
+    @State private var didScrollToEnd = false
 
     private var visibleMessages: [Message] {
         chat.messages.filter { message in
@@ -20,92 +18,47 @@ struct ConversationScreen: View {
         }
     }
 
-    private var title: String {
-        let first = chat.messages.first(where: { $0.role == .user })?.content
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "Conversation"
-        return first.count > 28 ? String(first.prefix(28)) + "…" : first
-    }
-
     var body: some View {
-        ZStack {
-            DS.bg.ignoresSafeArea()
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 12) {
-                        ForEach(visibleMessages) { message in
-                            bubble(message).id(message.id)
-                        }
-                        if chat.isSending, let status = chat.statusLabel, !status.isEmpty {
-                            Text(status)
-                                .font(.ds(12.5))
-                                .foregroundStyle(DS.muted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        Color.clear.frame(height: 1).id("end")
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 12) {
+                    if chat.hasOlderHistory, !visibleMessages.isEmpty {
+                        ProgressView()
+                            .tint(DS.muted)
+                            .frame(height: 24)
+                            .onAppear { loadOlder(proxy) }
                     }
-                    .padding(.horizontal, DS.Space.edge)
-                    .padding(.vertical, 12)
+                    ForEach(visibleMessages) { message in
+                        bubble(message).id(message.id)
+                    }
+                    if chat.isSending, let status = chat.statusLabel, !status.isEmpty {
+                        Text(status)
+                            .font(.ds(12.5))
+                            .foregroundStyle(DS.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Color.clear.frame(height: 1).id("end")
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onAppear { scrollToEnd(proxy, animated: false) }
-                .onChange(of: chat.messages.count) { scrollToEnd(proxy) }
-                .onChange(of: chat.messages.last?.content) { scrollToEnd(proxy) }
+                .padding(.horizontal, DS.Space.edge)
+                .padding(.vertical, 12)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .contentMargins(.top, topInset, for: .scrollContent)
+            .onAppear { scrollToEnd(proxy, animated: false) }
+            .onChange(of: visibleMessages.last?.id) {
+                scrollToEnd(proxy, animated: didScrollToEnd)
+                didScrollToEnd = true
+            }
+            .onChange(of: chat.messages.last?.content) { scrollToEnd(proxy, animated: true) }
         }
-        .safeAreaInset(edge: .top, spacing: 0) { header }
-        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
-        .dsAttachments(attachments, draft: $draft)
-        .dsVoice(voice) { text in
-            draft = text
-            send()
-        }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
-    // MARK: Frosted bars
-
-    private var header: some View {
-        HStack(spacing: 6) {
-            Button { dismiss() } label: {
-                DSIconView(icon: .back, size: 20)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
+    private func loadOlder(_ proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            if let anchor = await chat.loadOlder(userId: appState.userId) {
+                proxy.scrollTo(anchor, anchor: .top)
             }
-            .buttonStyle(.plain)
-            .padding(.leading, -8)
-            .accessibilityLabel("Back")
-            Text(title).font(.ds(24, .semibold)).tracking(-0.24).lineLimit(1)
-            Spacer(minLength: 0)
         }
-        .foregroundStyle(DS.ink)
-        .padding(.horizontal, DS.Space.edge)
-        .frame(height: 48)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) { Rectangle().fill(DS.line).frame(height: 1) }
-    }
-
-    private var composer: some View {
-        VStack(spacing: 0) {
-            if let message = voice.errorMessage {
-                DSBanner(text: message, actionTitle: "Dismiss") { voice.errorMessage = nil }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-            }
-            DSComposer(
-                text: $draft,
-                placeholder: "Reply",
-                attachment: attachments.pending,
-                isBusy: chat.isSending,
-                voice: voice,
-                onSend: send,
-                onStop: { chat.stopCurrentTurn() },
-                onAttach: { attachments.showSheet = true },
-                onVoice: toggleVoice,
-                onRemoveAttachment: { attachments.pending = nil }
-            )
-        }
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) { Rectangle().fill(DS.line).frame(height: 1) }
     }
 
     // MARK: Messages
@@ -127,22 +80,48 @@ struct ConversationScreen: View {
         }
     }
 
+    /// A reply to a message is stored as "↩︎ Name: quoted text", a blank line, then what was typed.
+    /// The quote shows as a small muted line above the bubble instead of raw text with an arrow.
+    private static func splitQuote(_ text: String) -> (quote: String?, body: String) {
+        guard text.hasPrefix("↩︎ ") else { return (nil, text) }
+        let parts = text.dropFirst(2).components(separatedBy: "\n\n")
+        guard parts.count >= 2 else { return (nil, text) }
+        var quote = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        if let colon = quote.firstIndex(of: ":"), quote.distance(from: quote.startIndex, to: colon) <= 24 {
+            quote = String(quote[quote.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+        }
+        let body = parts.dropFirst().joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (quote.isEmpty ? nil : quote, body)
+    }
+
     private func userBubble(_ message: Message) -> some View {
-        HStack {
+        let split = Self.splitQuote(message.content)
+        return HStack {
             Spacer(minLength: 48)
             VStack(alignment: .trailing, spacing: 6) {
+                if let quote = split.quote {
+                    Text(quote)
+                        .font(.ds(13))
+                        .foregroundStyle(DS.muted)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(DS.card))
+                        .padding(.bottom, -2)
+                }
                 if let data = message.attachmentImage, let image = UIImage(data: data) {
                     Image(uiImage: image).resizable().scaledToFill()
                         .frame(width: 160, height: 120)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                if !message.content.isEmpty {
-                    Text(message.content)
-                        .font(.ds(14))
+                if !split.body.isEmpty {
+                    Text(split.body)
+                        .font(.ds(15))
                         .foregroundStyle(DS.accentInk)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 16, bottomTrailingRadius: 4, topTrailingRadius: 16, style: .continuous).fill(DS.accent))
+                        .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18, bottomTrailingRadius: 5, topTrailingRadius: 18, style: .continuous).fill(DS.accent))
                 }
             }
         }
@@ -152,10 +131,10 @@ struct ConversationScreen: View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
                 if message.content.isEmpty && message.isStreaming {
-                    Text("…").font(.ds(14)).foregroundStyle(DS.muted)
+                    Text("…").font(.ds(15)).foregroundStyle(DS.muted)
                 } else if !message.content.isEmpty {
                     Text(Self.attributed(message.content))
-                        .font(.ds(14))
+                        .font(.ds(15))
                         .foregroundStyle(DS.ink)
                 }
                 if let error = message.turnError {
@@ -164,11 +143,10 @@ struct ConversationScreen: View {
                         .buttonStyle(.dsMidSecondary)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 4, bottomTrailingRadius: 16, topTrailingRadius: 16, style: .continuous).fill(DS.card))
-            .overlay(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 4, bottomTrailingRadius: 16, topTrailingRadius: 16, style: .continuous).strokeBorder(DS.line, lineWidth: 1))
-            Spacer(minLength: 48)
+            .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 5, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous).fill(DS.card))
+            Spacer(minLength: 40)
         }
     }
 
@@ -177,36 +155,11 @@ struct ConversationScreen: View {
             ?? AttributedString(text)
     }
 
-    // MARK: Actions
-
     private func scrollToEnd(_ proxy: ScrollViewProxy, animated: Bool = true) {
         if animated {
             withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("end", anchor: .bottom) }
         } else {
             proxy.scrollTo("end", anchor: .bottom)
         }
-    }
-
-    private func toggleVoice() {
-        guard !voice.isTranscribing else { return }
-        if voice.isRecording {
-            voice.stopRecording()
-        } else {
-            DSHaptics.light()
-            voice.startRecording(userId: appState.userId)
-        }
-    }
-
-    private func send() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || attachments.pending != nil else { return }
-        chat.inputText = text
-        if let file = attachments.pending {
-            chat.sendImageMessage(userId: appState.userId, imageData: file.data, fileName: file.name, mimeType: file.mime, isImage: file.isImage)
-            attachments.pending = nil
-        } else {
-            chat.sendMessage(userId: appState.userId)
-        }
-        draft = ""
     }
 }
