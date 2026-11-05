@@ -6,16 +6,44 @@ struct ConversationThread: View {
 
     var chat: ChatViewModel
     var topInset: CGFloat = 0
+    var reactionVersion = 0
+    var onReply: (Message) -> Void = { _ in }
+    var onHold: (HeldMessage) -> Void = { _ in }
 
     @State private var didScrollToEnd = false
 
     private var visibleMessages: [Message] {
         chat.messages.filter { message in
-            let text = message.content
-            if text.hasPrefix("[quiet") || text.hasPrefix("[react:") { return false }
-            if message.role == .user, text.hasPrefix("Reacted ") { return false }
-            return true
+            if message.role == .user { return !ReactionText.isReaction(message.content) }
+            if ReactionText.isQuiet(message.content) || ReactionText.isAgentReactionInProgress(message.content) { return false }
+            if ReactionText.agentReaction(message.content) != nil { return reactionTarget(of: message) == nil }
+            // A reply to a reaction that failed or never came isn't worth showing.
+            guard message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let index = chat.messages.firstIndex(where: { $0.id == message.id }), index > 0 else { return true }
+            return !ReactionText.isReaction(chat.messages[index - 1].content)
         }
+    }
+
+    /// The message an emoji reaction from Adam lands on, or nil when it should show as a plain emoji.
+    private func reactionTarget(of message: Message) -> Message? {
+        guard let index = chat.messages.firstIndex(where: { $0.id == message.id }), index > 0 else { return nil }
+        let target = chat.messages[index - 1]
+        guard target.role == .user, !ReactionText.isReaction(target.content),
+              ReactionText.canReact(to: target.content) else { return nil }
+        return target
+    }
+
+    /// The emoji on a message: Adam's reaction to it, or the one chosen here.
+    private func reaction(on message: Message) -> String? {
+        _ = reactionVersion
+        if message.role == .user,
+           let index = chat.messages.firstIndex(where: { $0.id == message.id }),
+           index + 1 < chat.messages.count {
+            let next = chat.messages[index + 1]
+            if next.role == .assistant, let emoji = ReactionText.agentReaction(next.content),
+               reactionTarget(of: next)?.id == message.id { return emoji }
+        }
+        return ReactionStore.shared.reaction(for: message)
     }
 
     var body: some View {
@@ -29,7 +57,14 @@ struct ConversationThread: View {
                             .onAppear { loadOlder(proxy) }
                     }
                     ForEach(visibleMessages) { message in
-                        bubble(message).id(message.id)
+                        SwipeReplyRow(
+                            message: message,
+                            onReply: { onReply(message) },
+                            onHold: { onHold(HeldMessage(message: message, frame: $0)) }
+                        ) {
+                            bubble(message)
+                        }
+                        .id(message.id)
                     }
                     if chat.isSending, let status = chat.statusLabel, !status.isEmpty {
                         Text(status)
@@ -73,7 +108,8 @@ struct ConversationThread: View {
                 message: message,
                 onActionCommand: { chat.sendCommand($0, userId: appState.userId) },
                 onRetryFailedTurn: { chat.retryLastFailedMessage(userId: appState.userId) },
-                onSceneRequest: { chat.sendInterfaceRequest($0, userId: appState.userId) }
+                onSceneRequest: { chat.sendInterfaceRequest($0, userId: appState.userId) },
+                reaction: reaction(on: message)
             )
         } else {
             assistantBubble(message)
@@ -122,6 +158,7 @@ struct ConversationThread: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18, bottomTrailingRadius: 5, topTrailingRadius: 18, style: .continuous).fill(DS.accent))
+                        .overlay(alignment: .bottomLeading) { badge(for: message).offset(x: -8, y: 12) }
                 }
             }
         }
@@ -146,8 +183,14 @@ struct ConversationThread: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 5, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous).fill(DS.card))
+            .overlay(alignment: .bottomTrailing) { badge(for: message).offset(x: 8, y: 12) }
             Spacer(minLength: 40)
         }
+    }
+
+    @ViewBuilder
+    private func badge(for message: Message) -> some View {
+        if let emoji = reaction(on: message) { DSReactionBadge(emoji: emoji) }
     }
 
     private static func attributed(_ text: String) -> AttributedString {

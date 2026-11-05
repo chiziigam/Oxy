@@ -24,12 +24,21 @@ struct MainScreen: View {
     @State private var attachments = DSAttachments()
     @State private var draft = ""
     @State private var decisions: [String: DecisionState] = [:]
+    @State private var replyingTo: Message?
+    @State private var held: HeldMessage?
+    @State private var reactionVersion = 0
 
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
                 DS.bg.ignoresSafeArea()
-                ConversationThread(chat: chat, topInset: 56)
+                ConversationThread(
+                    chat: chat,
+                    topInset: 56,
+                    reactionVersion: reactionVersion,
+                    onReply: startReply,
+                    onHold: { held = $0 }
+                )
                     .mask {
                         VStack(spacing: 0) {
                             Color.clear.frame(height: DS.safeTop)
@@ -64,6 +73,11 @@ struct MainScreen: View {
                 .padding(.top, 4)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                if let replyingTo {
+                    DSReplyBar(message: replyingTo) { withAnimation(.smooth(duration: 0.2)) { self.replyingTo = nil } }
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
                 DSComposer(
                     text: $draft,
                     attachment: attachments.pending,
@@ -75,6 +89,7 @@ struct MainScreen: View {
                     onVoice: toggleVoice,
                     onRemoveAttachment: { attachments.pending = nil }
                 )
+                }
                 .background(DS.bg.ignoresSafeArea(edges: .bottom))
             }
             .dsAttachments(attachments, draft: $draft)
@@ -83,6 +98,23 @@ struct MainScreen: View {
                 send()
             }
             .toolbar(.hidden, for: .navigationBar)
+            .overlay {
+                if let held {
+                    DSReactionPicker(
+                        held: held,
+                        current: ReactionStore.shared.reaction(for: held.message),
+                        onReact: { react($0, on: held.message) },
+                        onReply: { startReply(held.message) },
+                        onCopy: {
+                            UIPasteboard.general.string = ReplyQuote.split(held.message.content)?.body ?? held.message.content
+                            DSHaptics.success()
+                            self.held = nil
+                        },
+                        onClose: { self.held = nil }
+                    )
+                    .transition(.opacity)
+                }
+            }
             .navigationDestination(for: DSRoute.self) { route in
                 switch route {
                 case .home: HomeScreen()
@@ -284,11 +316,29 @@ struct MainScreen: View {
         }
     }
 
+    private func startReply(_ message: Message) {
+        held = nil
+        withAnimation(.smooth(duration: 0.2)) { replyingTo = message }
+    }
+
+    private func react(_ emoji: String, on message: Message) {
+        if ReactionStore.shared.toggle(emoji, on: message) {
+            chat.sendReaction(emoji, on: message, userId: appState.userId)
+        }
+        DSHaptics.tick()
+        reactionVersion += 1
+        held = nil
+    }
+
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || attachments.pending != nil else { return }
         let userId = appState.userId
         chat.inputText = text
+        if let replyingTo, !text.isEmpty, attachments.pending == nil {
+            chat.inputText = ReplyQuote.compose(quoting: replyingTo, body: text)
+        }
+        withAnimation(.smooth(duration: 0.2)) { replyingTo = nil }
         if let file = attachments.pending {
             chat.sendImageMessage(userId: userId, imageData: file.data, fileName: file.name, mimeType: file.mime, isImage: file.isImage)
             attachments.pending = nil

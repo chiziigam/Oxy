@@ -102,6 +102,7 @@
 		DD7D1AFEC3BA5F4857D262A9 /* Geist-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDD45F9002AB2B6566761051 /* Geist-Medium.ttf */; };
 		DD9F3270E5E1C2AF8ED0AAA8 /* Geist-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */; };
 		DD9B815CDA3A01C4E2C784E6 /* Geist-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */; };
+		DD29788A27748753318B06FB /* MessageInteractions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -205,6 +206,7 @@
 		DDD45F9002AB2B6566761051 /* Geist-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-Medium.ttf; sourceTree = "<group>"; };
 		DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-SemiBold.ttf; sourceTree = "<group>"; };
 		DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fonts/Geist-OFL.txt; sourceTree = "<group>"; };
+		DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageInteractions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -559,6 +561,7 @@
 			isa = PBXGroup;
 			children = (
 				DDFD0DB5007A8A9AE98322C8 /* ConversationScreen.swift */,
+				DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */,
 			);
 			path = Conversation;
 			sourceTree = "<group>";
@@ -690,6 +693,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD29788A27748753318B06FB /* MessageInteractions.swift in Sources */,
 				DDD09BD60AF4283B36F5F3CD /* TaskScreen.swift in Sources */,
 				DD8AF1E89BC464F7C58B3798 /* SettingsScreen.swift in Sources */,
 				DD4C99EFAFC4C1FB3673D0E8 /* MainScreen.swift in Sources */,
