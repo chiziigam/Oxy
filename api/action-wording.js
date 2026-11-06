@@ -34,6 +34,12 @@ function site(value) {
 
 const pick = (specific, general) => (specific ? specific : general);
 
+// The site a search is aimed at ("site:decathlon.co.uk/p/ shorts" -> "decathlon.co.uk").
+function searchSite(query) {
+  const match = String(query || '').match(/\bsite:(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i);
+  return match ? match[1].toLowerCase() : '';
+}
+
 function clip(value, max = 60) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
@@ -436,7 +442,7 @@ const ACTION_WORDING = Object.freeze({
   },
   web_search: {
     name: 'Search',
-    progress: (i) => pick(detail(i.query) && `Looking up ${detail(i.query)}`, 'Looking it up'),
+    progress: (i) => pick(searchSite(i.query) && `Searching ${searchSite(i.query)}`, pick(detail(i.query) && `Looking up ${detail(i.query)}`, 'Looking it up')),
     summary: (p) => ({ summary: `Searched for ${field(p, 'query') || 'something'}`, kind: 'looked' }),
     feed: (i) => `Looked up ${quoted(i.query) || 'something online'}`,
     failureLead: "I couldn't search for that."

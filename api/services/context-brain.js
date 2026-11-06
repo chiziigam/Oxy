@@ -141,6 +141,16 @@ function contextFromAction(action, source = 'action_result') {
       dateField: dateFieldOf(input)
     };
   }
+  if (type === 'play_game' || type === 'make_game') {
+    return {
+      kind: 'game',
+      label: input.title || input.game || label || 'the game',
+      source,
+      confidence: 'high',
+      suggestedAction: type,
+      input
+    };
+  }
   if (type === 'play_music' || type === 'add_to_music_playlist') {
     return {
       kind: 'media',
@@ -388,7 +398,7 @@ function parseOrdinalSelector(message) {
 function messageKindHints(message) {
   const text = normalizeText(message).toLowerCase();
   const hints = new Set();
-  if (/\b(play|again)\b/.test(text)) hints.add('media');
+  if (/\bplay\b/.test(text)) { hints.add('media'); hints.add('game'); }
   if (/\b(directions|navigate|maps?|route)\b/.test(text)) hints.add('route');
   if (/\bplace\b/.test(text) || /\bsame place\b/.test(text)) hints.add('place');
   if (/\b(send)\b/.test(text) && !/\b(email|mail)\b/.test(text)) hints.add('draft');
@@ -569,6 +579,16 @@ function resolveContextualTurn({ message = '', history = [], recentActions = [],
       resolvedContext,
       spoken: "I'll try that again.",
       actions: [{ type: resolvedContext.suggestedAction, input: resolvedContext.input }]
+    };
+  }
+
+  // "play again" after a game is another round of that game, never a song.
+  if (resolvedContext.kind === 'game' && resolvedContext.suggestedAction === 'play_game' && resolvedContext.input?.game && /\b(play|again|another|new)\b/i.test(lower)) {
+    return {
+      reason: 'context_game_replay',
+      resolvedContext,
+      spoken: 'Starting another round.',
+      actions: [{ type: 'play_game', input: { game: resolvedContext.input.game, operation: 'start' } }]
     };
   }
 

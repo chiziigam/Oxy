@@ -28,7 +28,7 @@ const googleConnector = require('../connectors/google');
 const telegram = require('../connectors/telegram');
 const telegramBot = require('../connectors/telegram-bot');
 const { inferDeterministicAction } = require('./intent-router');
-const { resolveRetailerFromGoal, allRetailerAliases } = require('./services/retailer-sites');
+const { resolveRetailerFromGoal } = require('./services/retailer-sites');
 const { createActionExecution, unavailableActionResult } = require('./services/action-execution');
 const { createDeclaredAdapterInvoker } = require('./services/declared-adapter-invoker');
 const { normalizeActionOutcome } = require('./services/action-outcome');
@@ -1714,26 +1714,14 @@ function extractShoppingContextHints(history = []) {
   // Track the most recently user-specified retailer and the last domain actually visited
   let specifiedRetailer = null;
   let visitedDomain = null;
-  const aliases = allRetailerAliases();
 
   for (const turn of recent) {
     const content = String(turn.content || '');
-    const lower = content.toLowerCase();
 
     if (turn.role === 'user') {
       // Try resolving retailer from the full user message (handles "on john lewis", "from asos", etc.)
       const resolved = resolveRetailerFromGoal(content);
-      if (resolved) {
-        specifiedRetailer = resolved.displayName;
-      } else {
-        // Fallback: bare retailer alias in user message
-        for (const alias of aliases) {
-          if (lower.includes(alias)) {
-            specifiedRetailer = alias;
-            break;
-          }
-        }
-      }
+      if (resolved) specifiedRetailer = resolved.displayName;
     }
 
     if (turn.role === 'assistant') {
@@ -2727,7 +2715,7 @@ function createSentenceTtsStreamer({ voiceName, sse, trace = null, onSpeakingSta
   };
 }
 
-const IMAGE_MODEL = process.env.OXY_IMAGE_MODEL || 'gpt-image-1';
+const IMAGE_MODEL = process.env.OXY_IMAGE_MODEL || 'gpt-image-2';
 
 async function generateImage(prompt, imageFile) {
   if (!prompt || !prompt.trim()) {
@@ -4072,7 +4060,6 @@ async function resumeRunAfterApproval(userId, pendingAction, actionResults, trac
       useSearch,
       modelName: route.model,
       provider: route.provider,
-      maxIterations: Number.isFinite(claimedTask.checkpoint?.maxIterations) ? claimedTask.checkpoint.maxIterations : 6,
       context: {
         autonomy: claimedTask.autonomy,
         guardMode: claimedTask.metadata?.guardMode === true || (await getChatSettings(supabase, userId)).guardMode === true,
@@ -6536,14 +6523,13 @@ async function runSavedGoal(userId, {
   title,
   instruction,
   metadata = {},
-  maxIterations = 6,
   now = new Date(),
   deviceType = 'ambient_home',
 } = {}) {
   if (!usageMeter.currentTurn()) {
     return usageMeter.runWithMeter((turn) => {
       turn.userId = userId;
-      return runSavedGoal(userId, { title, instruction, metadata, maxIterations, now, deviceType });
+      return runSavedGoal(userId, { title, instruction, metadata, now, deviceType });
     });
   }
   if (spendCap.status(userId).blocked) {
@@ -6587,7 +6573,6 @@ async function runSavedGoal(userId, {
     dynamicSystemPrompt: await buildBackgroundSystemPrompt(userId),
     provider: route.provider,
     modelName: route.model,
-    maxIterations,
     context: {
       autonomy: 'Active',
       guardMode: guardMode === true,
@@ -8305,11 +8290,6 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             // The loop must carry the same surface budget as the first turn, or a room question
             // that starts an agent costs the full 127-tool prompt again.
             toolNames: toolsForChannel(channel),
-            // A checkout is twenty small steps — find, add, basket, handover, guest, address,
-            // delivery, payment. The old six guaranteed it stopped before the till.
-            maxIterations: /(?:order|buy|purchase|checkout|basket|cart|shop|book|reserve|apply|renew|website|on [a-z0-9-]+\.(?:com|co\.uk|org))/i.test(message)
-              ? 20
-              : (isBroadMoneyGoal || autonomyLevel === 'High' || autonomyLevel === 'Bold' ? 10 : 6),
             context: {
               userMessage: message,
               location,

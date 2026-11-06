@@ -351,3 +351,34 @@ test('extractAssistantContexts is unaffected by this change for the existing med
   const contexts = extractAssistantContexts([{ role: 'assistant', content: 'Playing "Bad Habit" by Steve Lacy.' }]);
   assert.ok(contexts.some(c => c.kind === 'media' && c.label === 'Bad Habit by Steve Lacy'));
 });
+
+// ── "play again" after a game ─────────────────────────────────────────────────────
+// Recent actions as the action log returns them, newest first.
+const logged = (type, input) => ({ type, input, status: 'executed', resultText: 'done' });
+
+test('play again after a game starts another round, not a song', () => {
+  const history = [
+    u('play some Steve Lacy'),
+    a('', [action('play_music', { query: 'Steve Lacy' })]),
+    u('lets play a number guessing game'),
+    a('', [action('play_game', { game: 'guess', operation: 'start' }, { success: true, text: 'Guess a number.' })])
+  ];
+  const recentActions = [logged('play_game', { game: 'guess', operation: 'start' }), logged('play_music', { query: 'Steve Lacy' })];
+  const resolved = resolveContextualTurn({ message: 'play again', history, recentActions });
+  assert.equal(resolved.reason, 'context_game_replay');
+  assert.equal(resolved.actions[0].type, 'play_game');
+  assert.equal(resolved.actions[0].input.game, 'guess');
+});
+
+test('play again after a made game leaves it to the model and never plays music', () => {
+  const recentActions = [logged('make_game', { title: 'Snake' }), logged('play_music', { query: 'Steve Lacy' })];
+  const resolved = resolveContextualTurn({ message: 'play again', history: [], recentActions });
+  assert.equal(resolved === null || resolved.actions?.[0]?.type !== 'play_music', true);
+  assert.equal(buildResolvedContext('play again', [], recentActions).kind, 'game');
+});
+
+test('a bare "again" does not turn into music unless music was the last thing', () => {
+  const recentActions = [logged('play_game', { game: 'guess' }), logged('play_music', { query: 'Steve Lacy' })];
+  const resolved = resolveContextualTurn({ message: 'again', history: [], recentActions });
+  assert.notEqual(resolved?.actions?.[0]?.type, 'play_music');
+});

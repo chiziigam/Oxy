@@ -63,27 +63,21 @@ test('only batches made entirely of read-only lookups run side by side', () => {
   assert.equal(areIndependentReads([]), false);
 });
 
-test('a browser that keeps making progress keeps the run going, up to a ceiling; other tools do not', async (t) => {
+test('a run is not cut off by a step count; it goes on until the model answers', async (t) => {
   const brainProvider = require('../../api/services/brain-provider');
   const { runAgentLoop } = require('../../api/services/agent-orchestrator');
   const real = brainProvider.callToolsBrain;
   t.after(() => { brainProvider.callToolsBrain = real; });
-  const call = (name) => async () => ({
-    text: '', functionCalls: [{ id: 'c', name, args: {} }],
-    candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name, args: {} } }] } }],
-  });
   let calls = 0;
+  brainProvider.callToolsBrain = async () => {
+    if (calls >= 40) return { text: 'Done.', functionCalls: [], candidates: [{ content: { role: 'model', parts: [{ text: 'Done.' }] } }] };
+    const args = { step: calls };
+    return { text: '', functionCalls: [{ id: 'c', name: 'browser_act', args }], candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'c', name: 'browser_act', args } }] } }] };
+  };
   const exec = async (_u, actions) => { calls += 1; return actions.map((a) => ({ action: a.type, result: { success: true, text: 'ok' } })); };
-  const counting = call;
-
-  brainProvider.callToolsBrain = counting('browser_act');
-  await runAgentLoop({ userId: 'u', initialMessage: 'keep clicking', maxIterations: 2, executeActionsFn: exec });
-  assert.equal(calls, 14, 'browser steps extend the run to the ceiling and no further');
-
-  calls = 0;
-  brainProvider.callToolsBrain = counting('get_emails');
-  await runAgentLoop({ userId: 'u', initialMessage: 'email again', maxIterations: 2, executeActionsFn: exec });
-  assert.equal(calls, 2, 'a non-browser tool keeps the normal cap');
+  const out = await runAgentLoop({ userId: 'u', initialMessage: 'keep clicking', executeActionsFn: exec });
+  assert.equal(calls, 40, 'forty steps ran, far past the old caps of 6 to 20');
+  assert.match(out.spoken || out.text || '', /Done/);
 });
 
 test('a lookup that already answers in words ends the run without another model pass', async (t) => {
@@ -141,7 +135,7 @@ test('the retry after a failed wrap-up call is still tool-free', async (t) => {
     return { text: 'Sunny.', functionCalls: [], candidates: [{ content: { role: 'model', parts: [{ text: 'Sunny.' }] } }] };
   };
   const exec = async (_u, actions) => actions.map((a) => ({ action: a.type, result: { success: true } }));
-  await runAgentLoop({ userId: 'u', initialMessage: 'weather', maxIterations: 3, executeActionsFn: exec });
+  await runAgentLoop({ userId: 'u', initialMessage: 'weather', backstopSteps: 3, executeActionsFn: exec });
   const wrapUpCalls = toolCounts.slice(toolCounts.indexOf(0));
   assert.ok(wrapUpCalls.length >= 1 && wrapUpCalls.every((c) => c === 0), JSON.stringify(toolCounts));
 });

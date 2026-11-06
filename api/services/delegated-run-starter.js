@@ -106,9 +106,6 @@ function createDelegatedRunStarter({
           dynamicSystemPrompt,
           provider: route.provider,
           modelName: route.model,
-          maxIterations: Number.isFinite(claimedTask.checkpoint?.maxIterations)
-            ? claimedTask.checkpoint.maxIterations
-            : 6,
           context: {
             autonomy: claimedTask.autonomy,
             guardMode: claimedTask.metadata?.guardMode === true || savedGuardMode === true,

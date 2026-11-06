@@ -131,3 +131,13 @@ test('US and UK retailer counts are both substantial', () => {
   assert.ok(uk >= 15);
   assert.ok(us >= 25);
 });
+
+test('a shop name that is also an everyday word only counts when the message treats it as a shop', () => {
+  const { resolveRetailerFromGoal } = require('../../api/services/retailer-sites');
+  assert.equal(resolveRetailerFromGoal('can you get me some sportswear i wanna start going to the gym target size s or m'), null);
+  assert.equal(resolveRetailerFromGoal('what is on next week'), null);
+  assert.equal(resolveRetailerFromGoal('the gap year plan'), null);
+  assert.equal(resolveRetailerFromGoal('order shorts from target')?.displayName, 'target');
+  assert.equal(resolveRetailerFromGoal('get a tee at Target please')?.displayName, 'Target');
+  assert.equal(resolveRetailerFromGoal('target store near me')?.host, 'target.com');
+});

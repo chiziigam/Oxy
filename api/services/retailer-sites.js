@@ -554,13 +554,28 @@ function pickLocaleUrls(entry, region) {
   return { homeUrl: entry.homeUrl, searchUrl: entry.searchUrl };
 }
 
+// Shop names that are also everyday words ("target size", "next week", "very good", "gap year").
+// These only count as a shop when the message treats them as one.
+const EVERYDAY_WORD_SHOPS = new Set(['target', 'next', 'very', 'gap', 'boots', 'staples']);
+
+function shopNamePattern(name) {
+  const word = escapeRegExp(name).replace(/\s+/g, '\\s+');
+  if (!EVERYDAY_WORD_SHOPS.has(name)) return new RegExp(`\\b${word}\\b`, 'i');
+  return new RegExp(
+    `(?:\\b(?:from|on|at|using|via|in)\\s+(?:the\\s+)?${word}(?=\\s*$|\\s*[,.!?;]|\\s+(?:and|please|instead)\\b))` +
+    `|(?:\\b${word}(?=\\s+(?:store|stores|shop|shops|website|site|app|online|uk|us|\\.com)\\b))` +
+    `|(?:^\\s*${word}\\s*[.!?]*\\s*$)`,
+    'i'
+  );
+}
+
 function matchAliasInText(text, goalRegion, startIndex = 0) {
   const slice = text.slice(startIndex);
   for (const { host, name, entry, region } of ALIAS_INDEX) {
     if (!regionMatchesEntry(region, goalRegion)) continue;
-    const re = new RegExp(`\\b${escapeRegExp(name).replace(/\s+/g, '\\s+')}\\b`, 'i');
+    const re = shopNamePattern(name);
     const m = slice.match(re);
-    if (m) return { host, entry, index: startIndex + m.index, matched: m[0] };
+    if (m) return { host, entry, index: startIndex + m.index, matched: (m[0].match(new RegExp(escapeRegExp(name).replace(/\s+/g, '\\s+'), 'i')) || m)[0] };
   }
   return null;
 }

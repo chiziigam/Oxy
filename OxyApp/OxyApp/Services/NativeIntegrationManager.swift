@@ -2924,8 +2924,30 @@ final class NativeIntegrationManager {
     }
 
     private func detectedDate(in message: String) -> Date? {
+        if let relative = relativeDuration(in: message) { return relative.date }
         let range = NSRange(message.startIndex..<message.endIndex, in: message)
         return detector?.firstMatch(in: message, options: [], range: range)?.date
+    }
+
+    /// "in 5 minutes", "in an hour", "in half an hour": a wait counted from now, which the system date detector does not read.
+    private func relativeDuration(in message: String) -> (date: Date, text: String)? {
+        let pattern = #"(?i)\b(?:in|after)\s+(half an?|an?|\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty five|forty-five)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?)\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: message, range: NSRange(message.startIndex..., in: message)),
+              let whole = Range(match.range, in: message),
+              let amountRange = Range(match.range(at: 1), in: message),
+              let unitRange = Range(match.range(at: 2), in: message) else { return nil }
+        let words: [String: Double] = ["a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15, "twenty": 20, "thirty": 30, "forty five": 45, "forty-five": 45, "half a": 0.5, "half an": 0.5]
+        let amountText = message[amountRange].lowercased()
+        guard let amount = Double(amountText) ?? words[amountText] else { return nil }
+        let unit = message[unitRange].lowercased()
+        let seconds: Double
+        if unit.hasPrefix("sec") { seconds = 1 }
+        else if unit.hasPrefix("min") { seconds = 60 }
+        else if unit.hasPrefix("h") { seconds = 3600 }
+        else if unit.hasPrefix("d") { seconds = 86_400 }
+        else { seconds = 604_800 }
+        return (Date().addingTimeInterval(amount * seconds), String(message[whole]))
     }
 
     private func cleanReminderTitle(_ message: String, date: Date?) -> String {
@@ -2967,6 +2989,7 @@ final class NativeIntegrationManager {
     }
 
     private func dateMatch(in message: String) -> String? {
+        if let relative = relativeDuration(in: message) { return relative.text }
         let range = NSRange(message.startIndex..<message.endIndex, in: message)
         guard let match = detector?.firstMatch(in: message, options: [], range: range),
               let swiftRange = Range(match.range, in: message) else { return nil }

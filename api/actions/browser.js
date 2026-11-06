@@ -493,18 +493,8 @@ async function webSearchAction({ userId, action, params, enrichedParams, context
   const { supabase, FAST_MODEL, parsePrice, guardConciergeSpend, generateBrain, webSearchBrain } = deps;
   const q = String(params?.query || '').trim();
   if (!q) return { success: false, error: 'web_search requires query' };
-  // The question being answered, so one question cannot search without limit.
-  const question = String(context?.userMessage || context?.taskGoal || '').slice(0, 300) || q;
   const repeated = searchBudget.cached(userId, q);
   if (repeated) return { success: true, text: repeated, query: q, cached: true };
-  if (!searchBudget.reserve(userId, question)) {
-    return {
-      success: false,
-      outcome: 'unavailable',
-      error: 'That is enough searching for this question. Answer from what you have already found, and say plainly what is still unconfirmed.',
-      query: q,
-    };
-  }
   try {
     // Exa, when chosen: cheap search results written up by the cheap model. Any failure falls
     // through to the OpenAI search below.
@@ -519,7 +509,7 @@ async function webSearchAction({ userId, action, params, enrichedParams, context
           });
           const written = String(response?.text || '').trim().replace(/[?&]utm_[a-z_]+=[^\s)&\]]*/gi, '');
           if (written.length >= 20) {
-            searchBudget.record(userId, question, q, written, { reserved: true });
+            searchBudget.record(userId, q, written);
             return { success: true, text: written, query: q, provider: 'exa' };
           }
         }
@@ -533,7 +523,7 @@ async function webSearchAction({ userId, action, params, enrichedParams, context
     });
     if (!answer) return { success: false, error: `Search for "${q}" returned no results.` };
     const cleaned = String(answer).replace(/[?&]utm_[a-z_]+=[^\s)&\]]*/gi, '');
-    searchBudget.record(userId, question, q, cleaned, { reserved: true });
+    searchBudget.record(userId, q, cleaned);
     return { success: true, text: cleaned, query: q };
   } catch (e) {
     return { success: false, error: `Search failed: ${e.message}`, query: q };

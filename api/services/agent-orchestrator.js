@@ -91,14 +91,14 @@ async function callGeminiWithTools(modelName, contents, config, trace = null, pr
 
 /**
  * Core ReAct-style agent loop.
- * Runs up to maxIterations: generate (with tools), execute any function calls, feed results back as "function" responses, repeat.
+ * Runs until the work is done: generate (with tools), execute any function calls, feed results back as "function" responses, repeat.
  * Returns final spoken text + executed actions + trace.
  */
+// Adam keeps working until the job is done. This is only a backstop against a loop that can never
+// end; no real task gets near it.
+const RUNAWAY_BACKSTOP_STEPS = 1000;
 // Lookups that only read, asked for together in one turn, depend on nothing but the request, so
 // they can run side by side. Anything that writes, spends, or drives the browser keeps its order.
-const BROWSER_ITERATION_CEILING = 14;
-// After this long in one turn the agent is told to answer with what it has.
-const TURN_WALL_BUDGET_MS = 45000;
 const READ_ACTION = /^(search|get|find|list|check|web_search)(_|$)/;
 function areIndependentReads(actions) {
   if (!Array.isArray(actions) || actions.length < 2) return false;
@@ -116,7 +116,7 @@ async function runAgentLoop({
   useSearch = false,
   modelName = PRIMARY_CHAT_MODEL || require('./model-routing').defaultModelForProvider('openai'),
   provider = null,
-  maxIterations = 6,
+  backstopSteps = RUNAWAY_BACKSTOP_STEPS,
   context = {},
   executeActionsFn,
   trace = null,
@@ -187,10 +187,7 @@ async function runAgentLoop({
   const startIteration = Number.isFinite(resumeFrom?.iteration) ? resumeFrom.iteration + 1 : 0;
   // Approval may arrive after the run parked on its final allowed iteration. Give
   // the resumed goal at least one model turn instead of falling through as completed.
-  let effectiveMaxIterations = Math.max(
-    Number.isFinite(resumeFrom?.maxIterations) ? resumeFrom.maxIterations : maxIterations,
-    startIteration + 1
-  );
+  const effectiveMaxIterations = Math.max(backstopSteps, startIteration + 1);
   let spoken = resumeFrom?.spoken || '';
   let lastToolResultsText = '';
 
@@ -221,7 +218,6 @@ async function runAgentLoop({
     if (!persistedTask) return checkpointChain;
     const checkpointData = {
         iteration,
-        maxIterations,
         contents: JSON.parse(JSON.stringify(resumedContents)),
         executedActions: executedActions.slice(),
         spoken,
@@ -251,18 +247,13 @@ async function runAgentLoop({
 
   await checkpoint(startIteration - 1);
 
-  const loopStartedAt = Date.now();
   let wrappedUp = false;
   for (let i = startIteration; i < effectiveMaxIterations; i++) {
     logAgentStep(agentTrace, { type: 'think', iteration: i + 1 });
-    // A turn that has searched and browsed for a while must answer with what it has, not keep going.
-    const usedBrowser = executedActions.some(a => /^browser_|^run_browser|^web_browse/.test(String(a?.type || a?.action || '')));
-    const overBudget = i > startIteration && Date.now() - loopStartedAt > (usedBrowser ? TURN_WALL_BUDGET_MS * 2 : TURN_WALL_BUDGET_MS);
-    // The last allowed step is always an answer: running out of steps must not throw the findings away.
     const lastStep = i >= effectiveMaxIterations - 1 && i > startIteration;
-    if ((overBudget || lastStep) && !wrappedUp) {
+    if (lastStep && !wrappedUp) {
       wrappedUp = true;
-      resumedContents.push({ role: 'user', parts: [{ text: `${overBudget ? 'Time is up.' : 'That is the last step.'} Answer now in a few plain sentences using what you have found. If you could not finish, say what you found and what you need from me.` }] });
+      resumedContents.push({ role: 'user', parts: [{ text: `That is the last step. Answer now in a few plain sentences using what you have found. If you could not finish, say what you found and what you need from me.` }] });
     }
 
     if (onStep) onStep({ phase: 'thinking', iteration: i + 1 });
@@ -343,12 +334,6 @@ async function runAgentLoop({
     }
 
     executedActions.push(...results);
-    // Driving a page takes as many steps as the page needs (open, search, pick, confirm), so a
-    // browser that is still making progress keeps the run going, within a hard ceiling.
-    if (results.some((r) => String(r.action || '').startsWith('browser_') && r.result?.success !== false)) {
-      effectiveMaxIterations = Math.max(effectiveMaxIterations, Math.min(BROWSER_ITERATION_CEILING, i + 3));
-    }
-
     // Feed results back into conversation for next think
     const functionResponses = [];
     results.forEach((r, idx) => {
