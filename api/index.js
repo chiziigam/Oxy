@@ -8292,8 +8292,6 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       }
 
       let actionResultsForFailure = [];
-      // What the last finished step was, so the pause before the next one can say what it follows.
-      let lastObservedStep = '';
       try {
         const agentTurn = await runAgenticTurn({
           runLoop: () => runAgenticLoop({
@@ -8331,18 +8329,12 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             trace,
             onStep: !agenticSendStatus ? null : step => {
               if (step.phase === 'thinking') {
-                agenticSendStatus('action_start', lastObservedStep
-                  ? `Deciding what to do after ${lastObservedStep.charAt(0).toLowerCase()}${lastObservedStep.slice(1)}`
-                  : 'Working out what to do', { action: 'phase' });
+                agenticSendStatus('agent_thinking', 'Working on it');
               } else if (step.phase === 'executing') {
                 for (const action of step.actions || []) {
                   agenticSendStatus('action_start', getActionStatusLabel(action.type, 'start', action.input), { action: action.type });
                 }
               } else if (step.phase === 'observed') {
-                const lastResult = (step.results || []).length - 1;
-                if (lastResult >= 0) {
-                  lastObservedStep = getActionStatusLabel(step.results[lastResult].action, 'start', step.actions?.[lastResult]?.input);
-                }
                 (step.results || []).forEach((r, idx) => {
                   agenticSendStatus('action_complete', getActionStatusLabel(r.action, actionCompletionPhase(r.result), step.actions?.[idx]?.input), {
                     action: r.action,
