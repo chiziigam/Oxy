@@ -123,7 +123,11 @@ function openAIResponsesBody({ model, messages, config = {}, stream = false }) {
   if (instructions) body.instructions = instructions;
   // Same key for every user: the fixed prompt and tools are shared, so requests land on one cache.
   if (process.env.OXY_PROMPT_CACHE_KEY !== 'off') body.prompt_cache_key = 'adam-chat-v1';
-  if (stream) body.stream = true;
+  if (stream) {
+    body.stream = true;
+    // The model names each stretch of its thinking in a few words; the phone shows that line.
+    if (process.env.OXY_REASONING_SUMMARY !== 'off') body.reasoning.summary = 'auto';
+  }
   const tools = geminiToolsToOpenAI(config.tools);
   if (tools.length) {
     // strict defaults to true on /responses, which our loose schemas would fail.
@@ -219,12 +223,30 @@ async function* sseData(res) {
 }
 
 // Responses API stream -> Gemini-shaped chunks; function calls arrive whole in output_item.done.
+// A thinking summary starts with its title in bold ("**Checking the calendar**"). The title is
+// passed on once per stretch of thinking as `thought`, and never mixed into the answer text.
+function summaryTitle(buffer) {
+  const match = /^\s*\*\*([^*\n]{3,90})\*\*/.exec(buffer);
+  return match ? match[1].trim() : null;
+}
+
 async function* streamResponsesSSE(res, model) {
   const calls = [];
+  let summaryBuffer = '';
+  let titleSent = false;
   for await (const data of sseData(res)) {
     let ev;
     try { ev = JSON.parse(data); } catch { continue; }
-    if (ev.type === 'response.output_text.delta' && ev.delta) yield { text: ev.delta, candidates: [] };
+    if (ev.type === 'response.reasoning_summary_part.added') {
+      summaryBuffer = '';
+      titleSent = false;
+    } else if (ev.type === 'response.reasoning_summary_text.delta' && ev.delta) {
+      summaryBuffer += ev.delta;
+      if (!titleSent) {
+        const title = summaryTitle(summaryBuffer);
+        if (title) { titleSent = true; yield { thought: title, candidates: [] }; }
+      }
+    } else if (ev.type === 'response.output_text.delta' && ev.delta) yield { text: ev.delta, candidates: [] };
     else if (ev.type === 'response.output_item.done' && ev.item?.type === 'function_call') calls.push(ev.item);
     else if (ev.type === 'response.completed' && ev.response?.usage) usageMeter.record(ev.response.model || model, ev.response.usage);
     else if (ev.type === 'response.failed' || ev.type === 'error') {
@@ -343,7 +365,17 @@ async function* compatibleStream({ provider, model, contents, config }) {
   const resolvedModel = resolveBrainModel(provider, model);
   if (provider === 'openai') {
     const messages = toOpenAIMessages(contents, config?.systemInstruction);
-    yield* streamResponsesSSE(await postOpenAIResponses(openAIResponsesBody({ model: resolvedModel, messages, config, stream: true })), resolvedModel);
+    const body = openAIResponsesBody({ model: resolvedModel, messages, config, stream: true });
+    let res;
+    try {
+      res = await postOpenAIResponses(body);
+    } catch (err) {
+      // An account or model that cannot return thinking summaries still gets its answer.
+      if (!body.reasoning?.summary || !/summary|verif/i.test(String(err.message))) throw err;
+      delete body.reasoning.summary;
+      res = await postOpenAIResponses(body);
+    }
+    yield* streamResponsesSSE(res, resolvedModel);
     return;
   }
   const res = await fetch(`${compatibleBaseURL(provider)}/chat/completions`, {

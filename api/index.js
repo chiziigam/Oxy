@@ -2575,6 +2575,15 @@ async function generateSpeech(text, voiceName) {
   return synthesizeSpeechOpenAI(text, voiceName);
 }
 
+// The phone shows one line, so a long title is cut at a word and marked.
+function trimThinkingTitle(title) {
+  const text = String(title || '').trim();
+  if (text.length <= 44) return text;
+  const cut = text.slice(0, 44);
+  const space = cut.lastIndexOf(' ');
+  return `${cut.slice(0, space > 20 ? space : 44)}…`;
+}
+
 function getActionStatusLabel(actionType, phase = 'start', input = {}) {
   const base = progressLine(actionType, input);
   if (phase === 'complete') return `${base} complete`;
@@ -8283,6 +8292,8 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       }
 
       let actionResultsForFailure = [];
+      // What the last finished step was, so the pause before the next one can say what it follows.
+      let lastObservedStep = '';
       try {
         const agentTurn = await runAgenticTurn({
           runLoop: () => runAgenticLoop({
@@ -8320,12 +8331,18 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             trace,
             onStep: !agenticSendStatus ? null : step => {
               if (step.phase === 'thinking') {
-                agenticSendStatus('agent_thinking', 'Working on it');
+                agenticSendStatus('action_start', lastObservedStep
+                  ? `Deciding what to do after ${lastObservedStep.charAt(0).toLowerCase()}${lastObservedStep.slice(1)}`
+                  : 'Working out what to do', { action: 'phase' });
               } else if (step.phase === 'executing') {
                 for (const action of step.actions || []) {
                   agenticSendStatus('action_start', getActionStatusLabel(action.type, 'start', action.input), { action: action.type });
                 }
               } else if (step.phase === 'observed') {
+                const lastResult = (step.results || []).length - 1;
+                if (lastResult >= 0) {
+                  lastObservedStep = getActionStatusLabel(step.results[lastResult].action, 'start', step.actions?.[lastResult]?.input);
+                }
                 (step.results || []).forEach((r, idx) => {
                   agenticSendStatus('action_complete', getActionStatusLabel(r.action, actionCompletionPhase(r.result), step.actions?.[idx]?.input), {
                     action: r.action,
@@ -8434,8 +8451,30 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
       res.once('close', () => clearInterval(classicHeartbeat));
       res.once('finish', () => clearInterval(classicHeartbeat));
 
+      // A phase is a step the phone shows in its trail. It is only sent while that work is really
+      // happening, and it closes the moment the work does.
+      const phaseStart = label => sendStatus('action_start', label, { action: 'phase' });
+      const phaseDone = label => sendStatus('action_complete', `${label} complete`, { action: 'phase', success: true });
+      // The model's own few-word title for what it is thinking about, when its provider gives one.
+      // Otherwise a plain "Thinking it through", which is true and says no more than that.
+      let thinkingLabel = null;
+      const startThinking = label => {
+        if (label === thinkingLabel) return;
+        thinkingLabel = label;
+        phaseStart(label);
+      };
+      const endThinking = () => {
+        if (!thinkingLabel) return;
+        const label = thinkingLabel;
+        thinkingLabel = null;
+        thinkingEnded = true;
+        phaseDone(label);
+      };
+      let thinkingEnded = false;
+
       try {
         sendStatus('thinking_start', 'Thinking');
+        if (chatProvider !== 'openai' || process.env.OXY_REASONING_SUMMARY === 'off') startThinking('Thinking it through');
         // Stream the model response token-by-token (provider per OXY_BRAIN_PROVIDER)
         const stream = await trace.run('brain.stream.initial', () => streamBrain({
           provider: chatProvider,
@@ -8492,9 +8531,11 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
           onSpeakingStart: () => sendStatus('speaking_start', 'Speaking')
         }) : null;
         for await (const chunk of stream) {
+          if (chunk.thought && !thinkingEnded) startThinking(trimThinkingTitle(chunk.thought));
           const text = chunk.text || '';
           if (text) {
             if (firstChunk) { trace.log('brain.first_token'); firstChunk = false; }
+            endThinking();
             fullText += text;
             emitSafeDisplayText(text);
             // Kick off TTS for complete sentences as they arrive, not after full generation
@@ -8503,10 +8544,12 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
           // The provider emits accumulated tool calls as one terminal chunk, so this
           // assigns rather than appends. Text and tool calls can both be present.
           if (chunk.functionCalls?.length) {
+            endThinking();
             streamedToolCalls = chunk.functionCalls;
             trace.log('brain.native_tool_calls', streamedToolCalls.map(fc => fc.name).join(','));
           }
         }
+        endThinking();
         flushSafeDisplayText();
         trace.log('brain.initial_complete');
         // A turn that called a tool legitimately has no text yet — the reply is composed from
@@ -8587,6 +8630,7 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
             { role: 'user', parts: [{ text: synthesisPromptForDataResults(message, dataResults) }] }
           );
           const compositionStarted = Date.now();
+          phaseStart('Writing the answer');
           const followUp = await trace.run('brain.stream.followup', () => streamBrain({
             provider: chatProvider,
             model: chatModel,
@@ -8605,6 +8649,7 @@ app.post('/chat', chatUsageMeter, chatRateLimiter, async (req, res) => {
               if (ttsStreamer) ttsStreamer.ingest(spoken);
             }
           }
+          phaseDone('Writing the answer');
           spoken = guardVisibleDataResponse(parseActions(spoken).spoken || spoken, dataResults);
           devTiming('chat', 'assistant_response_composition.end', {
             route: 'data_followup',
