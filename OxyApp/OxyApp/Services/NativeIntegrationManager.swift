@@ -2353,7 +2353,7 @@ final class NativeIntegrationManager {
             notifications: notificationSettings.authorizationStatus == .authorized || notificationSettings.authorizationStatus == .provisional,
             healthKit: HKHealthStore.isHealthDataAvailable(),
             musicKit: MusicAuthorization.currentStatus == .authorized,
-            contacts: contactStatus == .authorized,
+            contacts: Self.contactsAccessGranted(contactStatus),
             reminders: remindersAuthorized,
             locationAlways: locationStatus == .authorizedAlways
         )
@@ -2548,13 +2548,18 @@ final class NativeIntegrationManager {
         }
     }
 
+    /// Full access, or the limited access iOS 18 lets people choose ("Limit Access" in the prompt).
+    private nonisolated static func contactsAccessGranted(_ status: CNAuthorizationStatus) -> Bool {
+        if status == .authorized { return true }
+        if #available(iOS 18.0, *), status == .limited { return true }
+        return false
+    }
+
     private func contactHints(in message: String) async -> [NativeContactHint] {
-        switch CNContactStore.authorizationStatus(for: .contacts) {
-        case .authorized:
-            break
-        case .notDetermined:
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        if status == .notDetermined {
             guard (try? await contactStore.requestAccess(for: .contacts)) == true else { return [] }
-        default:
+        } else if !Self.contactsAccessGranted(status) {
             return []
         }
 
