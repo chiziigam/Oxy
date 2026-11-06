@@ -66,11 +66,9 @@ struct ConversationThread: View {
                         }
                         .id(message.id)
                     }
-                    if chat.isSending, let status = chat.statusLabel, !status.isEmpty {
-                        Text(status)
-                            .font(.ds(12.5))
-                            .foregroundStyle(DS.muted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if chat.isSending, chat.activitySteps.contains(where: { $0.state == .active }),
+                       let last = chat.messages.last, !isWaiting(last) {
+                        WorkingLine(steps: chat.activitySteps, label: nil, showsWaiting: false).transition(.opacity)
                     }
                     Color.clear.frame(height: 1).id("end")
                 }
@@ -85,6 +83,7 @@ struct ConversationThread: View {
                 didScrollToEnd = true
             }
             .onChange(of: chat.messages.last?.content) { scrollToEnd(proxy, animated: true) }
+            .onChange(of: chat.activitySteps) { scrollToEnd(proxy, animated: true) }
         }
     }
 
@@ -102,8 +101,10 @@ struct ConversationThread: View {
     private func bubble(_ message: Message) -> some View {
         if message.role == .user {
             userBubble(message)
-        } else if !message.actions.isEmpty || !message.sources.isEmpty || message.offer != nil {
-            // Rich results (confirmations, places, travel) keep their full cards.
+        } else if isWaiting(message) {
+            WorkingLine(steps: chat.activitySteps, label: chat.statusLabel).transition(.opacity)
+        } else if hasMemoryNote(message) {
+            // Memory notes live inside the old bubble, so these keep it whole.
             MessageBubble(
                 message: message,
                 onActionCommand: { chat.sendCommand($0, userId: appState.userId) },
@@ -111,6 +112,21 @@ struct ConversationThread: View {
                 onSceneRequest: { chat.sendInterfaceRequest($0, userId: appState.userId) },
                 reaction: reaction(on: message)
             )
+        } else if !message.actions.isEmpty || !message.sources.isEmpty || message.offer != nil {
+            // The text is drawn like every other reply; the old view only supplies what hangs
+            // under it (the receipt line, cards, sources, a suggestion).
+            VStack(alignment: .leading, spacing: 6) {
+                if !message.content.isEmpty { assistantBubble(message) }
+                MessageBubble(
+                    message: extras(of: message),
+                    showsTypingIndicator: false,
+                    showsTimestamp: false,
+                    onActionCommand: { chat.sendCommand($0, userId: appState.userId) },
+                    onRetryFailedTurn: { chat.retryLastFailedMessage(userId: appState.userId) },
+                    onSceneRequest: { chat.sendInterfaceRequest($0, userId: appState.userId) }
+                )
+                .padding(.horizontal, -6)
+            }
         } else {
             assistantBubble(message)
         }
@@ -167,9 +183,7 @@ struct ConversationThread: View {
     private func assistantBubble(_ message: Message) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
-                if message.content.isEmpty && message.isStreaming {
-                    Text("…").font(.ds(15)).foregroundStyle(DS.muted)
-                } else if !message.content.isEmpty {
+                if !message.content.isEmpty {
                     Text(Self.attributed(message.content))
                         .font(.ds(15))
                         .foregroundStyle(DS.ink)
@@ -186,6 +200,25 @@ struct ConversationThread: View {
             .overlay(alignment: .bottomTrailing) { badge(for: message).offset(x: 8, y: 12) }
             Spacer(minLength: 40)
         }
+    }
+
+    private static let memoryActions: Set<String> = ["remember_person", "save_occasion", "forget_person_detail", "forget_memory"]
+
+    private func hasMemoryNote(_ message: Message) -> Bool {
+        message.actions.contains { Self.memoryActions.contains($0.action) && $0.isCompleted }
+    }
+
+    /// The message without its text, for the parts of the old view that sit under a reply.
+    private func extras(of message: Message) -> Message {
+        var copy = message
+        copy.content = ""
+        return copy
+    }
+
+    /// An assistant message that exists but has nothing to show yet.
+    private func isWaiting(_ message: Message) -> Bool {
+        message.role == .assistant && message.isStreaming && message.content.isEmpty
+            && message.actions.isEmpty && message.sources.isEmpty && message.offer == nil && message.turnError == nil
     }
 
     @ViewBuilder

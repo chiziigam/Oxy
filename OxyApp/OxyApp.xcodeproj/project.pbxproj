@@ -103,6 +103,9 @@
 		DD9F3270E5E1C2AF8ED0AAA8 /* Geist-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */; };
 		DD9B815CDA3A01C4E2C784E6 /* Geist-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */; };
 		DD29788A27748753318B06FB /* MessageInteractions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */; };
+		DDB084F0F64C5F4ED180B5CB /* DSWorkingGraphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB4A87D1BDACA528525EE9A /* DSWorkingGraphics.swift */; };
+		DD927F4D8F23EC9041F0E114 /* DSTaskTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD177639086986EFDB1F9205 /* DSTaskTabs.swift */; };
+		DD3FEBFAC8AD0C926E94FDBD /* WorkingLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD666303C19D48E8E1E71B42 /* WorkingLine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -207,6 +210,9 @@
 		DDD92120A8BE06B39F794D87 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fonts/Geist-SemiBold.ttf; sourceTree = "<group>"; };
 		DDB56AE6A1E06E796C62DFAD /* Geist-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fonts/Geist-OFL.txt; sourceTree = "<group>"; };
 		DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageInteractions.swift; sourceTree = "<group>"; };
+		DDB4A87D1BDACA528525EE9A /* DSWorkingGraphics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSWorkingGraphics.swift; sourceTree = "<group>"; };
+		DD177639086986EFDB1F9205 /* DSTaskTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSTaskTabs.swift; sourceTree = "<group>"; };
+		DD666303C19D48E8E1E71B42 /* WorkingLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingLine.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -532,6 +538,8 @@
 				DD2F39B1DC2AF0F3BA843C15 /* DSComposer.swift */,
 				DD4A5FFBB6561604E1D24F3F /* DSIcons.swift */,
 				DD76508B256F3673C5FA01DA /* DSTokens.swift */,
+				DDB4A87D1BDACA528525EE9A /* DSWorkingGraphics.swift */,
+				DD177639086986EFDB1F9205 /* DSTaskTabs.swift */,
 			);
 			path = Design;
 			sourceTree = "<group>";
@@ -562,6 +570,7 @@
 			children = (
 				DDFD0DB5007A8A9AE98322C8 /* ConversationScreen.swift */,
 				DDE2259E1E4908DF26C24872 /* MessageInteractions.swift */,
+				DD666303C19D48E8E1E71B42 /* WorkingLine.swift */,
 			);
 			path = Conversation;
 			sourceTree = "<group>";
@@ -693,6 +702,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD3FEBFAC8AD0C926E94FDBD /* WorkingLine.swift in Sources */,
+				DD927F4D8F23EC9041F0E114 /* DSTaskTabs.swift in Sources */,
+				DDB084F0F64C5F4ED180B5CB /* DSWorkingGraphics.swift in Sources */,
 				DD29788A27748753318B06FB /* MessageInteractions.swift in Sources */,
 				DDD09BD60AF4283B36F5F3CD /* TaskScreen.swift in Sources */,
 				DD8AF1E89BC464F7C58B3798 /* SettingsScreen.swift in Sources */,

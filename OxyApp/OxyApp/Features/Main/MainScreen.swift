@@ -25,6 +25,8 @@ struct MainScreen: View {
     @State private var draft = ""
     @State private var decisions: [String: DecisionState] = [:]
     @State private var replyingTo: Message?
+    /// A task the next message is about. Chosen from the lists under the chips.
+    @State private var scopedTask: BoardItem?
     @State private var held: HeldMessage?
     @State private var reactionVersion = 0
 
@@ -77,6 +79,14 @@ struct MainScreen: View {
                 if let replyingTo {
                     DSReplyBar(message: replyingTo) { withAnimation(.smooth(duration: 0.2)) { self.replyingTo = nil } }
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
+                } else if let scopedTask {
+                    DSReplyBar(
+                        label: "Replying about this task",
+                        snippet: scopedTask.title,
+                        onTap: { open(scopedTask) },
+                        onClose: { withAnimation(.smooth(duration: 0.2)) { self.scopedTask = nil } }
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
                 DSComposer(
                     text: $draft,
@@ -87,7 +97,12 @@ struct MainScreen: View {
                     onStop: { chat.stopCurrentTurn() },
                     onAttach: { attachments.showSheet = true },
                     onVoice: toggleVoice,
-                    onRemoveAttachment: { attachments.pending = nil }
+                    onRemoveAttachment: { attachments.pending = nil },
+                    showsTabs: usesTaskTabs,
+                    tasks: taskItems,
+                    onTask: { task in
+                        if let item = (board.needsYou + board.handling).first(where: { $0.id == task.id }) { open(item) }
+                    }
                 )
                 }
                 .background(DS.bg.ignoresSafeArea(edges: .bottom))
@@ -123,7 +138,38 @@ struct MainScreen: View {
                 }
             }
         }
-        .task { await chat.prepareChat(userId: appState.userId) }
+        .task {
+            await chat.prepareChat(userId: appState.userId)
+            #if DEBUG
+            // OXY_DEBUG_ACTIONS=1 adds a reply that carries a finished action, like a real one.
+            if ProcessInfo.processInfo.environment["OXY_DEBUG_ACTIONS"] == "1",
+               let data = #"{"action":"get_calendar","success":true,"outcome":"completed","text":"Nothing on tomorrow","pending":false}"#.data(using: .utf8),
+               let action = try? JSONDecoder().decode(ActionResult.self, from: data) {
+                chat.messages.append(Message(role: .user, content: "when to wake up tmr"))
+                chat.messages.append(Message(role: .assistant, content: "Set your alarm for 8:00. There's nothing on your calendar tomorrow; if you're heading to Staines, your train time might mean getting up earlier.", actions: [action]))
+            }
+            // OXY_DEBUG_WORKING=1 plays a made-up run of steps so the working trail can be seen.
+            if ProcessInfo.processInfo.environment["OXY_DEBUG_WORKING"] == "1" {
+                chat.messages.append(Message(role: .assistant, content: "", isStreaming: true))
+                chat.isSending = true
+                let run: [[ActivityStep]] = [
+                    [],
+                    [ActivityStep(title: "Searching for standing desks", state: .active)],
+                    [ActivityStep(title: "Searching for standing desks", state: .complete),
+                     ActivityStep(title: "Comparing 6 shops", state: .active)],
+                    [ActivityStep(title: "Searching for standing desks", state: .complete),
+                     ActivityStep(title: "Comparing 6 shops", state: .complete),
+                     ActivityStep(title: "Checking delivery to SW11", state: .active)]
+                ]
+                var index = 0
+                while !Task.isCancelled {
+                    chat.activitySteps = run[min(index, run.count - 1)]
+                    index += 1
+                    try? await Task.sleep(for: .seconds(index == 1 ? 3 : 7))
+                }
+            }
+            #endif
+        }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
@@ -138,7 +184,9 @@ struct MainScreen: View {
     private var header: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
-                if !hasLoaded {
+                if usesTaskTabs {
+                    EmptyView()
+                } else if !hasLoaded {
                     DSChipSkeleton(); DSChipSkeleton()
                 } else {
                     ForEach(DSGroup.allCases, id: \.self) { group in
@@ -168,6 +216,21 @@ struct MainScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+    }
+
+    // MARK: Tasks on the composer
+
+    /// Open tasks could live on a tab joined to the composer instead of in two chips at the top.
+    /// The tab is built (`DSTaskTabs.swift`) but switched off.
+    private var usesTaskTabs: Bool { false }
+
+    /// Open tasks as circles on the composer tab. The same items the chips list.
+    private var taskItems: [DSTaskItem] {
+        var seen = Set<String>()
+        let all = board.needsYou.map { ($0, true) } + board.handling.map { ($0, false) }
+        return all.filter { seen.insert($0.0.id).inserted }.prefix(4).map { item, needsYou in
+            DSTaskItem(id: item.id, title: item.title, needsYou: needsYou, working: !needsYou, icon: DSTaskItem.icon(for: item.title))
+        }
     }
 
     // MARK: Lists
@@ -237,7 +300,7 @@ struct MainScreen: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
-        .onTapGesture { open(item) }
+        .onTapGesture { scope(item) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
     }
@@ -261,6 +324,22 @@ struct MainScreen: View {
         path.append(.task(item))
     }
 
+    /// Makes the next message about this task, and closes the list.
+    private func scope(_ item: BoardItem) {
+        DSHaptics.light()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : .smooth(duration: 0.26)) {
+            replyingTo = nil
+            scopedTask = item
+            openGroup = nil
+        }
+    }
+
+    /// How a task is quoted to Adam: its title, plus what it is waiting on or how far along it is.
+    private func taskContext(_ item: BoardItem) -> String {
+        let extra = (item.prompt ?? item.detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return ReplyQuote.snippet(of: extra.isEmpty ? item.title : "\(item.title) — \(extra)")
+    }
+
     // MARK: Actions
 
     @MainActor
@@ -275,6 +354,7 @@ struct MainScreen: View {
         #endif
         do {
             board = try await HomeBoardService.fetchBoard()
+            if let task = scopedTask, !(board.needsYou + board.handling).contains(where: { $0.id == task.id }) { scopedTask = nil }
             loadFailed = false
         } catch {
             loadFailed = true
@@ -318,7 +398,7 @@ struct MainScreen: View {
 
     private func startReply(_ message: Message) {
         held = nil
-        withAnimation(.smooth(duration: 0.2)) { replyingTo = message }
+        withAnimation(.smooth(duration: 0.2)) { replyingTo = message; scopedTask = nil }
     }
 
     private func react(_ emoji: String, on message: Message) {
@@ -337,8 +417,10 @@ struct MainScreen: View {
         chat.inputText = text
         if let replyingTo, !text.isEmpty, attachments.pending == nil {
             chat.inputText = ReplyQuote.compose(quoting: replyingTo, body: text)
+        } else if let scopedTask, !text.isEmpty, attachments.pending == nil {
+            chat.inputText = "\(ReplyQuote.marker)Task: \(taskContext(scopedTask))\n\n\(text)"
         }
-        withAnimation(.smooth(duration: 0.2)) { replyingTo = nil }
+        withAnimation(.smooth(duration: 0.2)) { replyingTo = nil; scopedTask = nil }
         if let file = attachments.pending {
             chat.sendImageMessage(userId: userId, imageData: file.data, fileName: file.name, mimeType: file.mime, isImage: file.isImage)
             attachments.pending = nil

@@ -17,7 +17,7 @@ struct SettingsScreen: View {
     var body: some View {
         DSScreen(title: "Settings") {
             DSGroupCard(title: "Connections") {
-                legacyRow("Accounts", page: .accounts)
+                legacyRow("Apps", page: .accounts)
                 legacyRow("Cards", page: .cards)
                 legacyRow("Saved logins", page: .logins)
             }

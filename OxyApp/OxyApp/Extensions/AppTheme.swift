@@ -317,12 +317,21 @@ private func appTextStyle(for size: CGFloat) -> Font.TextStyle {
 }
 
 extension Font {
+    /// The older screens use the same typeface as the rest of the app.
+    private static func appGeist(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .semibold, .bold, .heavy, .black: return "Geist-SemiBold"
+        case .medium: return "Geist-Medium"
+        default: return "Geist-Regular"
+        }
+    }
+
     static func appTitle(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .default)
+        .custom(appGeist(weight), fixedSize: size)
     }
 
     static func appDisplay(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .default)
+        .custom(appGeist(weight), fixedSize: size)
     }
 
     /// Fraunces is a variable face whose default instance is `opsz 9 / wght 900`,
@@ -343,7 +352,7 @@ extension Font {
 
     /// Interface text follows the phone's preferred reading size.
     static func appBody(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(appTextStyle(for: size), design: .default).weight(weight)
+        .custom(appGeist(weight), size: size, relativeTo: appTextStyle(for: size))
     }
 
     static func appMono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

@@ -86,21 +86,42 @@ struct DSReactionBadge: View {
 // MARK: - Reply bar above the message box
 
 struct DSReplyBar: View {
-    let message: Message
+    let label: String
+    let snippet: String
+    var onTap: (() -> Void)?
     var onClose: () -> Void
+
+    init(message: Message, onClose: @escaping () -> Void) {
+        label = "Replying to \(message.role == .user ? "yourself" : "Adam")"
+        snippet = ReplyQuote.snippet(of: message.content)
+        onTap = nil
+        self.onClose = onClose
+    }
+
+    init(label: String, snippet: String, onTap: (() -> Void)? = nil, onClose: @escaping () -> Void) {
+        self.label = label
+        self.snippet = snippet
+        self.onTap = onTap
+        self.onClose = onClose
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Replying to \(message.role == .user ? "yourself" : "Adam")")
-                    .font(.ds(12, .medium))
-                    .foregroundStyle(DS.muted)
-                Text(ReplyQuote.snippet(of: message.content))
-                    .font(.ds(14))
-                    .foregroundStyle(DS.ink)
-                    .lineLimit(1)
+            Button { onTap?() } label: {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label)
+                        .font(.ds(12, .medium))
+                        .foregroundStyle(DS.muted)
+                    Text(snippet)
+                        .font(.ds(14))
+                        .foregroundStyle(DS.ink)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 0)
+            .buttonStyle(.plain)
+            .disabled(onTap == nil)
             Button(action: onClose) {
                 DSIconView(icon: .x, size: 14)
                     .foregroundStyle(DS.muted)

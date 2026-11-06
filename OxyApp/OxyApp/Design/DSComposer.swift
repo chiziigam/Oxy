@@ -154,6 +154,10 @@ struct DSComposer: View {
     var onAttach: () -> Void
     var onVoice: () -> Void
     var onRemoveAttachment: () -> Void = {}
+    /// The raised tab joined to the box: the main conversation, any open tasks, and a new-task button.
+    var showsTabs = false
+    var tasks: [DSTaskItem] = []
+    var onTask: (DSTaskItem) -> Void = { _ in }
 
     @FocusState private var focused: Bool
 
@@ -166,6 +170,12 @@ struct DSComposer: View {
             if let attachment { attachmentChip(attachment) }
             if voice.isRecording || voice.isTranscribing {
                 listening
+            } else if showsTabs {
+                VStack(spacing: 0) {
+                    DSTaskTabRow(tasks: tasks, onTask: onTask, onNew: { focused = true })
+                    barContent
+                }
+                .background(DSComposerShape(leftTabWidth: DSTaskTabRow.leftWidth(tasks.count)).fill(DS.card))
             } else {
                 bar
             }
@@ -177,6 +187,11 @@ struct DSComposer: View {
 
     /// One box: plus on the left, the text, and send, stop or record on the right.
     private var bar: some View {
+        barContent
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(DS.card))
+    }
+
+    private var barContent: some View {
         HStack(alignment: .bottom, spacing: 2) {
             Button {
                 focused = false
@@ -202,7 +217,6 @@ struct DSComposer: View {
             trailing
         }
         .padding(4)
-        .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(DS.card))
     }
 
     @ViewBuilder
