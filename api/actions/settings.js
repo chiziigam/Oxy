@@ -12,7 +12,7 @@ const SETTINGS = Object.freeze({
   alert_arriving_leaving: { values: ['on', 'off'], say: (v) => (v === 'on' ? 'Arriving and leaving reminders are on.' : 'Arriving and leaving reminders are off.') },
   daily_check_in: { values: ['on', 'off'], say: (v) => (v === 'on' ? 'Daily check-ins are on.' : 'Daily check-ins are off.') },
   listen_for_sounds: { values: ['on', 'off'], say: (v) => (v === 'on' ? 'I will listen for alarms and doorbells while the app is open.' : 'I have stopped listening for sounds.') },
-  learn_from_photos: { values: ['on', 'off', 'scan_now'], say: (v) => ({ on: 'I will start looking through your photos.', off: 'I have stopped looking through your photos.', scan_now: 'Looking through your photos now.' }[v]) }
+  learn_from_photos: { values: ['on', 'off', 'scan_now'], say: (v) => ({ on: 'I will ask your phone for photo access, then start looking through your photos. If you do not allow it, nothing will be read.', off: 'I have stopped looking through your photos.', scan_now: 'Looking through your photos now.' }[v]) }
 });
 
 async function changeSetting({ params }) {

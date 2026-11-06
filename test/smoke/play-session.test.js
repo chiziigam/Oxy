@@ -92,3 +92,88 @@ test('trivia refuses unknown games and malformed answers without pretending a tu
   });
   assert.equal(malformed.success, false);
 });
+
+test('the guessing game keeps its number on the server and never puts it in a result', async () => {
+  const start = await handlers.play_game({ params: { game: 'guess' }, context: {} });
+  assert.equal(start.success, true);
+  assert.match(start.text, /number from 1 to 8/);
+  assert.equal(start.selection.options.length, 8);
+  assert.equal(start.selection.action.input.operation, 'answer');
+  assert.equal(start.selection.action.input.session_id, start.sessionId);
+
+  const { secretCandidates } = await findSecret(start.sessionId);
+  assert.equal(secretCandidates.length, 1, 'exactly one guess wins');
+  assert.doesNotMatch(JSON.stringify(start), /secret|correct|"won"/i, 'nothing marks the number');
+});
+
+async function findSecret(sessionId) {
+  const winners = [];
+  for (let guess = 1; guess <= 8; guess += 1) {
+    const turn = await handlers.play_game({
+      params: { game: 'guess', operation: 'answer', session_id: sessionId, round: 1, guess },
+      context: {}
+    });
+    if (turn.finished && /^Yes/.test(turn.text)) winners.push(guess);
+  }
+  return { secretCandidates: winners };
+}
+
+test('a wrong guess gets a true hint and a right one ends the game', async () => {
+  const start = await handlers.play_game({ params: { game: 'guess' }, context: {} });
+  const [secret] = (await findSecret(start.sessionId)).secretCandidates;
+  const wrong = secret === 1 ? 2 : 1;
+  const hint = await handlers.play_game({
+    params: { game: 'guess', operation: 'answer', session_id: start.sessionId, round: 1, guess: wrong },
+    context: {}
+  });
+  assert.equal(hint.success, true);
+  assert.equal(hint.finished, false);
+  assert.match(hint.text, wrong < secret ? /Too low/ : /Too high/);
+  assert.match(hint.text, /Guess 2 of 3/);
+  assert.equal(hint.selection.action.input.round, 2);
+
+  const win = await handlers.play_game({
+    params: { game: 'guess', operation: 'answer', session_id: start.sessionId, round: 2, guess: secret },
+    context: {}
+  });
+  assert.equal(win.finished, true);
+  assert.match(win.text, new RegExp(`it was ${secret}\\. You got it in 2 guesses`));
+  assert.equal(win.selection.options[0].label, 'Play again');
+});
+
+test('three wrong guesses reveal the number and offer another go at the same game', async () => {
+  const start = await handlers.play_game({ params: { game: 'guess' }, context: {} });
+  const [secret] = (await findSecret(start.sessionId)).secretCandidates;
+  const wrong = secret === 1 ? 2 : 1;
+  const out = await handlers.play_game({
+    params: { game: 'guess', operation: 'answer', session_id: start.sessionId, round: 3, guess: wrong },
+    context: {}
+  });
+  assert.equal(out.finished, true);
+  assert.match(out.text, new RegExp(`Out of guesses\\. It was ${secret}\\.`));
+  assert.equal(out.selection.action.input.game, 'guess');
+});
+
+test('different sessions get different numbers over a run, and a bad guess is refused', async () => {
+  const seen = new Set();
+  for (let i = 0; i < 12; i += 1) {
+    const start = await handlers.play_game({ params: { game: 'guess' }, context: {} });
+    seen.add((await findSecret(start.sessionId)).secretCandidates[0]);
+  }
+  assert.ok(seen.size > 1, 'the number is not fixed');
+  const bad = await handlers.play_game({
+    params: { game: 'guess', operation: 'answer', session_id: 'abc', round: 1, guess: 99 },
+    context: {}
+  });
+  assert.equal(bad.success, false);
+  const unknown = await handlers.play_game({ params: { game: 'chess' }, context: {} });
+  assert.equal(unknown.success, false);
+  assert.match(unknown.error, /trivia or a number guessing game/);
+});
+
+test('the guessing game guidance says not to claim a hidden number and not to run code', () => {
+  const { getActionContract } = require('../../api/action-contracts');
+  const guidance = getActionContract('play_game').guidance;
+  assert.match(guidance, /Never say you have picked a secret number/);
+  assert.match(guidance, /CODE for a game/);
+});

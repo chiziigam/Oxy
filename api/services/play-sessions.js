@@ -157,9 +157,84 @@ function answerTrivia({ sessionId: id, questionId, choiceId, round, score } = {}
   };
 }
 
+// A guessing game needs a number the player cannot see, and the model must not be able to see it
+// either, or it will "remember" a number it never held. The number is derived from the session id
+// with a server-side key, so nothing is stored and nothing in a result or receipt reveals it.
+const GUESS_MAX = 8;
+const GUESS_TRIES = 3;
+
+function secretFor(id) {
+  const key = process.env.OXY_SESSION_SECRET || 'oxy-play-game';
+  const digest = crypto.createHmac('sha256', key).update(`guess:${id}`).digest();
+  return (digest[0] % GUESS_MAX) + 1;
+}
+
+function guessReceipt({ sessionId: id, round }) {
+  return { game: 'guess', operation: 'answer', session_id: id, round };
+}
+
+function startGuess({ sessionId: suppliedId } = {}) {
+  const id = sessionId(suppliedId);
+  return {
+    game: 'guess',
+    sessionId: id,
+    round: 1,
+    text: `I've picked a number from 1 to ${GUESS_MAX}. You have ${GUESS_TRIES} guesses. Guess 1 of ${GUESS_TRIES}?`,
+    receipt: guessReceipt({ sessionId: id, round: 1 })
+  };
+}
+
+function answerGuess({ sessionId: id, guess, round } = {}) {
+  const cleanSession = clean(id);
+  const currentRound = integer(round, -1, { min: 1, max: GUESS_TRIES });
+  const number = integer(Number(guess), -1, { min: 1, max: GUESS_MAX });
+  if (!cleanSession || currentRound < 1) {
+    return { success: false, error: 'That play session is no longer available.' };
+  }
+  if (number < 1) return { success: false, error: `A guess is a whole number from 1 to ${GUESS_MAX}.` };
+
+  const secret = secretFor(cleanSession);
+  if (number === secret) {
+    return {
+      success: true,
+      game: 'guess',
+      finished: true,
+      sessionId: cleanSession,
+      round: currentRound,
+      won: true,
+      text: `Yes, it was ${secret}. You got it in ${currentRound} ${currentRound === 1 ? 'guess' : 'guesses'}.`
+    };
+  }
+  if (currentRound >= GUESS_TRIES) {
+    return {
+      success: true,
+      game: 'guess',
+      finished: true,
+      sessionId: cleanSession,
+      round: currentRound,
+      won: false,
+      text: `Out of guesses. It was ${secret}.`
+    };
+  }
+  const nextRound = currentRound + 1;
+  return {
+    success: true,
+    game: 'guess',
+    finished: false,
+    sessionId: cleanSession,
+    round: nextRound,
+    text: `${number < secret ? 'Too low' : 'Too high'}. Guess ${nextRound} of ${GUESS_TRIES}?`,
+    receipt: guessReceipt({ sessionId: cleanSession, round: nextRound })
+  };
+}
+
 module.exports = {
   MAX_ROUNDS,
   QUESTIONS,
+  GUESS_MAX,
+  GUESS_TRIES,
   startTrivia,
-  answerTrivia
+  answerTrivia,
+  startGuess,
+  answerGuess
 };

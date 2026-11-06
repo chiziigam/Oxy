@@ -68,14 +68,15 @@ const ACTION_CONTRACTS = {
     adapter: { kind: 'inline' },
     risk: 'low',
     required: ['game'],
-    optional: ['operation', 'session_id', 'question_id', 'choice_id', 'round', 'score'],
+    optional: ['operation', 'session_id', 'question_id', 'choice_id', 'guess', 'round', 'score'],
     inputExample: { game: 'trivia' },
     paramHints: {
-      game: 'trivia',
+      game: 'trivia, or guess for a number guessing game',
       operation: 'start or answer',
-      choice_id: 'the exact choice id from the current question'
+      choice_id: 'the exact choice id from the current question',
+      guess: 'the number the user guessed, from the guessing game'
     },
-    guidance: 'Use when the user asks to play a game, quiz, trivia, or something fun together. Start with game "trivia" and let the user answer naturally or choose one of the presented options. Keep it light and short; do not turn this into a productivity task, invent current facts, or claim a physical game is running. A play session is conversation-first and can later be carried by a speaker or other device.',
+    guidance: 'Use when the user asks to PLAY a game, quiz, trivia, or something fun together right now: game "trivia" for questions, game "guess" for guessing a number. Let the user answer naturally or choose one of the presented options. Do not use it when the user asks for CODE for a game: write the code in a fenced code block and say plainly that this app cannot run it, then offer trivia or the guessing game here. Never say you have picked a secret number, word or card yourself; you cannot hold a hidden value in chat, so for any guessing game use game "guess", which keeps the number on the server. Keep it light and short; do not turn this into a productivity task, invent current facts, or claim a physical game is running. A play session is conversation-first and can later be carried by a speaker or other device.',
     successSummary: 'Game in progress',
     failureSummary: 'Game unavailable',
     confirmation: 'none',
