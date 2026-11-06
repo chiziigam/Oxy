@@ -399,6 +399,10 @@ const ACTION_WORDING = Object.freeze({
     progress: (i) => pick(detail(i.title) && `Drawing ${detail(i.title)}`, 'Drawing it out'),
     summary: () => ({ summary: 'Showed something on a display', kind: 'did' })
   },
+  make_game: {
+    progress: (i) => pick(detail(i.title) && `Building ${detail(i.title)}`, 'Building a game'),
+    summary: () => ({ summary: 'Made a game', kind: 'did' })
+  },
   get_display_scene: {
     progress: () => 'Checking the screen'
   },

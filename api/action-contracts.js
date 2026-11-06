@@ -76,7 +76,7 @@ const ACTION_CONTRACTS = {
       choice_id: 'the exact choice id from the current question',
       guess: 'the number the user guessed, from the guessing game'
     },
-    guidance: 'Use when the user asks to PLAY a game, quiz, trivia, or something fun together right now: game "trivia" for questions, game "guess" for guessing a number. Let the user answer naturally or choose one of the presented options. Do not use it when the user asks for CODE for a game: write the code in a fenced code block and say plainly that this app cannot run it, then offer trivia or the guessing game here. Never say you have picked a secret number, word or card yourself; you cannot hold a hidden value in chat, so for any guessing game use game "guess", which keeps the number on the server. Keep it light and short; do not turn this into a productivity task, invent current facts, or claim a physical game is running. A play session is conversation-first and can later be carried by a speaker or other device.',
+    guidance: 'Use when the user asks to PLAY a game, quiz, trivia, or something fun together right now: game "trivia" for questions, game "guess" for guessing a number. Let the user answer naturally or choose one of the presented options. Do not use it when the user asks for CODE for a game or a game of their own design: use make_game, which the phone runs. Never say you have picked a secret number, word or card yourself in chat; you cannot hold a hidden value there, so for a guessing game in chat use game "guess", which keeps the number on the server. Keep it light and short; do not turn this into a productivity task, invent current facts, or claim a physical game is running. A play session is conversation-first and can later be carried by a speaker or other device.',
     successSummary: 'Game in progress',
     failureSummary: 'Game unavailable',
     confirmation: 'none',
@@ -527,6 +527,21 @@ const ACTION_CONTRACTS = {
     guidance: 'Use when the user asks which nearby displays are paired or before sending content to a display. Only report displays the service returns. Never invent a screen, connection, or pairing.',
     successSummary: 'Displays checked',
     failureSummary: 'Could not check displays',
+    confirmation: 'none',
+    executionMode: 'direct'
+  },
+  make_game: {
+    adapter: { kind: 'inline' },
+    risk: 'low',
+    required: ['title', 'html'],
+    inputExample: { title: 'Number guess', html: '<div id="app"><p id="msg">Guess 1 to 10</p><button onclick="guess()">Guess</button></div><script>function guess(){}</script>' },
+    paramHints: {
+      title: 'a short name for the game',
+      html: 'the whole game as one string of page body markup: the elements, one <style> block and one <script> block. No <html>, <head> or <body> tags.'
+    },
+    guidance: 'Use when the user asks for a game, toy or small interactive thing to play or try in the app, including "write me code for a small game I can play here". The phone opens it full screen and runs it. It runs in a closed box: no internet, no saved data, no links out, no access to the user\'s account or the rest of the app. Write one self-contained page: markup, one <style> block and one <script> block, under about 40,000 characters. Do not use fetch, XMLHttpRequest, WebSocket, any web address, external scripts, fonts or images, localStorage, sessionStorage, indexedDB or cookies; draw with HTML, CSS, canvas or inline SVG, and keep all state in script variables. Design for a phone held upright: touch and tap controls, large buttons (at least 44 pixels), no keyboard or mouse needed, text that fits a 390 pixel wide screen without sideways scrolling. Include a way to restart. Make it complete and working on the first try, not a skeleton. A game that needs a hidden value (a secret number, a shuffled deck) can keep it in script variables because the page itself runs it. Say in one plain sentence what the game is and how to play. If the user wants the code itself to keep, show it in a fenced code block as well.',
+    successSummary: 'Made a game',
+    failureSummary: 'Could not make that game',
     confirmation: 'none',
     executionMode: 'direct'
   },

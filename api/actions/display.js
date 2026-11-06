@@ -70,6 +70,55 @@ async function showScene({ params }) {
   };
 }
 
+// A small game or toy the user plays inside the app. The model writes one self-contained page; the
+// phone runs it in a box with no network, no storage and no way back into the app (see
+// PlayableGameCard). This checks the page is usable and that it is not reaching for the internet,
+// so a page that could never work is sent back to be rewritten rather than shown broken.
+const MAX_GAME_HTML = 60000;
+const MIN_GAME_HTML = 40;
+
+function cleanGameHtml(value) {
+  return String(value)
+    .replace(/<!doctype[^>]*>/gi, '')
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, '')
+    .trim();
+}
+
+function reachesTheInternet(html) {
+  const withoutNamespaces = html.replace(/https?:\/\/www\.w3\.org\/[^\s"'<>)]*/gi, '');
+  return /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts)\b/.test(withoutNamespaces)
+    || /(?:https?:)?\/\/[a-z0-9-]+\.[a-z]{2,}/i.test(withoutNamespaces)
+    || /\b(?:localStorage|sessionStorage|indexedDB|document\.cookie)\b/.test(withoutNamespaces);
+}
+
+async function makeGame({ params } = {}) {
+  const title = String(params?.title || '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Game';
+  if (typeof params?.html !== 'string') {
+    return { success: false, outcome: 'failed', error: 'make_game needs html: the page body as one string.' };
+  }
+  const html = cleanGameHtml(params.html);
+  if (html.length < MIN_GAME_HTML) {
+    return { success: false, outcome: 'failed', error: 'That page is too short to be a game. Send the whole page.' };
+  }
+  if (html.length > MAX_GAME_HTML) {
+    return { success: false, outcome: 'failed', error: `That page is too long (${html.length} characters; the limit is ${MAX_GAME_HTML}). Make the game smaller.` };
+  }
+  if (reachesTheInternet(html)) {
+    return {
+      success: false,
+      outcome: 'failed',
+      error: 'A game runs with no internet and no saved data. Remove fetch, XMLHttpRequest, WebSocket, web addresses, localStorage, sessionStorage, indexedDB and cookies, and keep everything inside the page.'
+    };
+  }
+  return {
+    success: true,
+    outcome: 'completed',
+    text: `Made a game: ${title}. Tap Play to open it.`,
+    actionSummary: 'Made a game: ' + title,
+    playable: { title, html }
+  };
+}
+
 async function getDisplayScene({ userId, params, deps }) {
   const { supabase } = deps;
   const pairedDisplays = require('../services/paired-displays');
@@ -123,6 +172,7 @@ module.exports = {
     render_to_display: renderToDisplay,
     get_display_scene: getDisplayScene,
     show_scene: showScene,
-    generate_visual: generateVisual
+    generate_visual: generateVisual,
+    make_game: makeGame
   }
 };
